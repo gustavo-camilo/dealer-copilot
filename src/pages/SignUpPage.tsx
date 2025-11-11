@@ -94,58 +94,60 @@ export default function SignUpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col">
-      <div className="bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-slate-950 flex flex-col">
+      <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <Link to="/" className="flex items-center">
-              <Target className="h-8 w-8 text-blue-900" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+              <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-1.5 rounded-lg">
+                <Target className="h-6 w-6 text-white" />
+              </div>
+              <span className="ml-3 text-xl font-bold text-white">Dealer Co-Pilot</span>
             </Link>
-            <Link to="/" className="text-gray-600 hover:text-gray-900 flex items-center">
+            <Link to="/" className="text-slate-300 hover:text-white flex items-center transition">
               <ArrowLeft className="h-4 w-4 mr-1" />
               Back to Home
             </Link>
           </div>
         </div>
-      </div>
+      </nav>
 
       <div className="flex-1 flex items-center justify-center px-4 sm:px-6 lg:px-8 py-12">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
-            <h2 className="text-3xl font-bold text-gray-900">
+            <h2 className="text-4xl font-bold text-white mb-3">
               Create Your Account
             </h2>
-            <p className="mt-2 text-gray-600">
+            <p className="text-slate-400">
               Start your 14-day free trial. No credit card required.
             </p>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-8">
+          <div className="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-2xl p-8 shadow-2xl">
             <div className="mb-6">
               <div className="flex items-center">
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                  step >= 1 ? 'bg-blue-900 text-white' : 'bg-gray-200 text-gray-600'
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
+                  step >= 1 ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 text-slate-500'
                 }`}>
                   1
                 </div>
-                <div className={`flex-1 h-1 mx-2 ${
-                  step >= 2 ? 'bg-blue-900' : 'bg-gray-200'
+                <div className={`flex-1 h-1 mx-3 rounded-full transition-all ${
+                  step >= 2 ? 'bg-gradient-to-r from-orange-500 to-orange-600' : 'bg-slate-800'
                 }`} />
-                <div className={`flex items-center justify-center w-8 h-8 rounded-full ${
-                  step >= 2 ? 'bg-blue-900 text-white' : 'bg-gray-200 text-gray-600'
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
+                  step >= 2 ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 text-slate-500'
                 }`}>
                   2
                 </div>
               </div>
-              <div className="flex justify-between mt-2 text-xs text-gray-600">
+              <div className="flex justify-between mt-3 text-xs text-slate-400 font-medium">
                 <span>Dealership Info</span>
                 <span>Account Details</span>
               </div>
             </div>
 
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+              <div className="mb-4 p-4 bg-red-950/50 border border-red-800/50 rounded-xl text-red-300 text-sm">
                 {error}
               </div>
             )}
@@ -154,7 +156,7 @@ export default function SignUpPage() {
               {step === 1 && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Dealership Name *
                     </label>
                     <input
@@ -162,13 +164,13 @@ export default function SignUpPage() {
                       name="dealershipName"
                       value={formData.dealershipName}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Website URL
                     </label>
                     <input
@@ -177,15 +179,15 @@ export default function SignUpPage() {
                       value={formData.websiteUrl}
                       onChange={handleChange}
                       placeholder="https://www.yourdealership.com"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-2">
                       We'll automatically detect your location from your website
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Contact Phone
                     </label>
                     <input
@@ -195,12 +197,12 @@ export default function SignUpPage() {
                       onChange={handleChange}
                       placeholder="+1 (555) 123-4567"
                       maxLength={18}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Email Address *
                     </label>
                     <input
@@ -208,7 +210,7 @@ export default function SignUpPage() {
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                       required
                     />
                   </div>
@@ -216,7 +218,7 @@ export default function SignUpPage() {
                   <button
                     type="button"
                     onClick={handleNext}
-                    className="w-full bg-blue-900 text-white py-2 rounded-lg font-semibold hover:bg-blue-800 transition"
+                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 mt-6"
                   >
                     Continue
                   </button>
@@ -226,7 +228,7 @@ export default function SignUpPage() {
               {step === 2 && (
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Full Name *
                     </label>
                     <input
@@ -234,13 +236,13 @@ export default function SignUpPage() {
                       name="fullName"
                       value={formData.fullName}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                       required
                     />
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Password *
                     </label>
                     <input
@@ -248,16 +250,16 @@ export default function SignUpPage() {
                       name="password"
                       value={formData.password}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                       required
                     />
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-2">
                       Must be at least 6 characters
                     </p>
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Confirm Password *
                     </label>
                     <input
@@ -265,23 +267,23 @@ export default function SignUpPage() {
                       name="confirmPassword"
                       value={formData.confirmPassword}
                       onChange={handleChange}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                       required
                     />
                   </div>
 
-                  <div className="flex gap-3">
+                  <div className="flex gap-3 mt-6">
                     <button
                       type="button"
                       onClick={() => setStep(1)}
-                      className="flex-1 border border-gray-300 text-gray-700 py-2 rounded-lg font-semibold hover:bg-gray-50 transition"
+                      className="flex-1 border-2 border-slate-700 bg-slate-900/50 text-white py-3 rounded-xl font-bold hover:border-slate-600 hover:bg-slate-900 transition-all backdrop-blur"
                     >
                       Back
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="flex-1 bg-orange-600 text-white py-2 rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50"
+                      className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 disabled:opacity-50"
                     >
                       {loading ? 'Creating Account...' : 'Create Account'}
                     </button>
@@ -290,15 +292,15 @@ export default function SignUpPage() {
               )}
             </form>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
+            <div className="mt-6 text-center text-sm text-slate-400">
               Already have an account?{' '}
-              <Link to="/signin" className="text-blue-900 font-semibold hover:text-blue-800">
+              <Link to="/signin" className="text-orange-400 font-semibold hover:text-orange-300 transition">
                 Sign In
               </Link>
             </div>
           </div>
 
-          <p className="mt-6 text-center text-xs text-gray-500">
+          <p className="mt-6 text-center text-xs text-slate-500">
             By creating an account, you agree to our Terms of Service and Privacy Policy
           </p>
         </div>
