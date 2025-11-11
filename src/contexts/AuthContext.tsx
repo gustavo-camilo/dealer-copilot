@@ -27,9 +27,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from('users')
       .select('*')
       .eq('id', userId)
-      .single();
+      .maybeSingle();
 
-    if (userError) throw userError;
+    if (userError) {
+      console.error('Error fetching user profile:', userError);
+      throw userError;
+    }
+
+    if (!userData) {
+      console.error('User profile not found for userId:', userId);
+      throw new Error('User profile not found. Please complete signup.');
+    }
 
     setUser(userData);
 
@@ -38,16 +46,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .from('tenants')
         .select('*')
         .eq('id', userData.tenant_id)
-        .single();
+        .maybeSingle();
 
-      if (tenantError) throw tenantError;
-      setTenant(tenantData);
+      if (tenantError) {
+        console.error('Error fetching tenant:', tenantError);
+        throw tenantError;
+      }
+      if (tenantData) {
+        setTenant(tenantData);
+      }
     }
 
-    await supabase
+    supabase
       .from('users')
       .update({ last_login_at: new Date().toISOString() })
-      .eq('id', userId);
+      .eq('id', userId)
+      .then(({ error }) => {
+        if (error) console.warn('Failed to update last_login_at:', error);
+      });
   };
 
   const refreshUser = async () => {
@@ -124,7 +140,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (tenantError) {
       console.error('Tenant creation error:', tenantError);
-      throw tenantError;
+      throw new Error(`Failed to create tenant: ${tenantError.message}`);
     }
 
     const { error: userError } = await supabase.from('users').insert({
@@ -136,7 +152,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       is_active: true,
     });
 
-    if (userError) throw userError;
+    if (userError) {
+      console.error('User creation error:', userError);
+      throw new Error(`Failed to create user profile: ${userError.message}`);
+    }
 
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + 14);
