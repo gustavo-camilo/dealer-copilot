@@ -124,7 +124,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!authData.user) throw new Error('Failed to create user');
     if (!authData.session) throw new Error('Email confirmation is required. Please check your inbox and confirm your email before signing in.');
 
-    const { data: newTenant, error: tenantError } = await supabase
+    const supabaseWithSession = supabase;
+    await supabaseWithSession.auth.setSession({
+      access_token: authData.session.access_token,
+      refresh_token: authData.session.refresh_token,
+    });
+
+    const { data: newTenant, error: tenantError } = await supabaseWithSession
       .from('tenants')
       .insert({
         name: tenantData.name,
@@ -143,7 +149,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(`Failed to create tenant: ${tenantError.message}`);
     }
 
-    const { error: userError } = await supabase.from('users').insert({
+    const { error: userError } = await supabaseWithSession.from('users').insert({
       id: authData.user.id,
       tenant_id: newTenant.id,
       email,
@@ -160,7 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const trialEnd = new Date();
     trialEnd.setDate(trialEnd.getDate() + 14);
 
-    const { error: subError } = await supabase.from('subscriptions').insert({
+    const { error: subError } = await supabaseWithSession.from('subscriptions').insert({
       tenant_id: newTenant.id,
       plan_type: 'free',
       status: 'trialing',
