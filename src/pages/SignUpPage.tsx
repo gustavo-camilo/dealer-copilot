@@ -24,9 +24,9 @@ export default function SignUpPage() {
     const cleaned = value.replace(/\D/g, '');
 
     if (cleaned.length === 0) return '';
-    if (cleaned.length <= 3) return `+1 (${cleaned}`;
-    if (cleaned.length <= 6) return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
-    return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+    if (cleaned.length <= 3) return cleaned;
+    if (cleaned.length <= 6) return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    return `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -195,8 +195,8 @@ export default function SignUpPage() {
                       name="contactPhone"
                       value={formData.contactPhone}
                       onChange={handleChange}
-                      placeholder="+1 (555) 123-4567"
-                      maxLength={18}
+                      placeholder="(555) 123-4567"
+                      maxLength={14}
                       className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                     />
                   </div>
