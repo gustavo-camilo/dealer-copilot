@@ -99,9 +99,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     });
 
-    if (authError) throw authError;
+    if (authError) {
+      if (authError.message.includes('already registered')) {
+        throw new Error('This email is already registered. Please sign in instead.');
+      }
+      throw authError;
+    }
     if (!authData.user) throw new Error('Failed to create user');
-    if (!authData.session) throw new Error('No session created - email confirmation may be required');
+    if (!authData.session) throw new Error('Email confirmation is required. Please check your inbox and confirm your email before signing in.');
 
     const { data: newTenant, error: tenantError } = await supabase
       .from('tenants')
