@@ -13,7 +13,6 @@ export default function SignUpPage() {
   const [formData, setFormData] = useState({
     dealershipName: '',
     websiteUrl: '',
-    location: '',
     contactPhone: '',
     fullName: '',
     email: '',
@@ -21,11 +20,30 @@ export default function SignUpPage() {
     confirmPassword: '',
   });
 
+  const formatPhoneNumber = (value: string) => {
+    const cleaned = value.replace(/\D/g, '');
+
+    if (cleaned.length === 0) return '';
+    if (cleaned.length <= 3) return `+1 (${cleaned}`;
+    if (cleaned.length <= 6) return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+    return `+1 (${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value,
-    });
+    const { name, value } = e.target;
+
+    if (name === 'contactPhone') {
+      const formatted = formatPhoneNumber(value);
+      setFormData({
+        ...formData,
+        [name]: formatted,
+      });
+    } else {
+      setFormData({
+        ...formData,
+        [name]: value,
+      });
+    }
     setError('');
   };
 
@@ -63,7 +81,7 @@ export default function SignUpPage() {
         {
           name: formData.dealershipName,
           website_url: formData.websiteUrl || null,
-          location: formData.location || null,
+          location: null,
           contact_phone: formData.contactPhone || null,
         }
       );
@@ -161,20 +179,9 @@ export default function SignUpPage() {
                       placeholder="https://www.yourdealership.com"
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
                     />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Location
-                    </label>
-                    <input
-                      type="text"
-                      name="location"
-                      value={formData.location}
-                      onChange={handleChange}
-                      placeholder="City, State"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
-                    />
+                    <p className="text-xs text-gray-500 mt-1">
+                      We'll automatically detect your location from your website
+                    </p>
                   </div>
 
                   <div>
@@ -186,7 +193,8 @@ export default function SignUpPage() {
                       name="contactPhone"
                       value={formData.contactPhone}
                       onChange={handleChange}
-                      placeholder="(555) 123-4567"
+                      placeholder="+1 (555) 123-4567"
+                      maxLength={18}
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
                     />
                   </div>
