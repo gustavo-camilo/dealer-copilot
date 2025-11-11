@@ -94,10 +94,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email,
       password,
+      options: {
+        emailRedirectTo: undefined,
+      }
     });
 
     if (authError) throw authError;
     if (!authData.user) throw new Error('Failed to create user');
+    if (!authData.session) throw new Error('No session created - email confirmation may be required');
 
     const { data: newTenant, error: tenantError } = await supabase
       .from('tenants')
@@ -113,7 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .select()
       .single();
 
-    if (tenantError) throw tenantError;
+    if (tenantError) {
+      console.error('Tenant creation error:', tenantError);
+      throw tenantError;
+    }
 
     const { error: userError } = await supabase.from('users').insert({
       id: authData.user.id,
