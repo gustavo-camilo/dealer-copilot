@@ -8,6 +8,7 @@ import OnboardingPage from './pages/OnboardingPage';
 import VINScanPage from './pages/VINScanPage';
 import VINScansPage from './pages/VINScansPage';
 import ManageInventoryPage from './pages/ManageInventoryPage';
+import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage';
 import RecommendationsPage from './pages/RecommendationsPage';
 import AdminPage from './pages/AdminPage';
 
@@ -113,6 +114,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <ManageInventoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/competitors"
+            element={
+              <ProtectedRoute>
+                <CompetitorAnalysisPage />
               </ProtectedRoute>
             }
           />

@@ -6,7 +6,7 @@
 export interface ListingDateResult {
   date: Date;
   confidence: 'high' | 'medium' | 'low' | 'estimated';
-  source: 'json_ld' | 'meta_tag' | 'sitemap' | 'visible_text' | 'http_header' | 'first_scan';
+  source: 'image_filename' | 'json_ld' | 'meta_tag' | 'sitemap' | 'visible_text' | 'http_header' | 'first_scan';
 }
 
 export interface SitemapCache {
@@ -19,8 +19,18 @@ export interface SitemapCache {
 export async function getActualListingDate(
   html: string,
   vehicleUrl: string,
-  sitemapCache?: SitemapCache
+  sitemapCache?: SitemapCache,
+  imageDate?: Date
 ): Promise<ListingDateResult> {
+  // Priority 0: Date extracted from vehicle image filenames (very reliable for new listings)
+  if (imageDate) {
+    return {
+      date: imageDate,
+      confidence: 'high',
+      source: 'image_filename',
+    };
+  }
+
   // Priority 1: JSON-LD structured data (most reliable)
   const jsonLdDate = extractJsonLdDate(html);
   if (jsonLdDate) {

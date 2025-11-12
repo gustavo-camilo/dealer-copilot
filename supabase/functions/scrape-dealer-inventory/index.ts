@@ -42,15 +42,10 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
     const batch = vehicles.slice(i, Math.min(i + concurrencyLimit, vehicles.length));
 
     const batchPromises = batch.map(async (vehicle) => {
-      // If vehicle already has a VIN, just return it
-      if (vehicle.vin) {
-        return vehicle;
-      }
-
-      // If vehicle has a URL, try to fetch the detail page
+      // If vehicle has a URL, try to fetch the detail page for VIN/mileage
       if (vehicle.url) {
         try {
-          console.log(`Fetching details for vehicle at ${vehicle.url}`);
+          console.log(`Fetching details for ${vehicle.year} ${vehicle.make} ${vehicle.model || ''} at ${vehicle.url}`);
 
           const response = await fetch(vehicle.url, {
             headers: {
@@ -67,13 +62,38 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
             const detailVehicles = parseInventoryHTML(html, vehicle.url);
 
             if (detailVehicles.length > 0) {
-              // Merge the data - prefer detail page data over listing page data
               const detailVehicle = detailVehicles[0];
-              return {
-                ...vehicle, // Keep original data as fallback
-                ...detailVehicle, // Override with detail page data
-                url: vehicle.url, // Always keep the original URL
-              };
+
+              // CRITICAL: Validate that detail page matches the original vehicle
+              // to avoid mixing data from different vehicles
+              const yearMatches = !vehicle.year || !detailVehicle.year ||
+                                  vehicle.year === detailVehicle.year;
+              const makeMatches = !vehicle.make || !detailVehicle.make ||
+                                  vehicle.make.toLowerCase() === detailVehicle.make.toLowerCase();
+
+              if (yearMatches && makeMatches) {
+                // Safe to merge - vehicles match
+                return {
+                  ...vehicle, // Keep original data as base
+                  // Only override with detail data if it's not already set
+                  vin: detailVehicle.vin || vehicle.vin,
+                  stock_number: detailVehicle.stock_number || vehicle.stock_number,
+                  mileage: detailVehicle.mileage || vehicle.mileage,
+                  trim: detailVehicle.trim || vehicle.trim,
+                  color: detailVehicle.color || vehicle.color,
+                  // Prefer detail page model if listing page didn't have it
+                  model: vehicle.model || detailVehicle.model,
+                  // Use detail page images if they have more/better images
+                  images: (detailVehicle.images && detailVehicle.images.length > (vehicle.images || []).length)
+                          ? detailVehicle.images : vehicle.images,
+                  imageDate: detailVehicle.imageDate || vehicle.imageDate,
+                  url: vehicle.url, // Always keep the original URL
+                };
+              } else {
+                // Vehicles don't match - keep original data only
+                console.log(`⚠️ Vehicle mismatch: listing shows ${vehicle.year} ${vehicle.make}, detail page shows ${detailVehicle.year} ${detailVehicle.make}. Keeping listing data.`);
+                return vehicle;
+              }
             }
           }
         } catch (error) {
@@ -483,12 +503,12 @@ async function processVehicles(
       // New vehicle - Try to get actual listing date
       console.log(`New vehicle found: ${identifier}, extracting listing date...`);
 
-      // For now, we use the inventory page HTML we already fetched
-      // In a future optimization, we could fetch individual vehicle pages
+      // Extract listing date using all available strategies including image filenames
       const listingDate = await getActualListingDate(
         '', // We don't have individual vehicle page HTML yet
         vehicle.url || '',
-        sitemapCache
+        sitemapCache,
+        vehicle.imageDate // Pass the date extracted from vehicle images
       );
 
       console.log(`Listing date for ${identifier}: ${listingDate.date.toISOString()} (${listingDate.confidence}, ${listingDate.source})`);

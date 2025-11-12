@@ -33,6 +33,7 @@ interface Vehicle {
   mileage: number | null;
   exterior_color: string | null;
   listing_url: string | null;
+  image_urls: string[] | null;
   first_seen_at: string;
   last_seen_at: string;
   status: 'active' | 'sold' | 'price_changed';
@@ -469,7 +470,7 @@ export default function ManageInventoryPage() {
           Showing {filteredVehicles.length} of {vehicles.length} vehicles
         </div>
 
-        {/* Vehicles List */}
+        {/* Vehicles Grid */}
         {loading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -487,71 +488,105 @@ export default function ManageInventoryPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
-            {filteredVehicles.map((vehicle) => (
-              <div
-                key={vehicle.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow"
-              >
-                <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
-                  {/* Vehicle Info */}
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between mb-3">
-                      <div>
-                        <div className="flex items-center gap-3 mb-2">
-                          <h3 className="text-xl font-semibold text-gray-900">
-                            {vehicle.year} {vehicle.make} {vehicle.model}
-                            {vehicle.trim && (
-                              <span className="text-gray-600 font-normal"> {vehicle.trim}</span>
-                            )}
-                          </h3>
-                          {getStatusBadge(vehicle.status)}
-                        </div>
-                        <div className="space-y-1 text-sm text-gray-600">
-                          <p className="font-mono">VIN: {vehicle.vin}</p>
-                          {vehicle.stock_number && <p>Stock #: {vehicle.stock_number}</p>}
-                          {vehicle.mileage && (
-                            <p>{vehicle.mileage.toLocaleString()} miles</p>
-                          )}
-                          {vehicle.exterior_color && <p>Color: {vehicle.exterior_color}</p>}
-                        </div>
-                      </div>
-                    </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {filteredVehicles.map((vehicle) => {
+              const firstImage = vehicle.image_urls && vehicle.image_urls.length > 0 ? vehicle.image_urls[0] : null;
+              const daysInInventory = getDaysInInventory(vehicle.first_seen_at);
 
-                    <div className="flex items-center gap-6 text-sm text-gray-500">
-                      <div>
-                        <span className="font-medium">First seen:</span> {formatDate(vehicle.first_seen_at)}
+              return (
+                <div
+                  key={vehicle.id}
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+                >
+                  {/* Vehicle Image */}
+                  <div className="relative h-48 bg-gray-100">
+                    {firstImage ? (
+                      <img
+                        src={firstImage}
+                        alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          // Fallback to placeholder if image fails to load
+                          e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5"%3E%3C/path%3E%3C/svg%3E';
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <Car className="w-16 h-16 text-gray-300" />
                       </div>
-                      <div>
-                        <span className="font-medium">Last seen:</span> {formatDate(vehicle.last_seen_at)}
-                      </div>
-                      <div>
-                        <span className="font-medium">Days in inventory:</span>{' '}
-                        {getDaysInInventory(vehicle.first_seen_at)}
-                      </div>
+                    )}
+                    <div className="absolute top-2 right-2">
+                      {getStatusBadge(vehicle.status)}
                     </div>
                   </div>
 
-                  {/* Price Info */}
-                  <div className="lg:min-w-[200px] text-right">
-                    <div className="text-3xl font-bold text-gray-900 mb-2">
-                      {formatCurrency(vehicle.price)}
+                  {/* Vehicle Info */}
+                  <div className="p-4">
+                    {/* Title */}
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                      {vehicle.year} {vehicle.make} {vehicle.model}
+                    </h3>
+                    {vehicle.trim && (
+                      <p className="text-sm text-gray-600 mb-3">{vehicle.trim}</p>
+                    )}
+
+                    {/* Price and Mileage */}
+                    <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200">
+                      <div className="text-2xl font-bold text-gray-900">
+                        {formatCurrency(vehicle.price)}
+                      </div>
+                      {vehicle.mileage && (
+                        <div className="text-sm text-gray-600">
+                          {vehicle.mileage.toLocaleString()} mi
+                        </div>
+                      )}
                     </div>
-                    {getPriceChangeIndicator(vehicle.price_history)}
+
+                    {/* Price Change Indicator */}
+                    {getPriceChangeIndicator(vehicle.price_history) && (
+                      <div className="mb-3">
+                        {getPriceChangeIndicator(vehicle.price_history)}
+                      </div>
+                    )}
+
+                    {/* Listing Date and Days */}
+                    <div className="space-y-1 text-sm text-gray-600 mb-3">
+                      <div>
+                        <span className="font-medium">Listed:</span> {formatDate(vehicle.first_seen_at)}
+                      </div>
+                      <div>
+                        <span className="font-medium">Days:</span> {daysInInventory}
+                      </div>
+                    </div>
+
+                    {/* Additional Details (Collapsible) */}
+                    <div className="text-xs text-gray-500 space-y-1 mb-3">
+                      {vehicle.stock_number && (
+                        <div>Stock #: {vehicle.stock_number}</div>
+                      )}
+                      {vehicle.exterior_color && (
+                        <div>Color: {vehicle.exterior_color}</div>
+                      )}
+                      <div className="font-mono truncate" title={vehicle.vin}>
+                        VIN: {vehicle.vin}
+                      </div>
+                    </div>
+
+                    {/* View Listing Link */}
                     {vehicle.listing_url && (
                       <a
                         href={vehicle.listing_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-sm text-blue-600 hover:underline mt-2 inline-block"
+                        className="block w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
                       >
                         View Listing →
                       </a>
                     )}
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>

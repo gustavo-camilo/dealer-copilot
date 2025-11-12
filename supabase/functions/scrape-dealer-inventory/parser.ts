@@ -15,6 +15,7 @@ export interface ParsedVehicle {
   color?: string;
   url?: string;
   images?: string[];
+  imageDate?: Date; // Extracted from image filenames
 }
 
 /**
@@ -129,6 +130,7 @@ function parseWordPressInventory(html: string, baseUrl: string): ParsedVehicle[]
       const itemHtml = match[1];
 
       const make = extractAttribute(itemHtml, 'data-make') || extractMake(itemHtml);
+      const images = extractImages(itemHtml, baseUrl);
       const vehicle: ParsedVehicle = {
         vin: extractAttribute(itemHtml, 'data-vin') || extractVIN(itemHtml),
         stock_number: extractAttribute(itemHtml, 'data-stock'),
@@ -136,9 +138,10 @@ function parseWordPressInventory(html: string, baseUrl: string): ParsedVehicle[]
         make: make,
         model: extractAttribute(itemHtml, 'data-model') || extractModel(itemHtml, make),
         price: parsePrice(extractText(itemHtml, /\$?([\d,]+)/)?.[1]),
-        mileage: parseInt(extractText(itemHtml, /([\d,]+)\s*mi/i)?.[1]?.replace(/,/g, '') || '0'),
+        mileage: extractAttribute(itemHtml, 'data-mileage') ? parseInt(extractAttribute(itemHtml, 'data-mileage') || '0') : extractMileage(itemHtml),
         url: extractLink(itemHtml, baseUrl),
-        images: extractImages(itemHtml, baseUrl),
+        images: images,
+        imageDate: extractDateFromImages(images),
       };
 
       if (vehicle.vin || (vehicle.year && vehicle.make)) {
@@ -209,10 +212,7 @@ function parseGenericVehicleCards(html: string, baseUrl: string): ParsedVehicle[
         model: extractModel(combinedText, make),
         vin: extractVIN(linkInfo.context),
         price: parsePrice(extractText(linkInfo.context, /\$[\d,]+/)?.[0]),
-        mileage: parseInt(
-          extractText(linkInfo.context, /([\d,]+)\s*(?:mi|miles|km)/i)?.[1]?.replace(/,/g, '') ||
-            '0'
-        ),
+        mileage: extractMileage(linkInfo.context),
       };
 
       if (vehicle.year && vehicle.make) {
@@ -241,6 +241,7 @@ function parseGenericVehicleCards(html: string, baseUrl: string): ParsedVehicle[
       for (const match of matches) {
         const cardHtml = match[0];
         const make = extractMake(cardHtml);
+        const images = extractImages(cardHtml, baseUrl);
 
         const vehicle: ParsedVehicle = {
           vin: extractVIN(cardHtml),
@@ -248,11 +249,10 @@ function parseGenericVehicleCards(html: string, baseUrl: string): ParsedVehicle[
           make: make,
           model: extractModel(cardHtml, make),
           price: parsePrice(extractText(cardHtml, /\$[\d,]+/)?.[0]),
-          mileage: parseInt(
-            extractText(cardHtml, /([\d,]+)\s*(?:mi|miles|km)/i)?.[1]?.replace(/,/g, '') || '0'
-          ),
+          mileage: extractMileage(cardHtml),
           url: extractLink(cardHtml, baseUrl),
-          images: extractImages(cardHtml, baseUrl),
+          images: images,
+          imageDate: extractDateFromImages(images),
         };
 
         if (vehicle.year && vehicle.make) {
@@ -344,7 +344,35 @@ function extractText(html: string, regex: RegExp): RegExpMatchArray | null {
 }
 
 function extractVIN(html: string): string | undefined {
-  // VIN is 17 alphanumeric characters (no I, O, Q)
+  // Strategy 1: Look for labeled VIN fields
+  const vinLabelPatterns = [
+    /VIN[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+    /Vehicle\s+Identification\s+Number[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+    /Stock\s*#[:\s]*([A-HJ-NPR-Z0-9]{17})/i,
+  ];
+
+  for (const pattern of vinLabelPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  // Strategy 2: Look for VIN in common HTML patterns
+  const htmlPatterns = [
+    /<[^>]*vin[^>]*>[\s]*([A-HJ-NPR-Z0-9]{17})/i,
+    /<[^>]*data-vin["']=["']([A-HJ-NPR-Z0-9]{17})["']/i,
+    /"vin"[\s]*:[\s]*"([A-HJ-NPR-Z0-9]{17})"/i,
+  ];
+
+  for (const pattern of htmlPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      return match[1];
+    }
+  }
+
+  // Strategy 3: Find any 17-character VIN (no I, O, Q)
   const vinRegex = /\b[A-HJ-NPR-Z0-9]{17}\b/;
   const match = html.match(vinRegex);
   return match?.[0];
@@ -413,6 +441,46 @@ function extractMake(html: string): string | undefined {
   return undefined;
 }
 
+function extractMileage(html: string): number | undefined {
+  // Strategy 1: Look for labeled mileage fields
+  const mileageLabelPatterns = [
+    /Mileage[:\s]*([\d,]+)\s*(?:mi|miles|km)?/i,
+    /Odometer[:\s]*([\d,]+)\s*(?:mi|miles|km)?/i,
+    /Miles[:\s]*([\d,]+)/i,
+  ];
+
+  for (const pattern of mileageLabelPatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const cleaned = match[1].replace(/,/g, '');
+      const num = parseInt(cleaned);
+      if (!isNaN(num) && num > 0 && num < 999999) { // Sanity check
+        return num;
+      }
+    }
+  }
+
+  // Strategy 2: Look for mileage in common formats
+  const mileagePatterns = [
+    /([\d,]+)\s*(?:mi|miles)\b/i,
+    /([\d,]+)\s*(?:km|kilometers)\b/i,
+    /<[^>]*mileage[^>]*>[\s]*([\d,]+)/i,
+  ];
+
+  for (const pattern of mileagePatterns) {
+    const match = html.match(pattern);
+    if (match && match[1]) {
+      const cleaned = match[1].replace(/,/g, '');
+      const num = parseInt(cleaned);
+      if (!isNaN(num) && num > 0 && num < 999999) {
+        return num;
+      }
+    }
+  }
+
+  return undefined;
+}
+
 function extractModel(html: string, make?: string): string | undefined {
   // After finding the make, try to extract the model
   if (!make) return undefined;
@@ -451,12 +519,70 @@ function parsePrice(priceStr?: string): number | undefined {
 }
 
 function extractLink(html: string, baseUrl: string): string | undefined {
-  const regex = /<a[^>]*href="([^"]+)"/i;
-  const match = html.match(regex);
-  if (match) {
-    return new URL(match[1], baseUrl).href;
+  // Find ALL links in the HTML chunk
+  const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>/gi;
+  const matches = [...html.matchAll(linkRegex)];
+
+  if (matches.length === 0) return undefined;
+
+  // Strategy 1: Prefer links that look like vehicle detail pages
+  for (const match of matches) {
+    const href = match[1];
+    const lowerHref = href.toLowerCase();
+
+    // Check if URL looks like a vehicle detail page
+    if (
+      lowerHref.includes('/vehicle') ||
+      lowerHref.includes('/inventory/') ||
+      lowerHref.includes('/cars/') ||
+      lowerHref.includes('/used-') ||
+      lowerHref.includes('-for-sale') ||
+      lowerHref.includes('/detail') ||
+      /\/\d+/.test(href) // Contains a number (likely stock# or ID)
+    ) {
+      // Avoid navigation/category links
+      if (
+        !lowerHref.includes('/search') &&
+        !lowerHref.includes('/category') &&
+        !lowerHref.includes('#') &&
+        lowerHref !== '/' &&
+        !lowerHref.endsWith('/inventory')
+      ) {
+        try {
+          return new URL(href, baseUrl).href;
+        } catch {
+          continue;
+        }
+      }
+    }
   }
-  return undefined;
+
+  // Strategy 2: If no obvious vehicle link, take the first link that's not obviously navigation
+  for (const match of matches) {
+    const href = match[1];
+    const lowerHref = href.toLowerCase();
+
+    if (
+      !lowerHref.includes('#') &&
+      !lowerHref.includes('javascript:') &&
+      lowerHref !== '/' &&
+      !lowerHref.includes('/search') &&
+      !lowerHref.includes('/category')
+    ) {
+      try {
+        return new URL(href, baseUrl).href;
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  // Strategy 3: Last resort - return first valid URL
+  try {
+    return new URL(matches[0][1], baseUrl).href;
+  } catch {
+    return undefined;
+  }
 }
 
 function extractImages(html: string, baseUrl: string): string[] {
@@ -474,4 +600,86 @@ function extractImages(html: string, baseUrl: string): string[] {
   }
 
   return images;
+}
+
+/**
+ * Extract listing date from vehicle image filenames
+ * Example: IMG-20250724-WA0033.jpg -> 2025-07-24
+ * Only extracts from multiple sequential images to ensure they're vehicle photos
+ */
+function extractDateFromImages(images: string[]): Date | undefined {
+  if (!images || images.length < 2) {
+    return undefined; // Need at least 2 images to be confident they're vehicle photos
+  }
+
+  const dates: Date[] = [];
+
+  for (const imageUrl of images) {
+    // Pattern 1: IMG-YYYYMMDD or IMG_YYYYMMDD format
+    const pattern1 = /IMG[-_](\d{4})(\d{2})(\d{2})/i;
+    const match1 = imageUrl.match(pattern1);
+
+    if (match1) {
+      const year = parseInt(match1[1]);
+      const month = parseInt(match1[2]);
+      const day = parseInt(match1[3]);
+
+      // Validate date components
+      if (year >= 2020 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        dates.push(new Date(year, month - 1, day));
+      }
+    }
+
+    // Pattern 2: photo-YYYYMMDD or photo_YYYYMMDD format
+    const pattern2 = /photo[-_](\d{4})(\d{2})(\d{2})/i;
+    const match2 = imageUrl.match(pattern2);
+
+    if (match2) {
+      const year = parseInt(match2[1]);
+      const month = parseInt(match2[2]);
+      const day = parseInt(match2[3]);
+
+      if (year >= 2020 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        dates.push(new Date(year, month - 1, day));
+      }
+    }
+
+    // Pattern 3: YYYYMMDD anywhere in filename
+    const pattern3 = /(\d{4})(\d{2})(\d{2})/;
+    const match3 = imageUrl.match(pattern3);
+
+    if (match3 && !match1 && !match2) { // Only use if not already matched
+      const year = parseInt(match3[1]);
+      const month = parseInt(match3[2]);
+      const day = parseInt(match3[3]);
+
+      if (year >= 2020 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        // Additional check: make sure it's in a typical vehicle image filename
+        const filename = imageUrl.toLowerCase();
+        if (filename.includes('vehicle') || filename.includes('car') ||
+            filename.includes('img') || filename.includes('photo') ||
+            filename.includes('dsc') || filename.includes('pic')) {
+          dates.push(new Date(year, month - 1, day));
+        }
+      }
+    }
+  }
+
+  // If we found multiple dates and they're close together (within 7 days),
+  // use the earliest one as the listing date
+  if (dates.length >= 2) {
+    dates.sort((a, b) => a.getTime() - b.getTime());
+
+    const earliest = dates[0];
+    const latest = dates[dates.length - 1];
+    const daysDiff = (latest.getTime() - earliest.getTime()) / (1000 * 60 * 60 * 24);
+
+    // If dates are within a week, likely all from same vehicle photoshoot
+    if (daysDiff <= 7) {
+      console.log(`Extracted listing date from ${dates.length} vehicle images: ${earliest.toISOString()}`);
+      return earliest;
+    }
+  }
+
+  return undefined;
 }

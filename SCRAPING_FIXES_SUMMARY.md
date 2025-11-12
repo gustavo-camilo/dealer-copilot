@@ -82,6 +82,77 @@ This ensures vehicles are tracked even without VINs, which is common on many dea
 
 ---
 
+---
+
+### 5. ✅ VIN and Mileage Extraction Fixed
+**Problem:** VINs and mileage were present on detail pages but weren't being extracted.
+
+**Root Cause:** The extraction patterns were too simplistic and didn't match real-world HTML structures.
+
+**Solution:** Implemented multi-strategy extraction:
+
+**VIN Extraction ([parser.ts:346-379](supabase/functions/scrape-dealer-inventory/parser.ts#L346-L379)):**
+1. Look for labeled VIN fields (`VIN: ...`)
+2. Check HTML attributes (`data-vin="..."`)
+3. Search for 17-character VINs anywhere in content
+
+**Mileage Extraction ([parser.ts:444-482](supabase/functions/scrape-dealer-inventory/parser.ts#L444-L482)):**
+1. Look for labeled fields (`Mileage: 45,000 mi`)
+2. Check HTML attributes (`data-mileage="45000"`)
+3. Extract from various formats (mi, miles, km)
+4. Validate ranges (0-999,999) to avoid false positives
+
+---
+
+### 6. ✅ Listing Date Extraction from Images
+**Problem:** Listing dates weren't being captured accurately, but were available in image filenames.
+
+**Example:** `IMG-20250724-WA0033.jpg` contains date `2025-07-24`
+
+**Solution:** Implemented intelligent image date extraction ([parser.ts:547-622](supabase/functions/scrape-dealer-inventory/parser.ts#L547-L622)):
+
+**Safety Measures:**
+- Requires **at least 2 images** with dates to ensure they're vehicle photos (not logos/headers)
+- Validates date ranges (2020-2030)
+- Checks dates are within 7 days of each other (same photoshoot)
+- Only extracts from vehicle-related filenames
+
+**Patterns Detected:**
+- `IMG-YYYYMMDD-*` format
+- `photo-YYYYMMDD-*` format
+- Generic `YYYYMMDD` in vehicle image filenames
+
+**Priority:** Image dates now have **highest priority** in date extraction ([dateExtractor.ts:25-32](supabase/functions/scrape-dealer-inventory/dateExtractor.ts#L25-L32))
+
+---
+
+### 7. ✅ Fixed Wrong Vehicle Data Matching
+**Problem:** Ford Explorer showing Kia Forte data - parser was mixing data from different vehicles.
+
+**Root Cause:** The data enhancement was blindly overwriting listing page data with detail page data without validation.
+
+**Solution:** Added vehicle matching validation ([index.ts:67-96](supabase/functions/scrape-dealer-inventory/index.ts#L67-L96)):
+
+**Validation Logic:**
+1. Compare year between listing and detail page
+2. Compare make between listing and detail page
+3. Only merge if both match
+4. If mismatch detected, keep original listing data
+5. Log warnings when mismatches occur
+
+**Merge Strategy:**
+- Keep listing data as base
+- Only add detail data if not already present
+- Never override with conflicting data
+- Always preserve the original URL
+
+**Example Log:**
+```
+⚠️ Vehicle mismatch: listing shows 2024 Ford, detail page shows 2024 Kia. Keeping listing data.
+```
+
+---
+
 ## Files Modified
 
 ### New Migration
@@ -91,19 +162,29 @@ This ensures vehicles are tracked even without VINs, which is common on many dea
 
 ### Enhanced Parser
 - **[supabase/functions/scrape-dealer-inventory/parser.ts](supabase/functions/scrape-dealer-inventory/parser.ts)**
-  - Added `extractModel()` function (lines 410-438)
-  - Updated WordPress parser to extract models (line 131-137)
-  - Updated generic vehicle links parser (lines 202-209)
-  - Updated generic card parser (lines 242-249)
+  - Added `extractModel()` function (lines 484-521) - intelligent model extraction
+  - Added `extractVIN()` multi-strategy function (lines 346-379) - finds VINs in various formats
+  - Added `extractMileage()` function (lines 444-482) - extracts mileage with validation
+  - Added `extractDateFromImages()` function (lines 547-622) - extracts dates from vehicle photos
+  - Updated all parsers to use new extraction functions
+  - Added `imageDate` field to `ParsedVehicle` interface
 
 ### Enhanced Scraper
 - **[supabase/functions/scrape-dealer-inventory/index.ts](supabase/functions/scrape-dealer-inventory/index.ts)**
-  - Added `enhanceVehicleData()` function (lines 31-93)
-  - Integrated enhancement step into scraping flow (lines 237-240)
-  - Implemented intelligent identifier generation (lines 431-447)
-  - Updated vehicle lookup to use identifiers (lines 449-456)
-  - Updated vehicle insert to use identifiers (lines 473-492)
-  - Updated sold vehicle tracking to handle identifiers (lines 542-554)
+  - Rewrote `enhanceVehicleData()` function (lines 35-113) with vehicle matching validation
+  - Added year/make validation before merging data
+  - Improved merge strategy to preserve listing data
+  - Added mismatch warning logs
+  - Integrated image date extraction into listing date flow (line 511)
+  - Implemented intelligent identifier generation (lines 431-466)
+  - Updated vehicle lookup to use identifiers
+  - Updated sold vehicle tracking to handle identifiers
+
+### Enhanced Date Extractor
+- **[supabase/functions/scrape-dealer-inventory/dateExtractor.ts](supabase/functions/scrape-dealer-inventory/dateExtractor.ts)**
+  - Added `imageDate` parameter to `getActualListingDate()` (line 23)
+  - Image dates now have **highest priority** (lines 25-32)
+  - New source type: `'image_filename'` with `'high'` confidence
 
 ---
 
@@ -118,25 +199,33 @@ This ensures vehicles are tracked even without VINs, which is common on many dea
    ↓
 3. Fetches listing page HTML
    ↓
-4. Parses listing page for basic vehicle info (year, make, price, URLs)
+4. Parses listing page for basic vehicle info (year, make, price, URLs, images)
    ↓
-5. **NEW:** Fetches each individual vehicle detail page
+5. **NEW:** Extracts dates from vehicle image filenames (IMG-20250724-*.jpg)
    ↓
-6. **NEW:** Extracts complete details (VIN, model, stock number, specs)
+6. **NEW:** Fetches each individual vehicle detail page (5 at a time)
    ↓
-7. **NEW:** Generates identifier if VIN is missing
+7. **NEW:** Validates year/make match before merging data
    ↓
-8. Extracts accurate listing dates from sitemap/metadata
+8. **NEW:** Extracts VIN using multi-strategy patterns
    ↓
-9. Saves to vehicle_history table
+9. **NEW:** Extracts mileage with validation
    ↓
-10. Creates inventory snapshot with stats
+10. **NEW:** Extracts complete details (model, trim, color, stock number)
    ↓
-11. Tracks price changes and sold vehicles
+11. **NEW:** Generates unique identifier if VIN is missing (includes mileage, trim, color)
    ↓
-12. Auto-creates sales records for sold vehicles
+12. Extracts accurate listing dates (prioritizes image dates)
    ↓
-13. Data available for AI analysis and recommendations
+13. Saves to vehicle_history table with all details
+   ↓
+14. Creates inventory snapshot with stats
+   ↓
+15. Tracks price changes and sold vehicles
+   ↓
+16. Auto-creates sales records for sold vehicles
+   ↓
+17. Data available for AI analysis and recommendations
 ```
 
 ### Database Tables Populated
@@ -175,10 +264,14 @@ This ensures vehicles are tracked even without VINs, which is common on many dea
 
 ### Expected Results:
 - ✅ Multiple scrapes per day work without errors
-- ✅ All 91 vehicles (or whatever count) appear in Manage Inventory
-- ✅ Each vehicle has year, make, model, price
-- ✅ VIN shown if available, otherwise generated identifier
+- ✅ All vehicles appear in Manage Inventory with complete data
+- ✅ Each vehicle has year, make, model, price, mileage
+- ✅ **VINs extracted from detail pages** when available
+- ✅ **Mileage accurately extracted** from various formats
+- ✅ **Listing dates from image filenames** (high accuracy for new listings)
+- ✅ **No more wrong vehicle matches** (Ford showing as Kia, etc.)
 - ✅ Images and listing URLs preserved
+- ✅ Unique identifiers for vehicles without VINs (includes all distinguishing features)
 - ✅ Analysis data available for AI recommendations
 
 ---

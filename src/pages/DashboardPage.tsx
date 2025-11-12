@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Vehicle, SalesRecord, VINScan } from '../types/database';
-import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Menu, X, LogOut, Settings, Globe, ChevronRight, Package } from 'lucide-react';
+import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Menu, X, LogOut, Settings, Globe, ChevronRight, Package, Eye } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, tenant, signOut } = useAuth();
@@ -249,7 +249,7 @@ export default function DashboardPage() {
         {/* Quick Actions - Button Cards */}
         <div className="mb-8">
           <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Link
               to="/scan"
               className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-orange-600 hover:shadow-md transition text-center"
@@ -264,6 +264,14 @@ export default function DashboardPage() {
             >
               <Car className="h-8 w-8 text-blue-900 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 text-sm">Inventory</h3>
+            </Link>
+
+            <Link
+              to="/competitors"
+              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-purple-600 hover:shadow-md transition text-center"
+            >
+              <Eye className="h-8 w-8 text-purple-600 mx-auto mb-2" />
+              <h3 className="font-semibold text-gray-900 text-sm">Competitor Intel</h3>
             </Link>
 
             <Link
