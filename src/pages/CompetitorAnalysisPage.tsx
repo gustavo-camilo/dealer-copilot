@@ -15,6 +15,7 @@ import {
   BarChart3,
   AlertCircle,
   Loader2,
+  Car,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 
@@ -82,12 +83,21 @@ export default function CompetitorAnalysisPage() {
       setScanning(true);
       setError(null);
 
+      // Get the session token for authorization
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        throw new Error('Not authenticated');
+      }
+
+      console.log('Scraping response:', { url: competitorUrl, name: competitorName });
+
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-competitor`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             url: competitorUrl,

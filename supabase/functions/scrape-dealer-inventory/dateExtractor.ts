@@ -24,11 +24,14 @@ export async function getActualListingDate(
 ): Promise<ListingDateResult> {
   // Priority 0: Date extracted from vehicle image filenames (very reliable for new listings)
   if (imageDate) {
+    console.log(`✅ Using image filename date: ${imageDate.toISOString()}`);
     return {
       date: imageDate,
       confidence: 'high',
       source: 'image_filename',
     };
+  } else {
+    console.log(`❌ No image date found`);
   }
 
   // Priority 1: JSON-LD structured data (most reliable)
@@ -58,6 +61,7 @@ export async function getActualListingDate(
   }
 
   // Fall back to NOW (mark as estimated)
+  console.log(`⚠️ No listing date found, defaulting to current date (days_in_inventory will be 0)`);
   return {
     date: new Date(),
     confidence: 'estimated',

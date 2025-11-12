@@ -181,35 +181,128 @@ async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicl
   return detailed;
 }
 
-// Helper: Simplified inventory parser
+// Helper: Simplified inventory parser with improved detection
 function parseInventoryHTML(html: string, baseUrl: string): ParsedVehicle[] {
   const vehicles: ParsedVehicle[] = [];
 
-  // Strategy 1: Look for common vehicle card patterns
-  const cardPatterns = [
-    /<div[^>]*class="[^"]*(?:vehicle|inventory|car|listing)[^"]*"[^>]*>([\s\S]*?)<\/div>/gi,
-    /<article[^>]*>([\s\S]*?)<\/article>/gi,
-    /<li[^>]*class="[^"]*(?:vehicle|inventory|car)[^"]*"[^>]*>([\s\S]*?)<\/li>/gi,
-  ];
+  console.log('Starting HTML parsing...');
 
-  for (const pattern of cardPatterns) {
-    const matches = html.matchAll(pattern);
-    for (const match of matches) {
-      const cardHtml = match[0];
-      const vehicle = parseVehicleCard(cardHtml, baseUrl);
-      if (vehicle.year || vehicle.make || vehicle.price) {
-        vehicles.push(vehicle);
-      }
-    }
-    if (vehicles.length > 0) break; // Use first successful strategy
+  // Strategy 1: Look for JSON-LD structured data (most reliable)
+  const jsonLdVehicles = parseJSONLD(html, baseUrl);
+  if (jsonLdVehicles.length > 0) {
+    console.log(`Found ${jsonLdVehicles.length} vehicles via JSON-LD`);
+    return jsonLdVehicles;
   }
 
-  // If no cards found, try to parse entire page as single vehicle (detail page)
+  // Strategy 2: Look for vehicle card patterns with improved regex
+  // Use non-greedy matching and limit depth
+  const cardPatterns = [
+    // Look for divs with vehicle-related classes, limit nesting
+    /<div[^>]*class="[^"]*(?:vehicle|inventory|car|listing|item)[^"]*"[^>]*>(?:[^<]|<(?!\/div))*?<\/div>/gi,
+    // Articles (common in modern sites)
+    /<article[^>]*class="[^"]*(?:vehicle|car|listing|item)[^"]*"[^>]*>(?:[^<]|<(?!\/article))*?<\/article>/gi,
+    // List items
+    /<li[^>]*class="[^"]*(?:vehicle|inventory|car|item)[^"]*"[^>]*>(?:[^<]|<(?!\/li))*?<\/li>/gi,
+  ];
+
+  // Try to find repeating patterns (indicates vehicle cards)
+  for (const pattern of cardPatterns) {
+    const matches = [...html.matchAll(pattern)];
+    console.log(`Pattern found ${matches.length} potential matches`);
+
+    // Need at least 2 matches to be confident it's a listing page
+    if (matches.length >= 2) {
+      for (const match of matches) {
+        const cardHtml = match[0];
+        const vehicle = parseVehicleCard(cardHtml, baseUrl);
+
+        // Only include if we found substantial info
+        if ((vehicle.year && vehicle.make) || vehicle.price) {
+          vehicles.push(vehicle);
+        }
+      }
+
+      if (vehicles.length > 0) {
+        console.log(`Successfully parsed ${vehicles.length} vehicles from cards`);
+        break; // Use first successful strategy
+      }
+    }
+  }
+
+  // Strategy 3: If no cards found, look for year+make patterns (simple counting)
   if (vehicles.length === 0) {
+    console.log('No cards found, trying text-based vehicle detection...');
+    const yearMakePattern = /\b(20\d{2}|19\d{2})\s+(Ford|Chevrolet|Chevy|Toyota|Honda|Nissan|Jeep|RAM|Dodge|GMC|Mazda|Subaru|Kia|Hyundai|BMW|Mercedes|Audi|Lexus|Volkswagen|VW)\s+(\w+)/gi;
+    const textMatches = [...html.matchAll(yearMakePattern)];
+
+    console.log(`Found ${textMatches.length} year+make patterns in text`);
+
+    // Group by unique combinations to avoid duplicates
+    const uniqueVehicles = new Set<string>();
+    for (const match of textMatches) {
+      const key = `${match[1]}-${match[2]}-${match[3]}`.toLowerCase();
+      if (!uniqueVehicles.has(key)) {
+        uniqueVehicles.add(key);
+        vehicles.push({
+          year: parseInt(match[1]),
+          make: match[2],
+          model: match[3],
+        });
+      }
+    }
+
+    console.log(`Extracted ${vehicles.length} unique vehicles from text patterns`);
+  }
+
+  // Strategy 4: Last resort - parse entire page as single vehicle (detail page)
+  if (vehicles.length === 0) {
+    console.log('Trying to parse as single vehicle detail page...');
     const vehicle = parseVehicleCard(html, baseUrl);
     if (vehicle.year || vehicle.make || vehicle.price) {
       vehicles.push(vehicle);
+      console.log('Parsed as single vehicle detail page');
     }
+  }
+
+  console.log(`Total vehicles parsed: ${vehicles.length}`);
+  return vehicles;
+}
+
+// Helper: Parse JSON-LD structured data
+function parseJSONLD(html: string, baseUrl: string): ParsedVehicle[] {
+  const vehicles: ParsedVehicle[] = [];
+
+  try {
+    const jsonLdPattern = /<script[^>]*type="application\/ld\+json"[^>]*>(.*?)<\/script>/gis;
+    const matches = [...html.matchAll(jsonLdPattern)];
+
+    for (const match of matches) {
+      try {
+        const data = JSON.parse(match[1]);
+        const items = Array.isArray(data) ? data : [data];
+
+        for (const item of items) {
+          if (item['@type'] === 'Car' || item['@type'] === 'Vehicle') {
+            const vehicle: ParsedVehicle = {
+              year: item.modelDate ? parseInt(item.modelDate) : item.vehicleModelDate ? parseInt(item.vehicleModelDate) : undefined,
+              make: item.brand?.name || item.manufacturer?.name,
+              model: item.model?.name || item.model,
+              price: item.offers?.price ? parseFloat(item.offers.price) : undefined,
+              mileage: item.mileageFromOdometer?.value ? parseInt(item.mileageFromOdometer.value) : undefined,
+              url: item.url ? new URL(item.url, baseUrl).href : undefined,
+            };
+
+            if (vehicle.year || vehicle.make) {
+              vehicles.push(vehicle);
+            }
+          }
+        }
+      } catch (e) {
+        // Invalid JSON, continue
+      }
+    }
+  } catch (e) {
+    // Parsing error, return empty
   }
 
   return vehicles;
