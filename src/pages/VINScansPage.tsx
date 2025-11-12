@@ -6,16 +6,17 @@ import { Search, TrendingUp, TrendingDown, Minus, AlertCircle } from 'lucide-rea
 interface VINScan {
   id: string;
   vin: string;
-  vehicle_year: number;
-  vehicle_make: string;
-  vehicle_model: string;
-  vehicle_trim: string | null;
-  scanned_at: string;
+  decoded_data: {
+    year: number;
+    make: string;
+    model: string;
+    trim?: string;
+  };
   recommendation: 'buy' | 'caution' | 'pass';
   confidence_score: number;
-  estimated_market_value: number;
-  max_bid: number;
-  estimated_profit: number;
+  estimated_profit: number | null;
+  max_bid_suggestion: number | null;
+  created_at: string;
 }
 
 const PAGE_SIZE = 25;
@@ -43,7 +44,7 @@ export default function VINScansPage() {
           .from('vin_scans')
           .select('*')
           .eq('tenant_id', user.tenant_id)
-          .order('scanned_at', { ascending: false })
+          .order('created_at', { ascending: false })
           .range(from, to);
 
         if (error) throw error;
@@ -81,10 +82,10 @@ export default function VINScansPage() {
     const filtered = scans.filter(
       (scan) =>
         scan.vin.toLowerCase().includes(query) ||
-        scan.vehicle_make.toLowerCase().includes(query) ||
-        scan.vehicle_model.toLowerCase().includes(query) ||
-        `${scan.vehicle_year}`.includes(query) ||
-        (scan.vehicle_trim && scan.vehicle_trim.toLowerCase().includes(query))
+        scan.decoded_data.make.toLowerCase().includes(query) ||
+        scan.decoded_data.model.toLowerCase().includes(query) ||
+        `${scan.decoded_data.year}`.includes(query) ||
+        (scan.decoded_data.trim && scan.decoded_data.trim.toLowerCase().includes(query))
     );
     setFilteredScans(filtered);
   }, [searchQuery, scans]);
@@ -223,16 +224,16 @@ export default function VINScansPage() {
                     <div className="flex items-start justify-between mb-2">
                       <div>
                         <h3 className="text-xl font-semibold text-gray-900 mb-1">
-                          {scan.vehicle_year} {scan.vehicle_make} {scan.vehicle_model}
-                          {scan.vehicle_trim && (
-                            <span className="text-gray-600 font-normal"> {scan.vehicle_trim}</span>
+                          {scan.decoded_data.year} {scan.decoded_data.make} {scan.decoded_data.model}
+                          {scan.decoded_data.trim && (
+                            <span className="text-gray-600 font-normal"> {scan.decoded_data.trim}</span>
                           )}
                         </h3>
                         <p className="text-sm text-gray-600 font-mono">{scan.vin}</p>
                       </div>
                     </div>
                     <div className="text-sm text-gray-500">
-                      Scanned {formatDate(scan.scanned_at)}
+                      Scanned {formatDate(scan.created_at)}
                     </div>
                   </div>
 
@@ -242,27 +243,21 @@ export default function VINScansPage() {
                   </div>
 
                   {/* Financial Info */}
-                  <div className="grid grid-cols-3 gap-4 lg:min-w-[400px]">
-                    <div>
-                      <div className="text-xs text-gray-500 mb-1">Market Value</div>
-                      <div className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(scan.estimated_market_value)}
-                      </div>
-                    </div>
+                  <div className="grid grid-cols-2 gap-4 lg:min-w-[300px]">
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Max Bid</div>
                       <div className="text-lg font-semibold text-blue-600">
-                        {formatCurrency(scan.max_bid)}
+                        {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}
                       </div>
                     </div>
                     <div>
                       <div className="text-xs text-gray-500 mb-1">Est. Profit</div>
                       <div
                         className={`text-lg font-semibold ${
-                          scan.estimated_profit > 0 ? 'text-green-600' : 'text-red-600'
+                          scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600' : 'text-red-600'
                         }`}
                       >
-                        {formatCurrency(scan.estimated_profit)}
+                        {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
                       </div>
                     </div>
                   </div>
