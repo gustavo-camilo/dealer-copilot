@@ -321,10 +321,22 @@ serve(async (req) => {
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
+        // Log sample of what we found
+        if (vehicles.length > 0) {
+          const sample = vehicles[0];
+          console.log(`Sample vehicle: ${sample.year} ${sample.make} ${sample.model} - $${sample.price} - ${sample.mileage}mi - ${sample.url} - ${sample.images?.length || 0} images`);
+        }
+
         // Enhance vehicle data by fetching individual vehicle pages
         console.log('Fetching individual vehicle pages for complete data...');
         const enhancedVehicles = await enhanceVehicleData(vehicles);
         console.log(`Enhanced ${enhancedVehicles.length} vehicles with detailed information`);
+
+        // Log enhanced sample
+        if (enhancedVehicles.length > 0) {
+          const sample = enhancedVehicles[0];
+          console.log(`Enhanced sample: ${sample.year} ${sample.make} ${sample.model} - $${sample.price} - ${sample.mileage}mi - ${sample.url} - ${sample.images?.length || 0} images`);
+        }
 
         // Get sitemap cache for accurate date extraction
         const sitemapCache = await getSitemapCache(supabase, tenant.id, tenant.website_url);
