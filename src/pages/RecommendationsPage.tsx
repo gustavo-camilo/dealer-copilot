@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -15,14 +15,9 @@ import {
   Clock,
   Menu,
   X,
-  Car,
-  LogOut,
-  Settings,
-  Scan,
-  Globe,
-  Package,
   ChevronRight,
 } from 'lucide-react';
+import NavigationMenu from '../components/NavigationMenu';
 
 interface Recommendation {
   id: string;
@@ -50,6 +45,7 @@ type ConfidenceFilter = 'all' | 'high' | 'medium' | 'low';
 export default function RecommendationsPage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [filteredRecommendations, setFilteredRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,102 +245,15 @@ export default function RecommendationsPage() {
                   {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </button>
 
-                {/* Full-Page Mobile Menu / Dropdown for Desktop */}
+                {/* Navigation Menu */}
                 {menuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 md:hidden"
-                      onClick={() => setMenuOpen(false)}
-                    />
-                    <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200">
-                      <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
-                        <div className="flex items-center">
-                          <Target className="h-6 w-6 text-blue-900" />
-                          <span className="ml-2 text-lg font-bold text-gray-900">Menu</span>
-                        </div>
-                        <button
-                          onClick={() => setMenuOpen(false)}
-                          className="p-2 rounded-lg hover:bg-gray-100"
-                        >
-                          <X className="h-6 w-6" />
-                        </button>
-                      </div>
-                      <div className="p-6 md:p-4 border-b border-gray-200">
-                        <p className="text-base md:text-sm font-semibold text-gray-900">{user?.full_name}</p>
-                        <p className="text-sm md:text-xs text-gray-500">{user?.email}</p>
-                        <p className="text-sm md:text-xs text-gray-500 mt-1">{tenant?.name}</p>
-                      </div>
-                      <div className="py-4 md:py-2">
-                        <Link
-                          to="/dashboard"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Dashboard
-                        </Link>
-                        <Link
-                          to="/scan"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 md:hidden"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Scan className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3 text-orange-600" />
-                          Scan VIN
-                        </Link>
-                        <Link
-                          to="/inventory"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Car className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Manage Inventory
-                        </Link>
-                        <Link
-                          to="/recommendations"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          View Recommendations
-                        </Link>
-                        <Link
-                          to="/vin-scans"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Package className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          VIN Scan History
-                        </Link>
-                        <Link
-                          to="/onboarding"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Globe className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Scan Website
-                        </Link>
-                        {user?.role === 'super_admin' && (
-                          <Link
-                            to="/admin"
-                            className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                            onClick={() => setMenuOpen(false)}
-                          >
-                            <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                            Admin Panel
-                          </Link>
-                        )}
-                      </div>
-                      <div className="border-t border-gray-200 py-4 md:py-2 mt-auto">
-                        <button
-                          onClick={handleSignOut}
-                          className="flex items-center w-full px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-red-600 hover:bg-red-50"
-                        >
-                          <LogOut className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Sign Out
-                        </button>
-                      </div>
-                    </div>
-                  </>
+                  <NavigationMenu
+                    currentPath={location.pathname}
+                    onClose={() => setMenuOpen(false)}
+                    onSignOut={handleSignOut}
+                    user={user}
+                    tenantName={tenant?.name}
+                  />
                 )}
               </div>
             </div>

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -10,18 +10,13 @@ import {
   Target,
   Menu,
   X,
-  Car,
-  LogOut,
-  Settings,
-  Scan,
-  Globe,
-  Package,
   DollarSign,
   Gauge,
   BarChart3,
   AlertCircle,
   Loader2,
 } from 'lucide-react';
+import NavigationMenu from '../components/NavigationMenu';
 
 interface CompetitorSnapshot {
   id: string;
@@ -45,6 +40,7 @@ interface CompetitorSnapshot {
 export default function CompetitorAnalysisPage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [competitors, setCompetitors] = useState<CompetitorSnapshot[]>([]);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
@@ -55,21 +51,16 @@ export default function CompetitorAnalysisPage() {
 
   useEffect(() => {
     loadCompetitors();
-  }, [user?.tenant_id]);
+  }, []);
 
-  const loadCompetitors = async () => {
-    if (!user?.tenant_id) return;
-
+  const loadCompetitors = () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('competitor_snapshots')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .order('scanned_at', { ascending: false });
-
-      if (error) throw error;
-      setCompetitors(data || []);
+      // Load from localStorage
+      const stored = localStorage.getItem('competitor_snapshots');
+      if (stored) {
+        setCompetitors(JSON.parse(stored));
+      }
     } catch (error) {
       console.error('Error loading competitors:', error);
       setError('Failed to load competitors');
@@ -91,18 +82,12 @@ export default function CompetitorAnalysisPage() {
       setScanning(true);
       setError(null);
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('No active session');
-      }
-
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-competitor`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({
             url: competitorUrl,
@@ -117,12 +102,45 @@ export default function CompetitorAnalysisPage() {
         throw new Error(result.error || 'Failed to scan competitor');
       }
 
+      // Add to local storage
+      const newSnapshot: CompetitorSnapshot = {
+        id: crypto.randomUUID(),
+        competitor_url: result.data.competitor_url,
+        competitor_name: result.data.competitor_name,
+        scanned_at: result.data.scanned_at,
+        vehicle_count: result.data.vehicle_count,
+        avg_price: result.data.avg_price,
+        min_price: result.data.min_price,
+        max_price: result.data.max_price,
+        avg_mileage: result.data.avg_mileage,
+        min_mileage: result.data.min_mileage,
+        max_mileage: result.data.max_mileage,
+        total_inventory_value: result.data.total_inventory_value,
+        top_makes: result.data.top_makes,
+        scraping_duration_ms: result.data.scraping_duration_ms,
+        status: 'success',
+        error_message: null,
+      };
+
+      const stored = localStorage.getItem('competitor_snapshots');
+      const existing = stored ? JSON.parse(stored) : [];
+
+      // Replace if same URL exists, otherwise add
+      const index = existing.findIndex((c: CompetitorSnapshot) => c.competitor_url === newSnapshot.competitor_url);
+      if (index >= 0) {
+        existing[index] = newSnapshot;
+      } else {
+        existing.unshift(newSnapshot);
+      }
+
+      localStorage.setItem('competitor_snapshots', JSON.stringify(existing));
+
       // Clear form
       setNewCompetitorUrl('');
       setNewCompetitorName('');
 
       // Reload competitors list
-      await loadCompetitors();
+      loadCompetitors();
     } catch (error) {
       console.error('Error scanning competitor:', error);
       setError(error instanceof Error ? error.message : 'Failed to scan competitor');
@@ -131,19 +149,19 @@ export default function CompetitorAnalysisPage() {
     }
   };
 
-  const handleDeleteCompetitor = async (id: string) => {
+  const handleDeleteCompetitor = (id: string) => {
     if (!confirm('Are you sure you want to delete this competitor snapshot?')) {
       return;
     }
 
     try {
-      const { error } = await supabase
-        .from('competitor_snapshots')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      await loadCompetitors();
+      const stored = localStorage.getItem('competitor_snapshots');
+      if (stored) {
+        const existing = JSON.parse(stored);
+        const filtered = existing.filter((c: CompetitorSnapshot) => c.id !== id);
+        localStorage.setItem('competitor_snapshots', JSON.stringify(filtered));
+        loadCompetitors();
+      }
     } catch (error) {
       console.error('Error deleting competitor:', error);
       setError('Failed to delete competitor');
@@ -225,112 +243,13 @@ export default function CompetitorAnalysisPage() {
                 </button>
 
                 {menuOpen && (
-                  <>
-                    <div
-                      className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 md:hidden"
-                      onClick={() => setMenuOpen(false)}
-                    />
-
-                    <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200">
-                      <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
-                        <div className="flex items-center">
-                          <Target className="h-6 w-6 text-blue-900" />
-                          <span className="ml-2 text-lg font-bold text-gray-900">Menu</span>
-                        </div>
-                        <button
-                          onClick={() => setMenuOpen(false)}
-                          className="p-2 rounded-lg hover:bg-gray-100"
-                        >
-                          <X className="h-6 w-6" />
-                        </button>
-                      </div>
-
-                      <div className="p-6 md:p-4 border-b border-gray-200">
-                        <p className="text-base md:text-sm font-semibold text-gray-900">{user?.full_name}</p>
-                        <p className="text-sm md:text-xs text-gray-500">{user?.email}</p>
-                        <p className="text-sm md:text-xs text-gray-500 mt-1">{tenant?.name}</p>
-                      </div>
-
-                      <div className="py-4 md:py-2">
-                        <Link
-                          to="/dashboard"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Dashboard
-                        </Link>
-                        <Link
-                          to="/scan"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 md:hidden"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Scan className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3 text-orange-600" />
-                          Scan VIN
-                        </Link>
-                        <Link
-                          to="/inventory"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Car className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Manage Inventory
-                        </Link>
-                        <Link
-                          to="/competitors"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <TrendingUp className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Competitor Intel
-                        </Link>
-                        <Link
-                          to="/recommendations"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          View Recommendations
-                        </Link>
-                        <Link
-                          to="/vin-scans"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Package className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          VIN Scan History
-                        </Link>
-                        <Link
-                          to="/onboarding"
-                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                          onClick={() => setMenuOpen(false)}
-                        >
-                          <Globe className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Scan Website
-                        </Link>
-                        {user?.role === 'super_admin' && (
-                          <Link
-                            to="/admin"
-                            className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
-                            onClick={() => setMenuOpen(false)}
-                          >
-                            <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                            Admin Panel
-                          </Link>
-                        )}
-                      </div>
-
-                      <div className="border-t border-gray-200 py-4 md:py-2 mt-auto">
-                        <button
-                          onClick={handleSignOut}
-                          className="flex items-center w-full px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-red-600 hover:bg-red-50"
-                        >
-                          <LogOut className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-                          Sign Out
-                        </button>
-                      </div>
-                    </div>
-                  </>
+                  <NavigationMenu
+                    currentPath={location.pathname}
+                    onClose={() => setMenuOpen(false)}
+                    onSignOut={handleSignOut}
+                    user={user}
+                    tenantName={tenant?.name}
+                  />
                 )}
               </div>
             </div>

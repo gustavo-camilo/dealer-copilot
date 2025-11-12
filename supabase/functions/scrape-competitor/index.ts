@@ -1,5 +1,4 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // CORS headers
 const corsHeaders = {
@@ -45,47 +44,6 @@ serve(async (req) => {
       );
     }
 
-    // Get user and tenant from auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      return new Response(
-        JSON.stringify({ error: 'Missing authorization header' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      {
-        global: {
-          headers: { Authorization: authHeader },
-        },
-      }
-    );
-
-    const { data: { user } } = await supabaseClient.auth.getUser();
-    if (!user) {
-      return new Response(
-        JSON.stringify({ error: 'Invalid user' }),
-        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
-    // Get tenant_id
-    const { data: profile } = await supabaseClient
-      .from('profiles')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single();
-
-    if (!profile?.tenant_id) {
-      return new Response(
-        JSON.stringify({ error: 'Tenant not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
     const startTime = Date.now();
     console.log(`🔍 Scanning competitor: ${url}`);
 
@@ -113,45 +71,27 @@ serve(async (req) => {
 
     const duration = Date.now() - startTime;
 
-    // Step 6: Upsert to database
-    const { data, error } = await supabaseClient
-      .from('competitor_snapshots')
-      .upsert({
-        tenant_id: profile.tenant_id,
-        competitor_url: url,
-        competitor_name: name || new URL(url).hostname,
-        scanned_at: new Date().toISOString(),
-        vehicle_count: stats.vehicle_count,
-        avg_price: stats.avg_price,
-        min_price: stats.min_price,
-        max_price: stats.max_price,
-        avg_mileage: stats.avg_mileage,
-        min_mileage: stats.min_mileage,
-        max_mileage: stats.max_mileage,
-        total_inventory_value: stats.total_inventory_value,
-        top_makes: stats.top_makes,
-        scraping_duration_ms: duration,
-        status: 'success',
-      }, {
-        onConflict: 'tenant_id,competitor_url',
-      })
-      .select()
-      .single();
-
-    if (error) {
-      console.error('Database error:', error);
-      return new Response(
-        JSON.stringify({ error: 'Failed to save competitor snapshot', details: error.message }),
-        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-
+    // Return results directly (no database storage for public competitor research)
     console.log(`✅ Competitor scan complete in ${duration}ms`);
 
     return new Response(
       JSON.stringify({
         success: true,
-        data,
+        data: {
+          competitor_url: url,
+          competitor_name: name || new URL(url).hostname,
+          scanned_at: new Date().toISOString(),
+          vehicle_count: stats.vehicle_count,
+          avg_price: stats.avg_price,
+          min_price: stats.min_price,
+          max_price: stats.max_price,
+          avg_mileage: stats.avg_mileage,
+          min_mileage: stats.min_mileage,
+          max_mileage: stats.max_mileage,
+          total_inventory_value: stats.total_inventory_value,
+          top_makes: stats.top_makes,
+          scraping_duration_ms: duration,
+        },
         message: `Scanned ${stats.vehicle_count} vehicles in ${(duration / 1000).toFixed(1)}s`,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
