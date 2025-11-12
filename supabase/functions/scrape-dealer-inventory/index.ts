@@ -29,6 +29,70 @@ interface ScrapingResult {
 }
 
 /**
+ * Enhance vehicle data by fetching individual vehicle pages
+ * This extracts complete details including VINs, stock numbers, and additional specs
+ */
+async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
+  const enhancedVehicles: any[] = [];
+
+  // Process vehicles in parallel with a concurrency limit
+  const concurrencyLimit = 5; // Fetch 5 pages at a time to be respectful
+
+  for (let i = 0; i < vehicles.length; i += concurrencyLimit) {
+    const batch = vehicles.slice(i, Math.min(i + concurrencyLimit, vehicles.length));
+
+    const batchPromises = batch.map(async (vehicle) => {
+      // If vehicle already has a VIN, just return it
+      if (vehicle.vin) {
+        return vehicle;
+      }
+
+      // If vehicle has a URL, try to fetch the detail page
+      if (vehicle.url) {
+        try {
+          console.log(`Fetching details for vehicle at ${vehicle.url}`);
+
+          const response = await fetch(vehicle.url, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+            },
+            signal: AbortSignal.timeout(15000), // 15 second timeout
+          });
+
+          if (response.ok) {
+            const html = await response.text();
+
+            // Parse the detail page for additional data
+            const detailVehicles = parseInventoryHTML(html, vehicle.url);
+
+            if (detailVehicles.length > 0) {
+              // Merge the data - prefer detail page data over listing page data
+              const detailVehicle = detailVehicles[0];
+              return {
+                ...vehicle, // Keep original data as fallback
+                ...detailVehicle, // Override with detail page data
+                url: vehicle.url, // Always keep the original URL
+              };
+            }
+          }
+        } catch (error) {
+          console.log(`Failed to fetch details for ${vehicle.url}: ${error.message}`);
+        }
+      }
+
+      // Return vehicle as-is if we couldn't enhance it
+      return vehicle;
+    });
+
+    const batchResults = await Promise.all(batchPromises);
+    enhancedVehicles.push(...batchResults);
+  }
+
+  return enhancedVehicles;
+}
+
+/**
  * Find potential inventory pages on a dealer website
  */
 async function findInventoryPages(baseUrl: string): Promise<string[]> {
@@ -234,6 +298,11 @@ serve(async (req) => {
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
+        // Enhance vehicle data by fetching individual vehicle pages
+        console.log('Fetching individual vehicle pages for complete data...');
+        const enhancedVehicles = await enhanceVehicleData(vehicles);
+        console.log(`Enhanced ${enhancedVehicles.length} vehicles with detailed information`);
+
         // Get sitemap cache for accurate date extraction
         const sitemapCache = await getSitemapCache(supabase, tenant.id, tenant.website_url);
         console.log(`Loaded sitemap cache with ${Object.keys(sitemapCache).length} URLs`);
@@ -242,7 +311,7 @@ serve(async (req) => {
         const { newVehicles, updatedVehicles, soldVehicles } = await processVehicles(
           supabase,
           tenant.id,
-          vehicles,
+          enhancedVehicles,
           sitemapCache
         );
 
@@ -250,10 +319,10 @@ serve(async (req) => {
         await supabase
           .from('inventory_snapshots')
           .update({
-            vehicles_found: vehicles.length,
+            vehicles_found: enhancedVehicles.length,
             status: 'success',
             scraping_duration_ms: Date.now() - tenantStartTime,
-            raw_data: vehicles,
+            raw_data: enhancedVehicles,
           })
           .eq('id', snapshot.id);
 
@@ -262,7 +331,7 @@ serve(async (req) => {
           tenant_id: tenant.id,
           snapshot_id: snapshot.id,
           log_level: 'info',
-          message: `Successfully scraped ${vehicles.length} vehicles`,
+          message: `Successfully scraped ${enhancedVehicles.length} vehicles`,
           details: {
             new: newVehicles,
             updated: updatedVehicles,
@@ -274,7 +343,7 @@ serve(async (req) => {
           tenant_id: tenant.id,
           tenant_name: tenant.name,
           website_url: tenant.website_url,
-          vehicles_found: vehicles.length,
+          vehicles_found: enhancedVehicles.length,
           new_vehicles: newVehicles,
           updated_vehicles: updatedVehicles,
           sold_vehicles: soldVehicles,
@@ -359,20 +428,60 @@ async function processVehicles(
 
   // Process each vehicle
   for (const vehicle of vehicles) {
-    if (!vehicle.vin) continue; // Skip vehicles without VIN
+    // Generate a unique identifier for vehicles without VIN
+    // Use stock_number if available, otherwise generate from year/make/model/mileage/color
+    let identifier = vehicle.vin;
+    if (!identifier) {
+      if (vehicle.stock_number) {
+        identifier = `STOCK_${vehicle.stock_number}`;
+      } else if (vehicle.year && vehicle.make && vehicle.model) {
+        // Create a pseudo-VIN from available data
+        // Include mileage and color to differentiate similar vehicles
+        const uniqueParts = [
+          vehicle.year,
+          vehicle.make,
+          vehicle.model,
+          vehicle.trim || '',
+          vehicle.mileage || 0,
+          vehicle.color || '',
+          vehicle.price || 0,
+        ].filter(Boolean); // Remove empty values
 
-    // Check if vehicle exists in history
+        identifier = uniqueParts.join('_').replace(/\s+/g, '_').toUpperCase();
+
+        // If this identifier already exists in current batch, make it more unique with URL hash
+        const existingInBatch = vehicles.slice(0, vehicles.indexOf(vehicle)).find(v => {
+          const testId = v.vin || (v.year && v.make && v.model ?
+            [v.year, v.make, v.model, v.trim || '', v.mileage || 0, v.color || '', v.price || 0]
+              .filter(Boolean).join('_').replace(/\s+/g, '_').toUpperCase() : null);
+          return testId === identifier;
+        });
+
+        if (existingInBatch || !identifier) {
+          // Add URL hash as last resort for uniqueness
+          const urlHash = vehicle.url ?
+            vehicle.url.split('/').pop()?.replace(/[^a-zA-Z0-9]/g, '') :
+            Math.random().toString(36).substring(2, 10).toUpperCase();
+          identifier = `${identifier}_${urlHash}`;
+        }
+      } else {
+        console.log(`Skipping vehicle without enough identifying information:`, vehicle);
+        continue; // Skip vehicles we can't identify
+      }
+    }
+
+    // Check if vehicle exists in history (by VIN or generated identifier)
     const { data: existing } = await supabase
       .from('vehicle_history')
       .select('*')
       .eq('tenant_id', tenant_id)
-      .eq('vin', vehicle.vin)
+      .eq('vin', identifier)
       .eq('status', 'active')
       .single();
 
     if (!existing) {
       // New vehicle - Try to get actual listing date
-      console.log(`New vehicle found: ${vehicle.vin}, extracting listing date...`);
+      console.log(`New vehicle found: ${identifier}, extracting listing date...`);
 
       // For now, we use the inventory page HTML we already fetched
       // In a future optimization, we could fetch individual vehicle pages
@@ -382,12 +491,12 @@ async function processVehicles(
         sitemapCache
       );
 
-      console.log(`Listing date for ${vehicle.vin}: ${listingDate.date.toISOString()} (${listingDate.confidence}, ${listingDate.source})`);
+      console.log(`Listing date for ${identifier}: ${listingDate.date.toISOString()} (${listingDate.confidence}, ${listingDate.source})`);
 
       // Insert new vehicle with extracted listing date
       await supabase.from('vehicle_history').insert({
         tenant_id,
-        vin: vehicle.vin,
+        vin: identifier, // Use identifier (real VIN or generated)
         stock_number: vehicle.stock_number,
         year: vehicle.year,
         make: vehicle.make,
@@ -454,9 +563,29 @@ async function processVehicles(
 
   if (potentiallySold && potentiallySold.length > 0) {
     for (const vehicle of potentiallySold) {
-      // Double check it's not in current scrape
-      if (!currentVINs.includes(vehicle.vin)) {
-        console.log(`Vehicle ${vehicle.vin} marked as sold, creating sales record...`);
+      // Double check it's not in current scrape (check both real VINs and identifiers)
+      const vehicleIdentifier = vehicle.vin;
+      if (!currentVINs.includes(vehicleIdentifier) && !vehicles.some(v => {
+        // Check if any current vehicle would generate the same identifier
+        let currentId = v.vin;
+        if (!currentId && v.stock_number) {
+          currentId = `STOCK_${v.stock_number}`;
+        } else if (!currentId && v.year && v.make && v.model) {
+          // Use same logic as identifier generation
+          const uniqueParts = [
+            v.year,
+            v.make,
+            v.model,
+            v.trim || '',
+            v.mileage || 0,
+            v.color || '',
+            v.price || 0,
+          ].filter(Boolean);
+          currentId = uniqueParts.join('_').replace(/\s+/g, '_').toUpperCase();
+        }
+        return currentId === vehicleIdentifier || vehicleIdentifier.startsWith(currentId + '_');
+      })) {
+        console.log(`Vehicle ${vehicleIdentifier} marked as sold, creating sales record...`);
 
         // Calculate days to sale
         const firstSeen = new Date(vehicle.first_seen_at);
@@ -485,7 +614,7 @@ async function processVehicles(
           sale_date: now.toISOString().split('T')[0], // Format as YYYY-MM-DD
         });
 
-        console.log(`Sales record created for ${vehicle.vin}: $${vehicle.price}, ${daysListed} days`);
+        console.log(`Sales record created for ${vehicleIdentifier}: $${vehicle.price}, ${daysListed} days`);
         soldVehicles++;
       }
     }

@@ -128,12 +128,13 @@ function parseWordPressInventory(html: string, baseUrl: string): ParsedVehicle[]
     for (const match of matches) {
       const itemHtml = match[1];
 
+      const make = extractAttribute(itemHtml, 'data-make') || extractMake(itemHtml);
       const vehicle: ParsedVehicle = {
         vin: extractAttribute(itemHtml, 'data-vin') || extractVIN(itemHtml),
         stock_number: extractAttribute(itemHtml, 'data-stock'),
         year: extractYearFromText(itemHtml),
-        make: extractAttribute(itemHtml, 'data-make') || extractMake(itemHtml),
-        model: extractAttribute(itemHtml, 'data-model'),
+        make: make,
+        model: extractAttribute(itemHtml, 'data-model') || extractModel(itemHtml, make),
         price: parsePrice(extractText(itemHtml, /\$?([\d,]+)/)?.[1]),
         mileage: parseInt(extractText(itemHtml, /([\d,]+)\s*mi/i)?.[1]?.replace(/,/g, '') || '0'),
         url: extractLink(itemHtml, baseUrl),
@@ -199,10 +200,13 @@ function parseGenericVehicleCards(html: string, baseUrl: string): ParsedVehicle[
 
     // For each link, try to extract info from the link text and nearby content
     for (const linkInfo of vehicleLinks) {
+      const combinedText = linkInfo.text + ' ' + linkInfo.context;
+      const make = extractMake(combinedText);
       const vehicle: ParsedVehicle = {
         url: linkInfo.url,
         year: extractYearFromText(linkInfo.text),
-        make: extractMake(linkInfo.text + ' ' + linkInfo.context),
+        make: make,
+        model: extractModel(combinedText, make),
         vin: extractVIN(linkInfo.context),
         price: parsePrice(extractText(linkInfo.context, /\$[\d,]+/)?.[0]),
         mileage: parseInt(
@@ -236,11 +240,13 @@ function parseGenericVehicleCards(html: string, baseUrl: string): ParsedVehicle[
       // Likely found vehicle cards
       for (const match of matches) {
         const cardHtml = match[0];
+        const make = extractMake(cardHtml);
 
         const vehicle: ParsedVehicle = {
           vin: extractVIN(cardHtml),
           year: extractYearFromText(cardHtml),
-          make: extractMake(cardHtml),
+          make: make,
+          model: extractModel(cardHtml, make),
           price: parsePrice(extractText(cardHtml, /\$[\d,]+/)?.[0]),
           mileage: parseInt(
             extractText(cardHtml, /([\d,]+)\s*(?:mi|miles|km)/i)?.[1]?.replace(/,/g, '') || '0'
@@ -401,6 +407,36 @@ function extractMake(html: string): string | undefined {
     const regex = new RegExp(`\\b${make}\\b`, 'i');
     if (regex.test(html)) {
       return make;
+    }
+  }
+
+  return undefined;
+}
+
+function extractModel(html: string, make?: string): string | undefined {
+  // After finding the make, try to extract the model
+  if (!make) return undefined;
+
+  // Look for text pattern: Year Make Model
+  // Example: "2020 Toyota Camry" -> extract "Camry"
+  const yearMakeModelRegex = new RegExp(
+    `\\b(19|20)\\d{2}\\s+${make}\\s+([A-Za-z0-9\\-]+(?:\\s+[A-Za-z0-9\\-]+)?)\\b`,
+    'i'
+  );
+  const match = html.match(yearMakeModelRegex);
+  if (match && match[2]) {
+    return match[2].trim();
+  }
+
+  // Alternative: Look for Make Model pattern without year
+  const makeModelRegex = new RegExp(`\\b${make}\\s+([A-Za-z0-9\\-]+(?:\\s+[A-Za-z0-9\\-]+)?)\\b`, 'i');
+  const makeModelMatch = html.match(makeModelRegex);
+  if (makeModelMatch && makeModelMatch[1]) {
+    // Filter out common non-model words
+    const excludeWords = ['for', 'sale', 'certified', 'pre', 'owned', 'used', 'new', 'the', 'in'];
+    const modelCandidate = makeModelMatch[1].trim();
+    if (!excludeWords.includes(modelCandidate.toLowerCase())) {
+      return modelCandidate;
     }
   }
 
