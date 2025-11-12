@@ -1,12 +1,13 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Target, ArrowLeft, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { Target, ArrowLeft, CheckCircle, AlertCircle, Loader2, Menu, X } from 'lucide-react';
 import { decodeVIN, enrichDecodedData } from '../services/vinDecoder';
 import { getMarketPricing, calculateMaxBid } from '../services/marketPricing';
 import { generateRecommendation } from '../services/recommendationEngine';
 import ProfitCalculator from '../components/ProfitCalculator';
+import NavigationMenu from '../components/NavigationMenu';
 import { DecodedVehicleData, SalesRecord, TenantCostSettings } from '../types/database';
 
 // Default cost settings if tenant hasn't configured them
@@ -21,14 +22,25 @@ const DEFAULT_COST_SETTINGS: TenantCostSettings = {
 
 export default function VINScanPage() {
   const navigate = useNavigate();
-  const { user, tenant } = useAuth();
+  const location = useLocation();
+  const { user, tenant, signOut } = useAuth();
   const [vin, setVin] = useState('');
   const [mileage, setMileage] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const costSettings = tenant?.cost_settings || DEFAULT_COST_SETTINGS;
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const handleScan = async () => {
     if (!vin || !user?.tenant_id) return;
@@ -132,16 +144,42 @@ export default function VINScanPage() {
   if (result) {
     return (
       <div className="min-h-screen bg-gray-50">
+        {/* Header */}
         <div className="bg-white border-b border-gray-200">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
-              <Link to="/dashboard" className="flex items-center text-gray-600 hover:text-gray-900">
-                <ArrowLeft className="h-5 w-5 mr-1" />
-                Back to Dashboard
-              </Link>
               <div className="flex items-center">
-                <Target className="h-6 w-6 text-blue-900" />
-                <span className="ml-2 font-bold text-gray-900">{tenant?.name}</span>
+                <Target className="h-8 w-8 text-blue-900" />
+                <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+              </div>
+              <div className="flex items-center space-x-4 relative">
+                <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+                <Link
+                  to="/scan"
+                  className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
+                >
+                  Scan VIN
+                </Link>
+                <div className="relative">
+                  <button
+                    onClick={() => setMenuOpen(!menuOpen)}
+                    className="p-2 rounded-lg hover:bg-gray-100 transition"
+                    aria-label="Menu"
+                  >
+                    {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                  </button>
+
+                  {/* Navigation Menu */}
+                  {menuOpen && (
+                    <NavigationMenu
+                      currentPath={location.pathname}
+                      onClose={() => setMenuOpen(false)}
+                      onSignOut={handleSignOut}
+                      user={user}
+                      tenantName={tenant?.name}
+                    />
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -293,16 +331,42 @@ export default function VINScanPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b border-gray-200">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <Link to="/dashboard" className="flex items-center text-gray-600 hover:text-gray-900">
-              <ArrowLeft className="h-5 w-5 mr-1" />
-              Back to Dashboard
-            </Link>
             <div className="flex items-center">
-              <Target className="h-6 w-6 text-blue-900" />
-              <span className="ml-2 font-bold text-gray-900">{tenant?.name}</span>
+              <Target className="h-8 w-8 text-blue-900" />
+              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+            </div>
+            <div className="flex items-center space-x-4 relative">
+              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+              <Link
+                to="/scan"
+                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
+              >
+                Scan VIN
+              </Link>
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition"
+                  aria-label="Menu"
+                >
+                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
+
+                {/* Navigation Menu */}
+                {menuOpen && (
+                  <NavigationMenu
+                    currentPath={location.pathname}
+                    onClose={() => setMenuOpen(false)}
+                    onSignOut={handleSignOut}
+                    user={user}
+                    tenantName={tenant?.name}
+                  />
+                )}
+              </div>
             </div>
           </div>
         </div>
