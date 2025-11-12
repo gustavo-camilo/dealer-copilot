@@ -537,12 +537,22 @@ async function processVehicles(
 
       newVehicles++;
     } else {
-      // Existing vehicle - update
+      // Existing vehicle - ALWAYS update ALL fields with latest data
       const updates: any = {
         last_seen_at: new Date().toISOString(),
+        // Always update these fields with latest scraped data
+        stock_number: vehicle.stock_number,
+        year: vehicle.year,
+        make: vehicle.make,
+        model: vehicle.model,
+        trim: vehicle.trim,
+        mileage: vehicle.mileage,
+        exterior_color: vehicle.color,
+        listing_url: vehicle.url,
+        image_urls: vehicle.images,
       };
 
-      // Check if price changed
+      // Check if price changed (keep price history)
       if (existing.price !== vehicle.price) {
         const priceHistory = existing.price_history || [];
         priceHistory.push({
@@ -552,22 +562,12 @@ async function processVehicles(
         updates.price = vehicle.price;
         updates.price_history = priceHistory;
         updates.status = 'price_changed';
+      } else {
+        // Price same, just update it
+        updates.price = vehicle.price;
       }
 
-      // Update mileage if changed or if we didn't have it before
-      if (vehicle.mileage && (existing.mileage !== vehicle.mileage || !existing.mileage)) {
-        updates.mileage = vehicle.mileage;
-      }
-
-      // Update images if we have new ones or didn't have them before
-      if (vehicle.images && vehicle.images.length > 0) {
-        const existingImages = existing.image_urls || [];
-        if (JSON.stringify(existingImages) !== JSON.stringify(vehicle.images)) {
-          updates.image_urls = vehicle.images;
-        }
-      }
-
-      // Update VIN if we now have a real VIN and previously had a generated identifier
+      // Upgrade VIN if we now have a real VIN and previously had a generated identifier
       if (vehicle.vin && vehicle.vin.length === 17 && existing.vin !== vehicle.vin) {
         // Only update if the existing VIN looks generated (starts with STOCK_ or contains underscores)
         if (existing.vin.includes('_') || existing.vin.startsWith('STOCK_')) {
@@ -576,39 +576,10 @@ async function processVehicles(
         }
       }
 
-      // Update stock number if we have it and it's different
-      if (vehicle.stock_number && existing.stock_number !== vehicle.stock_number) {
-        updates.stock_number = vehicle.stock_number;
-      }
-
-      // Update trim if we have it and it's different
-      if (vehicle.trim && existing.trim !== vehicle.trim) {
-        updates.trim = vehicle.trim;
-      }
-
-      // Update color if we have it and it's different
-      if (vehicle.color && existing.exterior_color !== vehicle.color) {
-        updates.exterior_color = vehicle.color;
-      }
-
-      // Update listing URL if we have it and it's different
-      if (vehicle.url && existing.listing_url !== vehicle.url) {
-        updates.listing_url = vehicle.url;
-      }
-
-      // Only update if there are actual changes
-      if (Object.keys(updates).length > 1) { // More than just last_seen_at
-        await supabase
-          .from('vehicle_history')
-          .update(updates)
-          .eq('id', existing.id);
-      } else {
-        // Just update last_seen_at
-        await supabase
-          .from('vehicle_history')
-          .update({ last_seen_at: new Date().toISOString() })
-          .eq('id', existing.id);
-      }
+      await supabase
+        .from('vehicle_history')
+        .update(updates)
+        .eq('id', existing.id);
 
       updatedVehicles++;
     }

@@ -15,6 +15,7 @@ import {
   Menu,
   X,
   Car,
+  Trash2,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 
@@ -177,6 +178,27 @@ export default function ManageInventoryPage() {
       navigate('/signin');
     } catch (error) {
       console.error('Error signing out:', error);
+    }
+  };
+
+  const handleDeleteVehicle = async (vehicleId: string, vehicleInfo: string) => {
+    if (!confirm(`Are you sure you want to delete ${vehicleInfo}? This action cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('vehicle_history')
+        .delete()
+        .eq('id', vehicleId);
+
+      if (error) throw error;
+
+      // Reload vehicles
+      await loadVehicles();
+    } catch (error) {
+      console.error('Error deleting vehicle:', error);
+      alert('Failed to delete vehicle');
     }
   };
 
@@ -419,6 +441,13 @@ export default function ManageInventoryPage() {
                     <div className="absolute top-2 right-2">
                       {getStatusBadge(vehicle.status)}
                     </div>
+                    <button
+                      onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
+                      className="absolute top-2 left-2 p-2 bg-white/90 hover:bg-red-50 rounded-full shadow-sm transition-colors group"
+                      title="Delete vehicle"
+                    >
+                      <Trash2 className="w-4 h-4 text-gray-500 group-hover:text-red-600" />
+                    </button>
                   </div>
 
                   {/* Vehicle Info */}
