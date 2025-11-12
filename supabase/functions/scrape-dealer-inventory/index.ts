@@ -75,7 +75,7 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
                 // Safe to merge - vehicles match
                 return {
                   ...vehicle, // Keep original data as base
-                  // Only override with detail data if it's not already set
+                  // Only override with detail data if it exists and is not empty
                   vin: detailVehicle.vin || vehicle.vin,
                   stock_number: detailVehicle.stock_number || vehicle.stock_number,
                   mileage: detailVehicle.mileage || vehicle.mileage,
@@ -83,9 +83,12 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
                   color: detailVehicle.color || vehicle.color,
                   // Prefer detail page model if listing page didn't have it
                   model: vehicle.model || detailVehicle.model,
-                  // Use detail page images if they have more/better images
-                  images: (detailVehicle.images && detailVehicle.images.length > (vehicle.images || []).length)
-                          ? detailVehicle.images : vehicle.images,
+                  // Use detail page image if it exists, otherwise keep listing image
+                  images: (detailVehicle.images && detailVehicle.images.length > 0)
+                          ? detailVehicle.images
+                          : (vehicle.images && vehicle.images.length > 0)
+                            ? vehicle.images
+                            : [],
                   imageDate: detailVehicle.imageDate || vehicle.imageDate,
                   url: vehicle.url, // Always keep the original URL
                 };
@@ -537,34 +540,65 @@ async function processVehicles(
 
       newVehicles++;
     } else {
-      // Existing vehicle - ALWAYS update ALL fields with latest data
+      // Existing vehicle - Smart update: only update fields that have new data
+      console.log(`Updating existing vehicle: ${identifier}`);
+
       const updates: any = {
         last_seen_at: new Date().toISOString(),
-        // Always update these fields with latest scraped data
-        stock_number: vehicle.stock_number,
-        year: vehicle.year,
-        make: vehicle.make,
-        model: vehicle.model,
-        trim: vehicle.trim,
-        mileage: vehicle.mileage,
-        exterior_color: vehicle.color,
-        listing_url: vehicle.url,
-        image_urls: vehicle.images,
       };
 
-      // Check if price changed (keep price history)
-      if (existing.price !== vehicle.price) {
-        const priceHistory = existing.price_history || [];
-        priceHistory.push({
-          date: new Date().toISOString(),
-          price: vehicle.price,
-        });
-        updates.price = vehicle.price;
-        updates.price_history = priceHistory;
-        updates.status = 'price_changed';
+      // Smart update: only update fields if new scrape found data
+      if (vehicle.stock_number !== undefined && vehicle.stock_number !== null) {
+        updates.stock_number = vehicle.stock_number;
+      }
+      if (vehicle.year !== undefined && vehicle.year !== null) {
+        updates.year = vehicle.year;
+      }
+      if (vehicle.make !== undefined && vehicle.make !== null) {
+        updates.make = vehicle.make;
+      }
+      if (vehicle.model !== undefined && vehicle.model !== null) {
+        updates.model = vehicle.model;
+      }
+      if (vehicle.trim !== undefined && vehicle.trim !== null) {
+        updates.trim = vehicle.trim;
+      }
+      if (vehicle.mileage !== undefined && vehicle.mileage !== null) {
+        updates.mileage = vehicle.mileage;
+        console.log(`  Updating mileage: ${existing.mileage} -> ${vehicle.mileage}`);
       } else {
-        // Price same, just update it
-        updates.price = vehicle.price;
+        console.log(`  Preserving existing mileage: ${existing.mileage}`);
+      }
+      if (vehicle.color !== undefined && vehicle.color !== null) {
+        updates.exterior_color = vehicle.color;
+      }
+      if (vehicle.url !== undefined && vehicle.url !== null) {
+        updates.listing_url = vehicle.url;
+      }
+      // Only update images if we found a new image
+      if (vehicle.images && vehicle.images.length > 0) {
+        updates.image_urls = vehicle.images;
+        console.log(`  Updating image: ${vehicle.images[0]}`);
+      } else if (existing.image_urls && existing.image_urls.length > 0) {
+        console.log(`  Preserving existing image`);
+      }
+
+      // Check if price changed (keep price history)
+      if (vehicle.price !== undefined && vehicle.price !== null) {
+        if (existing.price !== vehicle.price) {
+          const priceHistory = existing.price_history || [];
+          priceHistory.push({
+            date: new Date().toISOString(),
+            price: vehicle.price,
+          });
+          updates.price = vehicle.price;
+          updates.price_history = priceHistory;
+          updates.status = 'price_changed';
+          console.log(`  Price changed: ${existing.price} -> ${vehicle.price}`);
+        } else {
+          // Price same, just update it
+          updates.price = vehicle.price;
+        }
       }
 
       // Upgrade VIN if we now have a real VIN and previously had a generated identifier

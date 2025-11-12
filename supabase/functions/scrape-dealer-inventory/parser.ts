@@ -587,13 +587,64 @@ function extractLink(html: string, baseUrl: string): string | undefined {
 
 function extractImages(html: string, baseUrl: string): string[] {
   const images: string[] = [];
-  const imgRegex = /<img[^>]*src="([^"]+)"/gi;
+  const imgRegex = /<img[^>]*src="([^"]+)"[^>]*>/gi;
   const matches = [...html.matchAll(imgRegex)];
 
   for (const match of matches) {
     try {
-      const url = new URL(match[1], baseUrl).href;
+      const imgTag = match[0];
+      const imgSrc = match[1];
+
+      // Filter out non-vehicle images
+      const lowerSrc = imgSrc.toLowerCase();
+      const lowerTag = imgTag.toLowerCase();
+
+      // Skip logos, icons, navigation, social media, etc.
+      if (
+        lowerSrc.includes('logo') ||
+        lowerSrc.includes('icon') ||
+        lowerSrc.includes('badge') ||
+        lowerSrc.includes('social') ||
+        lowerSrc.includes('nav') ||
+        lowerSrc.includes('menu') ||
+        lowerSrc.includes('header') ||
+        lowerSrc.includes('footer') ||
+        lowerSrc.includes('banner') ||
+        lowerSrc.includes('button') ||
+        lowerSrc.includes('arrow') ||
+        lowerSrc.includes('sprite') ||
+        lowerSrc.includes('placeholder') ||
+        lowerSrc.includes('avatar') ||
+        lowerSrc.includes('flag') ||
+        lowerSrc.includes('.svg') || // Usually icons
+        lowerSrc.includes('.gif') || // Usually icons or badges
+        lowerTag.includes('class="icon') ||
+        lowerTag.includes('class="logo') ||
+        lowerTag.includes('alt="icon') ||
+        lowerTag.includes('alt="logo')
+      ) {
+        continue;
+      }
+
+      // Check image dimensions from tag attributes
+      const widthMatch = imgTag.match(/width=["']?(\d+)/i);
+      const heightMatch = imgTag.match(/height=["']?(\d+)/i);
+
+      if (widthMatch && heightMatch) {
+        const width = parseInt(widthMatch[1]);
+        const height = parseInt(heightMatch[1]);
+
+        // Skip tiny images (likely icons)
+        if (width < 100 || height < 100) {
+          continue;
+        }
+      }
+
+      const url = new URL(imgSrc, baseUrl).href;
+
+      // Only get the FIRST good vehicle image
       images.push(url);
+      break; // Stop after first valid image
     } catch {
       // Invalid URL, skip
     }
