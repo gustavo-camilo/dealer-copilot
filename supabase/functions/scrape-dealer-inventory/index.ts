@@ -130,12 +130,12 @@ serve(async (req) => {
     // Get request body (optional: can specify specific tenant)
     const { tenant_id } = await req.json().catch(() => ({}));
 
-    // Get all active tenants with website URLs
+    // Get all active/trial tenants with website URLs (exclude only suspended/cancelled)
     let query = supabase
       .from('tenants')
       .select('id, name, website_url')
       .not('website_url', 'is', null)
-      .eq('status', 'active');
+      .not('status', 'in', '("suspended","cancelled")');
 
     if (tenant_id) {
       query = query.eq('id', tenant_id);
