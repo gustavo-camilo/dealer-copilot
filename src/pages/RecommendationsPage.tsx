@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -12,6 +13,15 @@ import {
   DollarSign,
   Target,
   Clock,
+  Menu,
+  X,
+  Car,
+  LogOut,
+  Settings,
+  Scan,
+  Globe,
+  Package,
+  ChevronRight,
 } from 'lucide-react';
 
 interface Recommendation {
@@ -38,7 +48,8 @@ type RecommendationFilter = 'all' | 'buy' | 'caution' | 'pass';
 type ConfidenceFilter = 'all' | 'high' | 'medium' | 'low';
 
 export default function RecommendationsPage() {
-  const { user } = useAuth();
+  const { user, tenant, signOut } = useAuth();
+  const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [filteredRecommendations, setFilteredRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,6 +57,8 @@ export default function RecommendationsPage() {
   const [recommendationFilter, setRecommendationFilter] =
     useState<RecommendationFilter>('all');
   const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>('all');
+  const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
   const [stats, setStats] = useState({
     buy: 0,
     caution: 0,
@@ -96,6 +109,15 @@ export default function RecommendationsPage() {
 
     setFilteredRecommendations(filtered);
   }, [recommendations, recommendationFilter, confidenceFilter, searchQuery]);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   const loadRecommendations = async () => {
     if (!user?.tenant_id) return;
@@ -202,6 +224,134 @@ export default function RecommendationsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <Link to="/dashboard" className="flex items-center">
+              <Target className="h-8 w-8 text-blue-900" />
+              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+            </Link>
+            <div className="flex items-center space-x-4 relative">
+              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+              <Link
+                to="/scan"
+                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
+              >
+                Scan VIN
+              </Link>
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition"
+                  aria-label="Menu"
+                >
+                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
+
+                {/* Full-Page Mobile Menu / Dropdown for Desktop */}
+                {menuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 md:hidden"
+                      onClick={() => setMenuOpen(false)}
+                    />
+                    <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200">
+                      <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
+                        <div className="flex items-center">
+                          <Target className="h-6 w-6 text-blue-900" />
+                          <span className="ml-2 text-lg font-bold text-gray-900">Menu</span>
+                        </div>
+                        <button
+                          onClick={() => setMenuOpen(false)}
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          <X className="h-6 w-6" />
+                        </button>
+                      </div>
+                      <div className="p-6 md:p-4 border-b border-gray-200">
+                        <p className="text-base md:text-sm font-semibold text-gray-900">{user?.full_name}</p>
+                        <p className="text-sm md:text-xs text-gray-500">{user?.email}</p>
+                        <p className="text-sm md:text-xs text-gray-500 mt-1">{tenant?.name}</p>
+                      </div>
+                      <div className="py-4 md:py-2">
+                        <Link
+                          to="/dashboard"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          Dashboard
+                        </Link>
+                        <Link
+                          to="/scan"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 md:hidden"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Scan className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3 text-orange-600" />
+                          Scan VIN
+                        </Link>
+                        <Link
+                          to="/inventory"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Car className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          Manage Inventory
+                        </Link>
+                        <Link
+                          to="/recommendations"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          View Recommendations
+                        </Link>
+                        <Link
+                          to="/vin-scans"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Package className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          VIN Scan History
+                        </Link>
+                        <Link
+                          to="/onboarding"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Globe className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          Scan Website
+                        </Link>
+                        {user?.role === 'super_admin' && (
+                          <Link
+                            to="/admin"
+                            className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                            Admin Panel
+                          </Link>
+                        )}
+                      </div>
+                      <div className="border-t border-gray-200 py-4 md:py-2 mt-auto">
+                        <button
+                          onClick={handleSignOut}
+                          className="flex items-center w-full px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <LogOut className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -329,104 +479,176 @@ export default function RecommendationsPage() {
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-3">
             {filteredRecommendations.map((rec) => {
               const config = getRecommendationConfig(rec.recommendation);
               return (
                 <div
                   key={rec.id}
-                  className={`rounded-lg shadow-sm border ${config.borderColor} ${config.bgColor} p-6`}
+                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition"
                 >
-                  <div className="flex flex-col lg:flex-row gap-6">
-                    {/* Left: Recommendation Badge */}
-                    <div className="flex lg:flex-col items-center lg:items-start gap-3 lg:min-w-[180px]">
-                      <div className={`${config.textColor}`}>{config.icon}</div>
-                      <div>
-                        <div className={`font-bold text-lg ${config.textColor} mb-1`}>
-                          {config.label}
-                        </div>
-                        <div className="text-sm">
-                          {getConfidenceBadge(rec.confidence_score)}
-                        </div>
-                        <div className="text-2xl font-bold mt-2">{rec.confidence_score}%</div>
+                  <div className="flex items-center justify-between gap-4">
+                    {/* Left: Vehicle Info */}
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold text-gray-900 truncate">
+                          {rec.decoded_data.year} {rec.decoded_data.make} {rec.decoded_data.model}
+                        </h3>
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${config.badgeColor} flex-shrink-0`}>
+                          {rec.recommendation.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <span className="font-medium">{rec.confidence_score}% confidence</span>
+                        <span className="hidden sm:inline">Max Bid: {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}</span>
+                        <span className={`hidden sm:inline font-medium ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                          Profit: {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
+                        </span>
                       </div>
                     </div>
 
-                    {/* Middle: Vehicle Info */}
-                    <div className="flex-1">
-                      <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        {rec.decoded_data.year} {rec.decoded_data.make} {rec.decoded_data.model}
-                        {rec.decoded_data.trim && (
-                          <span className="text-gray-600 font-normal"> {rec.decoded_data.trim}</span>
-                        )}
-                      </h3>
-                      <p className="text-sm text-gray-600 font-mono mb-4">{rec.vin}</p>
+                    {/* Right: View Details Button */}
+                    <button
+                      onClick={() => setSelectedRec(rec)}
+                      className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0 flex items-center gap-1"
+                    >
+                      Details
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
 
-                      {/* Positive Reasons */}
-                      {rec.match_reasoning && rec.match_reasoning.filter(r => r.type === 'positive').length > 0 && (
-                        <div className="mb-3">
-                          <div className="text-sm font-medium text-gray-700 mb-1">
-                            Why this recommendation:
-                          </div>
-                          <ul className="space-y-1">
-                            {rec.match_reasoning.filter(r => r.type === 'positive').map((reason, idx) => (
-                              <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
-                                <span className="text-green-600 mt-0.5">✓</span>
-                                <span>{reason.message}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      {/* Risk Factors */}
-                      {rec.match_reasoning && rec.match_reasoning.filter(r => r.type === 'negative').length > 0 && (
-                        <div>
-                          <div className="text-sm font-medium text-gray-700 mb-1">
-                            Risk factors to consider:
-                          </div>
-                          <ul className="space-y-1">
-                            {rec.match_reasoning.filter(r => r.type === 'negative').map((risk, idx) => (
-                              <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
-                                <span className="text-red-600 mt-0.5">⚠</span>
-                                <span>{risk.message}</span>
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-
-                      <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
-                        <Clock className="w-4 h-4" />
-                        <span>Scanned {formatDate(rec.created_at)}</span>
-                      </div>
+                  {/* Mobile: Show financial info */}
+                  <div className="mt-3 pt-3 border-t border-gray-100 flex gap-4 text-sm sm:hidden">
+                    <div>
+                      <span className="text-gray-500">Max Bid:</span>
+                      <span className="ml-1 font-semibold text-blue-600">
+                        {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}
+                      </span>
                     </div>
-
-                    {/* Right: Financial Info */}
-                    <div className="lg:min-w-[250px] lg:text-right">
-                      <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
-                        <div>
-                          <div className="text-xs text-gray-600 mb-1">Max Bid</div>
-                          <div className="text-lg font-semibold text-blue-600">
-                            {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}
-                          </div>
-                        </div>
-                        <div>
-                          <div className="text-xs text-gray-600 mb-1">Est. Profit</div>
-                          <div
-                            className={`text-lg font-semibold ${
-                              rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-red-600'
-                            }`}
-                          >
-                            {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
-                          </div>
-                        </div>
-                      </div>
+                    <div>
+                      <span className="text-gray-500">Profit:</span>
+                      <span className={`ml-1 font-semibold ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                        {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
+                      </span>
                     </div>
                   </div>
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* Details Modal */}
+        {selectedRec && (
+          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+            <div className="bg-white w-full md:max-w-3xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto">
+              {/* Modal Header */}
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Recommendation Details</h2>
+                <button
+                  onClick={() => setSelectedRec(null)}
+                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                >
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-4 md:p-6">
+                {/* Vehicle Info */}
+                <div className="mb-6">
+                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">
+                    {selectedRec.decoded_data.year} {selectedRec.decoded_data.make} {selectedRec.decoded_data.model}
+                    {selectedRec.decoded_data.trim && (
+                      <span className="text-gray-600 font-normal"> {selectedRec.decoded_data.trim}</span>
+                    )}
+                  </h3>
+                  <p className="text-sm text-gray-600 font-mono">{selectedRec.vin}</p>
+                  <p className="text-sm text-gray-500 mt-2">Scanned {formatDate(selectedRec.created_at)}</p>
+                </div>
+
+                {/* Recommendation Badge */}
+                <div className="mb-6">
+                  {(() => {
+                    const config = getRecommendationConfig(selectedRec.recommendation);
+                    return (
+                      <div className={`${config.bgColor} ${config.borderColor} border-2 rounded-lg p-4`}>
+                        <div className="flex items-center gap-3 mb-2">
+                          <div className={config.textColor}>{config.icon}</div>
+                          <div>
+                            <div className={`font-bold text-lg ${config.textColor}`}>
+                              {config.label}
+                            </div>
+                            <div className="text-sm">{getConfidenceBadge(selectedRec.confidence_score)}</div>
+                          </div>
+                        </div>
+                        <div className="text-3xl font-bold mt-2">{selectedRec.confidence_score}%</div>
+                      </div>
+                    );
+                  })()}
+                </div>
+
+                {/* Financial Info */}
+                <div className="grid grid-cols-2 gap-4 mb-6">
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-600 mb-1">Max Bid</div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {selectedRec.max_bid_suggestion ? formatCurrency(selectedRec.max_bid_suggestion) : 'N/A'}
+                    </div>
+                  </div>
+                  <div className="bg-gray-50 rounded-lg p-4">
+                    <div className="text-sm text-gray-600 mb-1">Est. Profit</div>
+                    <div
+                      className={`text-2xl font-bold ${
+                        selectedRec.estimated_profit && selectedRec.estimated_profit > 0 ? 'text-green-600' : 'text-red-600'
+                      }`}
+                    >
+                      {selectedRec.estimated_profit ? formatCurrency(selectedRec.estimated_profit) : 'N/A'}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Positive Reasons */}
+                {selectedRec.match_reasoning && selectedRec.match_reasoning.filter(r => r.type === 'positive').length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="font-semibold text-gray-900 mb-3">Why this recommendation:</h4>
+                    <ul className="space-y-2">
+                      {selectedRec.match_reasoning.filter(r => r.type === 'positive').map((reason, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-gray-700">
+                          <span className="text-green-600 mt-0.5 flex-shrink-0">✓</span>
+                          <span>{reason.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Risk Factors */}
+                {selectedRec.match_reasoning && selectedRec.match_reasoning.filter(r => r.type === 'negative').length > 0 && (
+                  <div className="mb-6">
+                    <h4 className="font-semibold text-gray-900 mb-3">Risk factors to consider:</h4>
+                    <ul className="space-y-2">
+                      {selectedRec.match_reasoning.filter(r => r.type === 'negative').map((risk, idx) => (
+                        <li key={idx} className="flex items-start gap-2 text-gray-700">
+                          <span className="text-red-600 mt-0.5 flex-shrink-0">⚠</span>
+                          <span>{risk.message}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 md:p-6">
+                <button
+                  onClick={() => setSelectedRec(null)}
+                  className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
           </div>
         )}
       </div>

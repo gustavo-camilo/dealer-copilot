@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -10,6 +11,14 @@ import {
   Filter,
   Calendar,
   DollarSign,
+  Target,
+  Menu,
+  X,
+  Car,
+  LogOut,
+  Settings,
+  Scan,
+  Globe,
 } from 'lucide-react';
 
 interface Vehicle {
@@ -34,13 +43,15 @@ type StatusFilter = 'all' | 'active' | 'sold' | 'price_changed';
 type SortBy = 'recent' | 'price_asc' | 'price_desc' | 'age';
 
 export default function ManageInventoryPage() {
-  const { user } = useAuth();
+  const { user, tenant, signOut } = useAuth();
+  const navigate = useNavigate();
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [filteredVehicles, setFilteredVehicles] = useState<Vehicle[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('recent');
+  const [menuOpen, setMenuOpen] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
@@ -161,6 +172,15 @@ export default function ManageInventoryPage() {
     return days;
   };
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const badges = {
       active: 'bg-green-100 text-green-800',
@@ -212,6 +232,144 @@ export default function ManageInventoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <Link to="/dashboard" className="flex items-center">
+              <Target className="h-8 w-8 text-blue-900" />
+              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+            </Link>
+            <div className="flex items-center space-x-4 relative">
+              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+              <Link
+                to="/scan"
+                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
+              >
+                Scan VIN
+              </Link>
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition"
+                  aria-label="Menu"
+                >
+                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
+
+                {/* Full-Page Mobile Menu / Dropdown for Desktop */}
+                {menuOpen && (
+                  <>
+                    {/* Full-page overlay on mobile, backdrop on desktop */}
+                    <div
+                      className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 md:hidden"
+                      onClick={() => setMenuOpen(false)}
+                    />
+
+                    {/* Mobile: Full-page menu, Desktop: Dropdown */}
+                    <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200">
+                      {/* Mobile Header */}
+                      <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
+                        <div className="flex items-center">
+                          <Target className="h-6 w-6 text-blue-900" />
+                          <span className="ml-2 text-lg font-bold text-gray-900">Menu</span>
+                        </div>
+                        <button
+                          onClick={() => setMenuOpen(false)}
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          <X className="h-6 w-6" />
+                        </button>
+                      </div>
+
+                      {/* User Info */}
+                      <div className="p-6 md:p-4 border-b border-gray-200">
+                        <p className="text-base md:text-sm font-semibold text-gray-900">{user?.full_name}</p>
+                        <p className="text-sm md:text-xs text-gray-500">{user?.email}</p>
+                        <p className="text-sm md:text-xs text-gray-500 mt-1">{tenant?.name}</p>
+                      </div>
+
+                      {/* Menu Items */}
+                      <div className="py-4 md:py-2">
+                        <Link
+                          to="/dashboard"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          Dashboard
+                        </Link>
+                        <Link
+                          to="/scan"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 md:hidden"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Scan className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3 text-orange-600" />
+                          Scan VIN
+                        </Link>
+                        <Link
+                          to="/inventory"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Car className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          Manage Inventory
+                        </Link>
+                        <Link
+                          to="/recommendations"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          View Recommendations
+                        </Link>
+                        <Link
+                          to="/vin-scans"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Package className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          VIN Scan History
+                        </Link>
+                        <Link
+                          to="/onboarding"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Globe className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          Scan Website
+                        </Link>
+                        {user?.role === 'super_admin' && (
+                          <Link
+                            to="/admin"
+                            className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                            Admin Panel
+                          </Link>
+                        )}
+                      </div>
+
+                      {/* Sign Out */}
+                      <div className="border-t border-gray-200 py-4 md:py-2 mt-auto">
+                        <button
+                          onClick={handleSignOut}
+                          className="flex items-center w-full px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <LogOut className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
