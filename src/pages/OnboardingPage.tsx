@@ -83,18 +83,35 @@ export default function OnboardingPage() {
 
       clearInterval(progressInterval);
 
+      console.log('Scraping response:', data);
+
       if (error) {
         throw new Error(error.message || 'Failed to scrape website');
+      }
+
+      if (!data) {
+        throw new Error('No response from scraping service');
       }
 
       if (!data.success) {
         throw new Error(data.error || 'Scraping failed');
       }
 
+      // Check if results array exists and has items
+      if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
+        console.error('No results in response:', data);
+        throw new Error('No scraping results returned. The scraper may not have found any inventory pages.');
+      }
+
       setAnalysisProgress(100);
 
       // Get the result for this tenant
       const result = data.results[0];
+
+      if (!result) {
+        throw new Error('Invalid result data returned from scraper');
+      }
+
       setScrapingResult(result);
 
       if (result.status === 'failed') {
