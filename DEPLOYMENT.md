@@ -18,9 +18,11 @@ This guide covers deploying the Dealer Copilot application to production.
 ### Static File Server
 The app uses `serve` to serve the production build with proper SPA routing support.
 
-## Environment Variables
+## Environment Variables ⚠️ CRITICAL
 
-You need to set these environment variables in your deployment platform:
+**THE BLANK PAGE ERROR IS CAUSED BY MISSING ENVIRONMENT VARIABLES**
+
+You need to set these environment variables in your deployment platform **BEFORE** building:
 
 ### Required Variables
 ```bash
@@ -28,10 +30,20 @@ VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
+### How to Get These Values
+
+1. Go to your Supabase Dashboard: https://supabase.com/dashboard
+2. Select your project
+3. Go to **Settings** → **API**
+4. Copy:
+   - **Project URL** → Use as `VITE_SUPABASE_URL`
+   - **Project API keys** → **anon public** key → Use as `VITE_SUPABASE_ANON_KEY`
+
 ### Important Notes
-- Vite requires environment variables to be prefixed with `VITE_`
-- These variables are embedded at **build time**, not runtime
-- You must rebuild after changing environment variables
+- ⚠️ **MUST be prefixed with `VITE_`** - This is required by Vite
+- ⚠️ **Set BEFORE building** - Variables are embedded at build time, not runtime
+- ⚠️ **Rebuild after changes** - Changing env vars requires a new build
+- The anon key is safe to expose in frontend code (it's public by design)
 
 ## Database Setup
 
@@ -50,25 +62,38 @@ The latest migration fixes RLS policies that were preventing tenant creation:
 
 ## Deployment Instructions
 
+### ⚠️ BEFORE YOU DEPLOY - Set Environment Variables First!
+
+**Your deployment will show a blank page if you don't set environment variables BEFORE building.**
+
+Go to your deployment platform and add these environment variables:
+1. `VITE_SUPABASE_URL` - Your Supabase project URL
+2. `VITE_SUPABASE_ANON_KEY` - Your Supabase anon/public key
+
+Then trigger a rebuild. The variables will be embedded into the JavaScript bundle.
+
 ### General Platform (Render, Railway, Heroku, etc.)
 
-#### 1. Build Command
+#### 1. Set Environment Variables FIRST
+In your platform's dashboard, add:
+- `VITE_SUPABASE_URL` = `https://xxxxxxxxxxxxx.supabase.co`
+- `VITE_SUPABASE_ANON_KEY` = `eyJhbGc...` (your anon key)
+
+#### 2. Build Command
 ```bash
 npm install && npm run build
 ```
 
-#### 2. Start Command
+#### 3. Start Command
 ```bash
 npm start
 ```
 
-#### 3. Environment Variables
-Add the following in your platform's dashboard:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-
 #### 4. Port Configuration
 The start command automatically uses the `PORT` environment variable set by the platform.
+
+#### 5. Trigger Deploy
+After setting variables, trigger a new deployment/build.
 
 ### Platform-Specific Notes
 
