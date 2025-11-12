@@ -59,10 +59,16 @@ export default function OnboardingPage() {
     setErrorMessage('');
 
     try {
+      // Normalize URL: ensure it has https:// protocol
+      let normalizedUrl = websiteUrl.trim();
+      if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
+        normalizedUrl = `https://${normalizedUrl}`;
+      }
+
       // Update tenant website URL
       await supabase
         .from('tenants')
-        .update({ website_url: websiteUrl })
+        .update({ website_url: normalizedUrl })
         .eq('id', user.tenant_id);
 
       // Simulate progress while calling the edge function

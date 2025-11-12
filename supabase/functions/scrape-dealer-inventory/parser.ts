@@ -131,7 +131,7 @@ function parseWordPressInventory(html: string, baseUrl: string): ParsedVehicle[]
       const vehicle: ParsedVehicle = {
         vin: extractAttribute(itemHtml, 'data-vin') || extractVIN(itemHtml),
         stock_number: extractAttribute(itemHtml, 'data-stock'),
-        year: parseInt(extractText(itemHtml, /(\d{4})/)?.[1] || '0'),
+        year: extractYearFromText(itemHtml),
         make: extractAttribute(itemHtml, 'data-make') || extractMake(itemHtml),
         model: extractAttribute(itemHtml, 'data-model'),
         price: parsePrice(extractText(itemHtml, /\$?([\d,]+)/)?.[1]),
@@ -191,26 +191,55 @@ function parseDataAttributes(html: string, baseUrl: string): ParsedVehicle[] {
 function parseGenericVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
   const vehicles: ParsedVehicle[] = [];
 
-  // Look for repeating patterns that might be vehicle listings
-  // This is a fallback and may need customization per site
+  // Strategy 3a: Look for links to individual vehicle pages
+  const vehicleLinks = extractVehicleLinks(html, baseUrl);
+
+  if (vehicleLinks.length > 0) {
+    console.log(`Found ${vehicleLinks.length} potential vehicle links`);
+
+    // For each link, try to extract info from the link text and nearby content
+    for (const linkInfo of vehicleLinks) {
+      const vehicle: ParsedVehicle = {
+        url: linkInfo.url,
+        year: extractYearFromText(linkInfo.text),
+        make: extractMake(linkInfo.text + ' ' + linkInfo.context),
+        vin: extractVIN(linkInfo.context),
+        price: parsePrice(extractText(linkInfo.context, /\$[\d,]+/)?.[0]),
+        mileage: parseInt(
+          extractText(linkInfo.context, /([\d,]+)\s*(?:mi|miles|km)/i)?.[1]?.replace(/,/g, '') ||
+            '0'
+        ),
+      };
+
+      if (vehicle.year && vehicle.make) {
+        vehicles.push(vehicle);
+      }
+    }
+
+    if (vehicles.length > 0) {
+      return vehicles;
+    }
+  }
+
+  // Strategy 3b: Look for repeating card patterns
   const cardPatterns = [
-    /<div[^>]*class="[^"]*vehicle[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
-    /<div[^>]*class="[^"]*car[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
-    /<div[^>]*class="[^"]*inventory[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+    /<div[^>]*class="[^"]*(?:vehicle|car|inventory)[^"]*"[^>]*>[\s\S]*?<\/div>/gi,
+    /<article[^>]*class="[^"]*(?:vehicle|car|inventory)[^"]*"[^>]*>[\s\S]*?<\/article>/gi,
+    /<li[^>]*class="[^"]*(?:vehicle|car|inventory)[^"]*"[^>]*>[\s\S]*?<\/li>/gi,
   ];
 
   // Try each pattern
   for (const pattern of cardPatterns) {
     const matches = [...html.matchAll(pattern)];
 
-    if (matches.length >= 3) {
+    if (matches.length >= 2) {
       // Likely found vehicle cards
       for (const match of matches) {
         const cardHtml = match[0];
 
         const vehicle: ParsedVehicle = {
           vin: extractVIN(cardHtml),
-          year: parseInt(extractText(cardHtml, /\b(19|20)\d{2}\b/)?.[0] || '0'),
+          year: extractYearFromText(cardHtml),
           make: extractMake(cardHtml),
           price: parsePrice(extractText(cardHtml, /\$[\d,]+/)?.[0]),
           mileage: parseInt(
@@ -232,6 +261,66 @@ function parseGenericVehicleCards(html: string, baseUrl: string): ParsedVehicle[
   }
 
   return vehicles;
+}
+
+/**
+ * Extract potential vehicle listing links from HTML
+ */
+function extractVehicleLinks(
+  html: string,
+  baseUrl: string
+): Array<{ url: string; text: string; context: string }> {
+  const links: Array<{ url: string; text: string; context: string }> = [];
+
+  // Look for links that contain year, make, or model patterns
+  const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gis;
+  const matches = [...html.matchAll(linkRegex)];
+
+  for (const match of matches) {
+    const href = match[1];
+    const linkText = match[2].replace(/<[^>]+>/g, ''); // Strip HTML tags
+
+    // Check if link text suggests a vehicle
+    const hasYear = /\b(19|20)\d{2}\b/.test(linkText);
+    const hasMake = extractMake(linkText) !== undefined;
+
+    if (hasYear || hasMake) {
+      try {
+        const fullUrl = new URL(href, baseUrl).href;
+
+        // Get context around the link (up to 500 chars before and after)
+        const matchIndex = html.indexOf(match[0]);
+        const contextStart = Math.max(0, matchIndex - 500);
+        const contextEnd = Math.min(html.length, matchIndex + match[0].length + 500);
+        const context = html.substring(contextStart, contextEnd);
+
+        links.push({
+          url: fullUrl,
+          text: linkText,
+          context: context,
+        });
+      } catch {
+        // Invalid URL, skip
+      }
+    }
+  }
+
+  return links;
+}
+
+/**
+ * Extract year from text
+ */
+function extractYearFromText(text: string): number | undefined {
+  const yearMatch = text.match(/\b(19|20)\d{2}\b/);
+  if (yearMatch) {
+    const year = parseInt(yearMatch[0]);
+    // Validate year is reasonable (1980-2030)
+    if (year >= 1980 && year <= 2030) {
+      return year;
+    }
+  }
+  return undefined;
 }
 
 // =====================================================
@@ -256,32 +345,61 @@ function extractVIN(html: string): string | undefined {
 }
 
 function extractMake(html: string): string | undefined {
-  // Common car makes
+  // Common car makes (expanded list)
   const makes = [
-    'Toyota',
-    'Honda',
-    'Ford',
-    'Chevrolet',
-    'Nissan',
-    'BMW',
-    'Mercedes',
-    'Volkswagen',
+    'Acura',
+    'Alfa Romeo',
+    'Aston Martin',
     'Audi',
-    'Lexus',
-    'Mazda',
-    'Subaru',
-    'Hyundai',
-    'Kia',
-    'Jeep',
-    'Ram',
-    'GMC',
+    'Bentley',
+    'BMW',
+    'Buick',
     'Cadillac',
-    'Dodge',
+    'Chevrolet',
+    'Chevy',
     'Chrysler',
+    'Dodge',
+    'Ferrari',
+    'Fiat',
+    'Ford',
+    'Genesis',
+    'GMC',
+    'Honda',
+    'Hyundai',
+    'Infiniti',
+    'Jaguar',
+    'Jeep',
+    'Kia',
+    'Lamborghini',
+    'Land Rover',
+    'Lexus',
+    'Lincoln',
+    'Maserati',
+    'Mazda',
+    'McLaren',
+    'Mercedes-Benz',
+    'Mercedes',
+    'Mini',
+    'Mitsubishi',
+    'Nissan',
+    'Porsche',
+    'Ram',
+    'Rolls-Royce',
+    'Subaru',
+    'Tesla',
+    'Toyota',
+    'Volkswagen',
+    'VW',
+    'Volvo',
   ];
 
-  for (const make of makes) {
-    if (html.toLowerCase().includes(make.toLowerCase())) {
+  // Sort by length (longest first) to match "Mercedes-Benz" before "Mercedes"
+  const sortedMakes = makes.sort((a, b) => b.length - a.length);
+
+  for (const make of sortedMakes) {
+    // Use word boundary to avoid partial matches
+    const regex = new RegExp(`\\b${make}\\b`, 'i');
+    if (regex.test(html)) {
       return make;
     }
   }
