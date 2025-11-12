@@ -7,6 +7,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML } from './parser.ts';
+import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
 
 // CORS headers
 const corsHeaders = {
@@ -233,11 +234,16 @@ serve(async (req) => {
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
+        // Get sitemap cache for accurate date extraction
+        const sitemapCache = await getSitemapCache(supabase, tenant.id, tenant.website_url);
+        console.log(`Loaded sitemap cache with ${Object.keys(sitemapCache).length} URLs`);
+
         // Process vehicles and update database
         const { newVehicles, updatedVehicles, soldVehicles } = await processVehicles(
           supabase,
           tenant.id,
-          vehicles
+          vehicles,
+          sitemapCache
         );
 
         // Update snapshot with results
@@ -343,7 +349,8 @@ serve(async (req) => {
 async function processVehicles(
   supabase: any,
   tenant_id: string,
-  vehicles: any[]
+  vehicles: any[],
+  sitemapCache: SitemapCache = {}
 ): Promise<{ newVehicles: number; updatedVehicles: number; soldVehicles: number }> {
   let newVehicles = 0;
   let updatedVehicles = 0;
@@ -364,7 +371,20 @@ async function processVehicles(
       .single();
 
     if (!existing) {
-      // New vehicle - insert
+      // New vehicle - Try to get actual listing date
+      console.log(`New vehicle found: ${vehicle.vin}, extracting listing date...`);
+
+      // For now, we use the inventory page HTML we already fetched
+      // In a future optimization, we could fetch individual vehicle pages
+      const listingDate = await getActualListingDate(
+        '', // We don't have individual vehicle page HTML yet
+        vehicle.url || '',
+        sitemapCache
+      );
+
+      console.log(`Listing date for ${vehicle.vin}: ${listingDate.date.toISOString()} (${listingDate.confidence}, ${listingDate.source})`);
+
+      // Insert new vehicle with extracted listing date
       await supabase.from('vehicle_history').insert({
         tenant_id,
         vin: vehicle.vin,
@@ -378,7 +398,9 @@ async function processVehicles(
         exterior_color: vehicle.color,
         listing_url: vehicle.url,
         image_urls: vehicle.images,
-        first_seen_at: new Date().toISOString(),
+        first_seen_at: listingDate.date.toISOString(),
+        listing_date_confidence: listingDate.confidence,
+        listing_date_source: listingDate.source,
         last_seen_at: new Date().toISOString(),
         status: 'active',
         price_history: [{ date: new Date().toISOString(), price: vehicle.price }],
@@ -434,11 +456,36 @@ async function processVehicles(
     for (const vehicle of potentiallySold) {
       // Double check it's not in current scrape
       if (!currentVINs.includes(vehicle.vin)) {
+        console.log(`Vehicle ${vehicle.vin} marked as sold, creating sales record...`);
+
+        // Calculate days to sale
+        const firstSeen = new Date(vehicle.first_seen_at);
+        const now = new Date();
+        const daysListed = Math.floor((now.getTime() - firstSeen.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Mark vehicle as sold
         await supabase
           .from('vehicle_history')
           .update({ status: 'sold' })
           .eq('id', vehicle.id);
 
+        // Create sales record (acquisition_cost and profit fields left null)
+        await supabase.from('sales_records').insert({
+          tenant_id: vehicle.tenant_id,
+          vehicle_id: vehicle.vehicle_id,
+          vin: vehicle.vin,
+          year: vehicle.year,
+          make: vehicle.make,
+          model: vehicle.model,
+          sale_price: vehicle.price, // Last known listing price
+          acquisition_cost: null,    // Unknown from scraping
+          gross_profit: null,        // Can't calculate without acquisition cost
+          margin_percent: null,      // Can't calculate without acquisition cost
+          days_to_sale: daysListed,
+          sale_date: now.toISOString().split('T')[0], // Format as YYYY-MM-DD
+        });
+
+        console.log(`Sales record created for ${vehicle.vin}: $${vehicle.price}, ${daysListed} days`);
         soldVehicles++;
       }
     }
