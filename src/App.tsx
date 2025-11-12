@@ -44,7 +44,8 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (user) {
-    return <Navigate to="/dashboard" />;
+    // Redirect super admins to admin panel, others to dashboard
+    return <Navigate to={user.role === 'super_admin' ? '/admin' : '/dashboard'} />;
   }
 
   return <>{children}</>;

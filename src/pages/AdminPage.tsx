@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant, User } from '../types/database';
-import { Target, Users, Building2, CreditCard } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard } from 'lucide-react';
 
 export default function AdminPage() {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
   const [tenants, setTenants] = useState<Tenant[]>([]);
   const [stats, setStats] = useState({
     totalTenants: 0,
@@ -14,6 +15,15 @@ export default function AdminPage() {
     totalUsers: 0,
   });
   const [loading, setLoading] = useState(true);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   useEffect(() => {
     loadAdminData();
@@ -69,9 +79,22 @@ export default function AdminPage() {
               <Target className="h-8 w-8 text-blue-900" />
               <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot Admin</span>
             </div>
-            <Link to="/dashboard" className="text-gray-600 hover:text-gray-900">
-              Back to Dashboard
-            </Link>
+            <div className="flex items-center space-x-4">
+              <Link
+                to="/dashboard"
+                className="flex items-center text-gray-600 hover:text-gray-900"
+              >
+                <LayoutDashboard className="h-4 w-4 mr-2" />
+                Dashboard
+              </Link>
+              <button
+                onClick={handleSignOut}
+                className="flex items-center text-red-600 hover:text-red-700"
+              >
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </button>
+            </div>
           </div>
         </div>
       </div>

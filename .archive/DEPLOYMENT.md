@@ -1,191 +1,258 @@
 # Deployment Guide
 
+## Overview
+This guide covers deploying the Dealer Copilot application to production.
+
 ## Prerequisites
-
-- Supabase account with project created
 - Node.js 18+ installed
-- Git installed
+- Supabase project set up
+- Git repository
 
-## Database Setup
+## Build Configuration
 
-The database migrations have already been applied to your Supabase instance. The following tables were created:
+### Package.json Scripts
+- `npm run dev` - Start development server
+- `npm run build` - Build for production (creates `dist` folder)
+- `npm start` - Serve production build (uses `serve` package)
 
-- `tenants` - Dealership accounts
-- `users` - User accounts with tenant association
-- `vehicles` - Vehicle inventory per tenant
-- `inventory_snapshots` - Historical inventory data
-- `vehicle_price_history` - Price tracking over time
-- `sales_records` - Sales tracking
-- `vin_scans` - VIN scan history
-- `recommendations` - Buy recommendations
-- `subscriptions` - Billing and subscription management
+### Static File Server
+The app uses `serve` to serve the production build with proper SPA routing support.
 
-All tables have Row Level Security (RLS) policies enabled for complete data isolation between tenants.
+## Environment Variables ⚠️ CRITICAL
 
-## Environment Variables
+**THE BLANK PAGE ERROR IS CAUSED BY MISSING ENVIRONMENT VARIABLES**
 
-The project is already configured with Supabase credentials in `.env`:
+You need to set these environment variables in your deployment platform **BEFORE** building:
 
-```
-VITE_SUPABASE_URL=your_supabase_url
+### Required Variables
+```bash
+VITE_SUPABASE_URL=your_supabase_project_url
 VITE_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
-## Local Development
+### How to Get These Values
 
-1. Install dependencies:
+1. Go to your Supabase Dashboard: https://supabase.com/dashboard
+2. Select your project
+3. Go to **Settings** → **API**
+4. Copy:
+   - **Project URL** → Use as `VITE_SUPABASE_URL`
+   - **Project API keys** → **anon public** key → Use as `VITE_SUPABASE_ANON_KEY`
+
+### Important Notes
+- ⚠️ **MUST be prefixed with `VITE_`** - This is required by Vite
+- ⚠️ **Set BEFORE building** - Variables are embedded at build time, not runtime
+- ⚠️ **Rebuild after changes** - Changing env vars requires a new build
+- The anon key is safe to expose in frontend code (it's public by design)
+
+## Database Setup
+
+### 1. Apply Migrations
+Before deploying, ensure all database migrations are applied:
+
+```bash
+# Push migrations to Supabase
+npx supabase db push
+```
+
+### 2. Critical Migration
+The latest migration fixes RLS policies that were preventing tenant creation:
+- File: `supabase/migrations/20251111185304_restore_tenant_rls_policies.sql`
+- This MUST be applied for signup to work
+
+## Deployment Instructions
+
+### ⚠️ BEFORE YOU DEPLOY - Set Environment Variables First!
+
+**Your deployment will show a blank page if you don't set environment variables BEFORE building.**
+
+Go to your deployment platform and add these environment variables:
+1. `VITE_SUPABASE_URL` - Your Supabase project URL
+2. `VITE_SUPABASE_ANON_KEY` - Your Supabase anon/public key
+
+Then trigger a rebuild. The variables will be embedded into the JavaScript bundle.
+
+### General Platform (Render, Railway, Heroku, etc.)
+
+#### 1. Set Environment Variables FIRST
+In your platform's dashboard, add:
+- `VITE_SUPABASE_URL` = `https://xxxxxxxxxxxxx.supabase.co`
+- `VITE_SUPABASE_ANON_KEY` = `eyJhbGc...` (your anon key)
+
+#### 2. Build Command
+```bash
+npm install && npm run build
+```
+
+#### 3. Start Command
+```bash
+npm start
+```
+
+#### 4. Port Configuration
+The start command automatically uses the `PORT` environment variable set by the platform.
+
+#### 5. Trigger Deploy
+After setting variables, trigger a new deployment/build.
+
+### Platform-Specific Notes
+
+#### Render
+- **Type**: Web Service
+- **Build Command**: `npm install && npm run build`
+- **Start Command**: `npm start`
+- **Environment**: Add variables in Settings → Environment
+
+#### Vercel
+Create `vercel.json`:
+```json
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+#### Railway
+- Automatically detects Node.js
+- Set build command: `npm run build`
+- Set start command: `npm start`
+- Add environment variables in Settings
+
+#### Netlify
+Create `netlify.toml`:
+```toml
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+```
+
+## Troubleshooting
+
+### White Page / Blank Screen
+**Cause**: Missing static file server or incorrect routing configuration
+**Solution**: Ensure you're using the `npm start` command which uses `serve`
+
+### "Missing Supabase environment variables" Error
+**Cause**: Environment variables not set or not prefixed with `VITE_`
+**Solution**:
+1. Verify environment variables are set in your platform
+2. Ensure they're prefixed with `VITE_`
+3. Rebuild the application after setting variables
+
+### 404 Errors on Page Refresh
+**Cause**: Server not configured for SPA routing
+**Solution**: The `serve.json` file handles this automatically
+
+### RLS Policy Violations During Signup
+**Cause**: Missing tenant RLS policies
+**Solution**: Apply the migration: `npx supabase db push`
+
+### Build Failures
+**Cause**: Missing dependencies or TypeScript errors
+**Solution**:
 ```bash
 npm install
-```
-
-2. Run development server:
-```bash
-npm run dev
-```
-
-3. Open http://localhost:5173
-
-## Creating a Super Admin
-
-To create the first super admin user:
-
-1. Sign up through the normal flow at `/signup`
-2. In Supabase SQL Editor, run:
-```sql
-UPDATE users SET role = 'super_admin' WHERE email = 'your-email@example.com';
-```
-3. Access the admin panel at `/admin`
-
-## Deployment to Vercel
-
-1. Push your code to GitHub:
-```bash
-git remote add origin https://github.com/yourusername/dealer-copilot.git
-git push -u origin master
-```
-
-2. Connect to Vercel:
-   - Go to vercel.com and import your GitHub repository
-   - Add environment variables:
-     - `VITE_SUPABASE_URL`
-     - `VITE_SUPABASE_ANON_KEY`
-   - Deploy
-
-3. Your app will be live at: `https://your-project.vercel.app`
-
-## Deployment to Netlify
-
-1. Build the project:
-```bash
+npm run typecheck
 npm run build
 ```
 
-2. Deploy to Netlify:
-   - Go to netlify.com and create new site from Git
-   - Build command: `npm run build`
-   - Publish directory: `dist`
-   - Add environment variables:
-     - `VITE_SUPABASE_URL`
-     - `VITE_SUPABASE_ANON_KEY`
-
-3. Your app will be live at: `https://your-site.netlify.app`
-
 ## Post-Deployment Checklist
 
-- [ ] Verify database connections work
-- [ ] Test user signup flow
-- [ ] Test signin flow
-- [ ] Create a super admin account
-- [ ] Test VIN scanning functionality
-- [ ] Test dashboard loads correctly
-- [ ] Verify RLS policies are working (users can only see their own data)
-- [ ] Test onboarding flow
-- [ ] Check responsive design on mobile devices
+- [ ] Environment variables are set correctly
+- [ ] Database migrations are applied
+- [ ] Can access the landing page
+- [ ] Can sign up a new user
+- [ ] User and tenant records are created in database
+- [ ] Can sign in with created user
+- [ ] Dashboard loads correctly
+- [ ] Protected routes require authentication
 
-## Key Features Implemented
+## Testing Signup Flow
 
-### Multi-Tenant Architecture
-- Complete tenant isolation with RLS policies
-- Shared database with tenant-specific data access
-- Role-based access control (super_admin, tenant_admin, tenant_user)
+After deployment, test the complete signup flow:
 
-### Landing Page
-- Compelling sales-oriented design
-- Feature highlights
-- Pricing tiers
-- Call-to-action buttons
+1. Navigate to `/signup`
+2. Fill out the form with valid data
+3. Submit the form
+4. Verify in Supabase dashboard:
+   - User exists in `auth.users`
+   - Tenant record created in `tenants` table
+   - User profile created in `users` table
+   - Subscription created in `subscriptions` table
 
-### User Authentication
-- Supabase Auth integration
-- Email/password authentication
-- Protected routes
-- Session management
+## Monitoring
 
-### Dashboard
-- Inventory overview
-- Portfolio metrics
-- Recent VIN scans
-- Quick actions
+### Logs
+Check your deployment platform's logs for errors:
+- Build logs: Ensure build completes successfully
+- Runtime logs: Check for JavaScript errors or API failures
 
-### VIN Scanner
-- VIN input and validation
-- Mock vehicle decoding
-- Buy/caution/pass recommendations
-- Profit calculator
-- Match reasoning
+### Database
+Monitor Supabase dashboard for:
+- RLS policy violations
+- Failed queries
+- User activity
 
-### Onboarding
-- Website URL analysis
-- Progress indicators
-- Sample vehicle data creation
-- Portfolio overview
+## Security Considerations
 
-### Super Admin Panel
-- View all tenants
-- Tenant statistics
-- User management
-- Subscription tracking
+### Environment Variables
+- Never commit `.env` files to Git
+- Use platform-specific secret management
+- Rotate keys periodically
 
-## Next Steps for Production
+### Supabase
+- Use Row Level Security (RLS) policies (already configured)
+- Use anon key in frontend (not service role key)
+- Configure allowed domains in Supabase dashboard
 
-1. **Implement real VIN decoding**:
-   - Integrate NHTSA vPIC API
-   - Add commercial VIN provider (DataOne, Vehicle Databases)
-   - Implement caching strategy
+## Performance Optimization
 
-2. **Add payment processing**:
-   - Integrate Stripe
-   - Set up subscription webhooks
-   - Implement billing portal
+### Caching
+The `serve.json` configuration includes:
+- No caching for HTML files (always fresh)
+- Long-term caching for assets (images, fonts)
 
-3. **Enhance VIN scanning**:
-   - Add actual OCR capability
-   - Implement mobile camera integration
-   - Add offline support
+### Build Optimization
+Vite automatically:
+- Minifies JavaScript and CSS
+- Code splits by route
+- Optimizes assets
+- Tree-shakes unused code
 
-4. **Build inventory scraping**:
-   - Implement website scraping with Puppeteer
-   - Parse vehicle data from listings
-   - Schedule automatic updates
+## Rollback Procedure
 
-5. **Add analytics and reporting**:
-   - Sales performance tracking
-   - Sweet spot analysis
-   - Turn rate metrics
-   - Profit analytics
+If deployment fails:
 
-6. **Implement email notifications**:
-   - Welcome emails
-   - Sale confirmations
-   - Subscription updates
-   - Recommendation alerts
+1. **Revert Code**:
+   ```bash
+   git revert HEAD
+   git push
+   ```
+
+2. **Revert Database** (if needed):
+   ```bash
+   # In Supabase dashboard, use SQL editor to manually revert
+   # Or use migration down scripts if available
+   ```
+
+3. **Redeploy Previous Version**: Most platforms allow redeploying previous deployments from their dashboard
 
 ## Support
 
-For questions or issues:
-- Email: support@dealercopilot.com
-- Documentation: See README.md
-
-## License
-
-Proprietary - All rights reserved
+For issues:
+1. Check deployment platform logs
+2. Check browser console for errors
+3. Check Supabase logs
+4. Review this troubleshooting guide

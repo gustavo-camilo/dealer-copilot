@@ -1,12 +1,13 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Vehicle, SalesRecord, VINScan } from '../types/database';
-import { BarChart3, Car, TrendingUp, Clock, Target, Scan } from 'lucide-react';
+import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Menu, X, LogOut, Settings, Globe } from 'lucide-react';
 
 export default function DashboardPage() {
-  const { user, tenant } = useAuth();
+  const { user, tenant, signOut } = useAuth();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
     totalVehicles: 0,
     portfolioValue: 0,
@@ -15,6 +16,16 @@ export default function DashboardPage() {
   });
   const [recentScans, setRecentScans] = useState<VINScan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   useEffect(() => {
     loadDashboardData();
@@ -89,16 +100,78 @@ export default function DashboardPage() {
               <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{tenant?.name}</span>
+              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
               <Link
                 to="/scan"
-                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition"
+                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
               >
                 Scan VIN
               </Link>
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition"
+              >
+                {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
             </div>
           </div>
         </div>
+
+        {/* Dropdown Menu */}
+        {menuOpen && (
+          <div className="absolute right-4 top-16 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+            <div className="p-4 border-b border-gray-200">
+              <p className="text-sm font-semibold text-gray-900">{user?.full_name}</p>
+              <p className="text-xs text-gray-500">{user?.email}</p>
+              <p className="text-xs text-gray-500 mt-1">{tenant?.name}</p>
+            </div>
+            <div className="py-2">
+              <Link
+                to="/inventory"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => setMenuOpen(false)}
+              >
+                <Car className="h-4 w-4 mr-3" />
+                Manage Inventory
+              </Link>
+              <Link
+                to="/recommendations"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => setMenuOpen(false)}
+              >
+                <Target className="h-4 w-4 mr-3" />
+                View Recommendations
+              </Link>
+              <Link
+                to="/onboarding"
+                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                onClick={() => setMenuOpen(false)}
+              >
+                <Globe className="h-4 w-4 mr-3" />
+                Scan Website
+              </Link>
+              {user?.role === 'super_admin' && (
+                <Link
+                  to="/admin"
+                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                  onClick={() => setMenuOpen(false)}
+                >
+                  <Settings className="h-4 w-4 mr-3" />
+                  Admin Panel
+                </Link>
+              )}
+            </div>
+            <div className="border-t border-gray-200 py-2">
+              <button
+                onClick={handleSignOut}
+                className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+              >
+                <LogOut className="h-4 w-4 mr-3" />
+                Sign Out
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
