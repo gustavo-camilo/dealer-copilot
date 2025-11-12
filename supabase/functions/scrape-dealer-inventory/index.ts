@@ -27,6 +27,92 @@ interface ScrapingResult {
   duration_ms: number;
 }
 
+/**
+ * Find potential inventory pages on a dealer website
+ */
+async function findInventoryPages(baseUrl: string): Promise<string[]> {
+  const urls: string[] = [];
+
+  // Common inventory page patterns
+  const inventoryPaths = [
+    '/inventory',
+    '/used-cars',
+    '/vehicles',
+    '/cars',
+    '/used-inventory',
+    '/pre-owned',
+    '/search',
+    '/stock',
+    '/cars-for-sale',
+    '/used-vehicles',
+    '/inventory.html',
+    '/inventory.php',
+  ];
+
+  // Parse base URL
+  const url = new URL(baseUrl);
+  const baseUrlClean = `${url.protocol}//${url.host}`;
+
+  // First, try to fetch the homepage and look for inventory links
+  try {
+    const response = await fetch(baseUrl, {
+      headers: {
+        'User-Agent':
+          'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+      },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+
+      // Look for links that might lead to inventory
+      const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
+      const matches = [...html.matchAll(linkRegex)];
+
+      for (const match of matches) {
+        const href = match[1];
+        const text = match[2].toLowerCase();
+
+        // Check if link text suggests inventory
+        if (
+          text.includes('inventory') ||
+          text.includes('vehicles') ||
+          text.includes('cars') ||
+          text.includes('search') ||
+          text.includes('browse')
+        ) {
+          try {
+            const fullUrl = new URL(href, baseUrl).href;
+            if (!urls.includes(fullUrl)) {
+              urls.push(fullUrl);
+            }
+          } catch {
+            // Invalid URL, skip
+          }
+        }
+      }
+    }
+  } catch (error) {
+    console.log('Error fetching homepage:', error.message);
+  }
+
+  // Add common inventory paths
+  for (const path of inventoryPaths) {
+    const fullUrl = `${baseUrlClean}${path}`;
+    if (!urls.includes(fullUrl)) {
+      urls.push(fullUrl);
+    }
+  }
+
+  // If no specific URLs found, at least try the homepage
+  if (urls.length === 0) {
+    urls.push(baseUrl);
+  }
+
+  return urls;
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -99,25 +185,51 @@ serve(async (req) => {
           throw new Error(`Failed to create snapshot: ${snapshotError.message}`);
         }
 
-        // Fetch dealer website
-        const response = await fetch(tenant.website_url, {
-          headers: {
-            'User-Agent':
-              'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-            Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-          },
-          signal: AbortSignal.timeout(30000), // 30 second timeout
-        });
+        // Try to find inventory pages
+        const inventoryUrls = await findInventoryPages(tenant.website_url);
 
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        console.log(`Found ${inventoryUrls.length} inventory URL(s) to scrape`);
+
+        let vehicles: any[] = [];
+
+        // Try each inventory URL
+        for (const url of inventoryUrls) {
+          try {
+            console.log(`Fetching ${url}...`);
+
+            const response = await fetch(url, {
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+                Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+              },
+              signal: AbortSignal.timeout(30000), // 30 second timeout
+            });
+
+            if (!response.ok) {
+              console.log(`HTTP ${response.status} for ${url}, skipping...`);
+              continue;
+            }
+
+            const html = await response.text();
+
+            // Parse inventory from HTML
+            const pageVehicles = parseInventoryHTML(html, url);
+
+            console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
+
+            vehicles = vehicles.concat(pageVehicles);
+
+            // If we found vehicles, we can stop (unless we want to check all pages)
+            if (vehicles.length > 0) {
+              break;
+            }
+          } catch (error) {
+            console.log(`Error fetching ${url}:`, error.message);
+            // Continue to next URL
+          }
         }
-
-        const html = await response.text();
-
-        // Parse inventory from HTML
-        const vehicles = parseInventoryHTML(html, tenant.website_url);
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
