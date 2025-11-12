@@ -1,118 +1,321 @@
-# Deployment Checklist - Fix Blank Page Issue
+# 🎯 Website Scraping - Deployment Checklist
 
-## The Problem
-Your app shows a blank page with the error:
-```
-Uncaught Error: Missing Supabase environment variables
-```
+Use this checklist to deploy the website scraping system step-by-step.
 
-This happens because Vite embeds environment variables at **build time**, and your deployment platform doesn't have them set.
+---
 
-## Quick Fix (Follow in Order)
+## ✅ **PRE-DEPLOYMENT**
 
-### Step 1: Get Your Supabase Credentials
-1. Go to https://supabase.com/dashboard
-2. Select your project
-3. Click **Settings** (gear icon) → **API**
-4. Copy these two values:
-   - **Project URL** (looks like: `https://xxxxxxxxxxxxx.supabase.co`)
-   - **anon public** key (under "Project API keys")
+- [ ] VIN Decoder is working correctly
+- [ ] Have at least 1 dealer with `website_url` in database
+- [ ] Supabase account is active
+- [ ] Have access to Supabase Dashboard
 
-### Step 2: Add Environment Variables to Your Deployment Platform
+---
 
-Choose your platform:
+## 📊 **STEP 1: DATABASE SETUP** (5 min)
 
-#### **Render**
-1. Go to your service dashboard
-2. Click **Environment** in the left sidebar
-3. Add two environment variables:
-   - Key: `VITE_SUPABASE_URL` → Value: (paste your Project URL)
-   - Key: `VITE_SUPABASE_ANON_KEY` → Value: (paste your anon key)
-4. Click **Save Changes**
+- [ ] Open Supabase Dashboard
+- [ ] Navigate to SQL Editor
+- [ ] Create New Query
+- [ ] Copy contents of `SCRAPING_DATABASE_MIGRATION.sql`
+- [ ] Paste and click "Run"
+- [ ] Verify success message: ✅ "Website scraping database schema created successfully!"
+- [ ] Run verification query:
+  ```sql
+  SELECT table_name FROM information_schema.tables
+  WHERE table_name IN ('inventory_snapshots', 'vehicle_history', 'scraping_logs');
+  ```
+- [ ] Confirm 3 tables returned
 
-#### **Vercel**
-1. Go to your project
-2. Click **Settings** → **Environment Variables**
-3. Add both variables (same as above)
-4. Make sure they're enabled for Production
-5. Click **Save**
+**Status:** ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Failed
 
-#### **Railway**
-1. Go to your project
-2. Click **Variables** tab
-3. Click **+ New Variable**
-4. Add both variables (same as above)
+---
 
-#### **Netlify**
-1. Go to **Site configuration** → **Environment variables**
-2. Add both variables (same as above)
-3. Click **Save**
+## 🛠️ **STEP 2: CLI SETUP** (10 min)
 
-#### **Heroku**
-1. Go to your app dashboard
-2. Click **Settings** → **Config Vars** → **Reveal Config Vars**
-3. Add both variables (same as above)
+- [ ] Install Supabase CLI: `npm install -g supabase`
+- [ ] Login: `supabase login`
+- [ ] Navigate to project: `cd /Users/gustavocamilo/Documents/GitHub/dealer-copilot`
+- [ ] Link project: `supabase link --project-ref ueoovsjhaxykewtsnbqx`
+- [ ] Verify link successful
 
-### Step 3: Trigger a Rebuild
-After adding the environment variables, you MUST rebuild:
+**Status:** ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Failed
 
-- **Render**: Click **Manual Deploy** → **Deploy latest commit**
-- **Vercel**: Go to **Deployments** → Click the three dots → **Redeploy**
-- **Railway**: Click **Deploy** or push a new commit
-- **Netlify**: Click **Trigger deploy** → **Deploy site**
-- **Heroku**: `git commit --allow-empty -m "Trigger rebuild" && git push heroku main`
+---
 
-### Step 4: Apply Database Migration (Also Critical!)
-The RLS policies also need to be fixed. Run this command locally:
+## 🚀 **STEP 3: DEPLOY FUNCTION** (5 min)
 
-```bash
-npx supabase db push
-```
+- [ ] Deploy command: `supabase functions deploy scrape-dealer-inventory`
+- [ ] Note the function URL from output
+- [ ] Copy URL: `https://ueoovsjhaxykewtsnbqx.supabase.co/functions/v1/scrape-dealer-inventory`
 
-This applies the migration that fixes the "new row violates row-level security policy for table 'tenants'" error.
+**Status:** ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Failed
 
-### Step 5: Verify It Works
-1. Wait for deployment to complete (check logs)
-2. Visit your deployed URL
-3. You should now see the landing page (not a blank page!)
-4. Navigate to `/signup`
-5. Try creating a test account
-6. Verify it works without RLS errors
+---
 
-## Common Mistakes
+## 🔐 **STEP 4: CONFIGURE SECRETS** (5 min)
 
-❌ **Setting variables without rebuilding** - Variables are embedded at build time
-❌ **Missing the `VITE_` prefix** - Must be `VITE_SUPABASE_URL`, not just `SUPABASE_URL`
-❌ **Using service_role key instead of anon key** - Use the anon/public key
-❌ **Not applying the database migration** - Run `npx supabase db push`
+- [ ] Get Service Role Key from Supabase Dashboard → Settings → API
+- [ ] Set SUPABASE_URL secret:
+  ```bash
+  supabase secrets set SUPABASE_URL=https://ueoovsjhaxykewtsnbqx.supabase.co
+  ```
+- [ ] Set SERVICE_ROLE_KEY secret:
+  ```bash
+  supabase secrets set SUPABASE_SERVICE_ROLE_KEY=your_actual_key_here
+  ```
+- [ ] Verify secrets set: `supabase secrets list`
 
-## Still Not Working?
+**Status:** ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Failed
 
-### Check Build Logs
-Look for these in your platform's build logs:
-```
-✓ built in Xms
-```
+---
 
-If you see errors, the build failed.
+## 🧪 **STEP 5: MANUAL TEST** (10 min)
 
-### Check Browser Console
-Open DevTools (F12) → Console tab
-- No errors? → Environment variables are working
-- "Missing Supabase environment variables"? → Variables not set or rebuild needed
-- Other errors? → Check the error message
+### First Test - Check Function Works:
 
-### Check Environment Variables Were Applied
-Add this temporarily to verify (then remove):
+- [ ] Save your Service Role Key to a variable:
+  ```bash
+  export SERVICE_ROLE_KEY="your_key_here"
+  ```
 
-In `src/lib/supabase.ts`, add console logs:
-```typescript
-console.log('VITE_SUPABASE_URL:', import.meta.env.VITE_SUPABASE_URL);
-console.log('Has anon key:', !!import.meta.env.VITE_SUPABASE_ANON_KEY);
-```
+- [ ] Test the function:
+  ```bash
+  curl -X POST \
+    'https://ueoovsjhaxykewtsnbqx.supabase.co/functions/v1/scrape-dealer-inventory' \
+    -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+    -H 'Content-Type: application/json' \
+    -d '{}'
+  ```
 
-Deploy again and check the console. If they're undefined, the variables weren't embedded during build.
+- [ ] Expected response includes: `"success": true`
+- [ ] Note: vehicles_found, new_vehicles, etc.
 
-## Need More Help?
+### Verify Data in Database:
 
-See the full [DEPLOYMENT.md](./DEPLOYMENT.md) guide for detailed platform-specific instructions.
+- [ ] Check inventory_snapshots:
+  ```sql
+  SELECT * FROM inventory_snapshots ORDER BY snapshot_date DESC LIMIT 5;
+  ```
+
+- [ ] Check vehicle_history:
+  ```sql
+  SELECT * FROM vehicle_history ORDER BY last_seen_at DESC LIMIT 10;
+  ```
+
+- [ ] Check scraping_logs:
+  ```sql
+  SELECT * FROM scraping_logs ORDER BY created_at DESC LIMIT 10;
+  ```
+
+### Test Results:
+- [ ] Vehicles found: _____ (write number)
+- [ ] New vehicles added: _____
+- [ ] Errors encountered: _____ (should be 0)
+
+**Status:** ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Failed
+
+---
+
+## ⏰ **STEP 6: ENABLE DAILY CRON** (5 min)
+
+- [ ] Open Supabase SQL Editor
+- [ ] Create New Query
+- [ ] Paste cron setup SQL:
+  ```sql
+  CREATE EXTENSION IF NOT EXISTS pg_cron;
+
+  SELECT cron.schedule(
+    'daily-dealer-scraping',
+    '0 2 * * *',
+    $$
+    SELECT net.http_post(
+      url := 'https://ueoovsjhaxykewtsnbqx.supabase.co/functions/v1/scrape-dealer-inventory',
+      headers := jsonb_build_object(
+        'Authorization', 'Bearer YOUR_SERVICE_ROLE_KEY_HERE',
+        'Content-Type', 'application/json'
+      ),
+      body := '{}'::jsonb
+    );
+    $$
+  );
+  ```
+- [ ] Replace `YOUR_SERVICE_ROLE_KEY_HERE` with actual key
+- [ ] Run the query
+- [ ] Verify cron job created:
+  ```sql
+  SELECT * FROM cron.job;
+  ```
+- [ ] Confirm job named "daily-dealer-scraping" exists
+
+**Status:** ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Failed
+
+---
+
+## 🎨 **STEP 7: CUSTOMIZE PARSER** (Optional - 30 min)
+
+Only if generic parser doesn't extract vehicles correctly.
+
+- [ ] Save dealer website HTML to file:
+  ```bash
+  curl "https://dealer-website.com/inventory" > test.html
+  ```
+
+- [ ] Open test.html and inspect structure
+- [ ] Identify vehicle card pattern
+- [ ] Edit `supabase/functions/scrape-dealer-inventory/parser.ts`
+- [ ] Add custom parsing logic
+- [ ] Redeploy: `supabase functions deploy scrape-dealer-inventory`
+- [ ] Re-test with manual trigger
+- [ ] Verify improved results
+
+**Status:** ⬜ Not Needed | 🟡 In Progress | ✅ Complete | ❌ Failed
+
+---
+
+## 📊 **STEP 8: MONITOR FIRST WEEK** (Daily - 5 min)
+
+### Day 1 (Deployment Day):
+- [ ] Manual test completed successfully
+- [ ] Cron scheduled for tomorrow 2 AM
+
+### Day 2 (After First Automatic Run):
+- [ ] Check if cron ran:
+  ```sql
+  SELECT * FROM inventory_snapshots
+  WHERE snapshot_date >= CURRENT_DATE
+  ORDER BY snapshot_date DESC;
+  ```
+- [ ] Verify vehicles found: _____
+- [ ] Check for errors in scraping_logs
+- [ ] Action needed: ⬜ None | 🟡 Investigate | ❌ Fix required
+
+### Day 3-7 (Monitor Daily):
+- [ ] Day 3: Cron ran ✅ | Vehicles: _____ | Status: _____
+- [ ] Day 4: Cron ran ✅ | Vehicles: _____ | Status: _____
+- [ ] Day 5: Cron ran ✅ | Vehicles: _____ | Status: _____
+- [ ] Day 6: Cron ran ✅ | Vehicles: _____ | Status: _____
+- [ ] Day 7: Cron ran ✅ | Vehicles: _____ | Status: _____
+
+### After 1 Week:
+- [ ] All scraping runs successful
+- [ ] Vehicles being tracked correctly
+- [ ] Price changes detected (if any)
+- [ ] No major errors in logs
+- [ ] Ready to add more dealers
+
+**Status:** ⬜ Not Started | 🟡 In Progress | ✅ Complete | ❌ Issues Found
+
+---
+
+## 🎯 **STEP 9: ADD MORE DEALERS** (As needed)
+
+For each new dealer:
+- [ ] Ensure tenant has `website_url` set in database
+- [ ] Trigger manual scrape for that tenant:
+  ```bash
+  curl -X POST \
+    'https://ueoovsjhaxykewtsnbqx.supabase.co/functions/v1/scrape-dealer-inventory' \
+    -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+    -H 'Content-Type: application/json' \
+    -d '{"tenant_id": "TENANT_UUID_HERE"}'
+  ```
+- [ ] Verify data extracted correctly
+- [ ] Customize parser if needed
+- [ ] Add to daily cron (automatic)
+
+**Dealers Added:**
+1. [ ] Dealer 1: _________________ | Status: _______
+2. [ ] Dealer 2: _________________ | Status: _______
+3. [ ] Dealer 3: _________________ | Status: _______
+
+---
+
+## 🔍 **TROUBLESHOOTING CHECKLIST**
+
+### If No Vehicles Found:
+- [ ] Check website is accessible (not blocking bots)
+- [ ] Inspect HTML structure manually
+- [ ] Verify parser matches HTML patterns
+- [ ] Check scraping_logs for specific errors
+- [ ] Try customizing parser
+
+### If Function Times Out:
+- [ ] Check website response time
+- [ ] Reduce number of tenants per run
+- [ ] Split into multiple cron jobs
+- [ ] Check for infinite loops in parser
+
+### If Cron Not Running:
+- [ ] Verify pg_cron extension enabled
+- [ ] Check cron job exists: `SELECT * FROM cron.job;`
+- [ ] Check service role key is correct
+- [ ] View cron logs: `SELECT * FROM cron.job_run_details ORDER BY start_time DESC;`
+
+### If Duplicate Sales Records:
+- [ ] Check VIN extraction working correctly
+- [ ] Verify unique constraint on sales_records
+- [ ] Review trigger logic
+
+---
+
+## 📈 **SUCCESS METRICS**
+
+After 1 Week:
+- [ ] 7/7 successful scraping runs
+- [ ] Average vehicles per run: _____
+- [ ] Total vehicles tracked: _____
+- [ ] Vehicles marked as sold: _____
+- [ ] Sales records created: _____
+- [ ] Average scraping duration: _____ ms
+
+After 1 Month:
+- [ ] 30/30 successful scraping runs
+- [ ] Built meaningful sales history
+- [ ] Price trends visible
+- [ ] VIN decoder confidence improved
+- [ ] Zero intervention required
+
+---
+
+## 🎓 **KNOWLEDGE CHECK**
+
+Before marking complete, ensure you understand:
+
+- [ ] How the scraping function works
+- [ ] How to read inventory_snapshots data
+- [ ] How vehicle_history tracks changes
+- [ ] How sold vehicles are detected
+- [ ] How to troubleshoot common issues
+- [ ] How to customize the parser
+- [ ] How to monitor scraping health
+- [ ] Where to find logs and errors
+
+---
+
+## ✨ **DEPLOYMENT COMPLETE!**
+
+When all steps are ✅:
+
+- [ ] System is scraping automatically daily
+- [ ] Data is being tracked correctly
+- [ ] Sales history is building
+- [ ] VIN decoder will improve over time
+- [ ] No manual intervention needed
+
+**Deployment Date:** _______________
+**Deployed By:** _______________
+**Notes:** _______________
+
+---
+
+## 📞 **NEXT STEPS**
+
+- [ ] Review data after 1 week
+- [ ] Add admin dashboard (optional)
+- [ ] Set up email alerts (optional)
+- [ ] Expand to more dealers
+- [ ] Integrate with VIN recommendations
+
+**Congratulations! 🎉 Website scraping is live!**
