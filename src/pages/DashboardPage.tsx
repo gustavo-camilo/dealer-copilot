@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Vehicle, SalesRecord, VINScan } from '../types/database';
-import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Menu, X, LogOut, Settings, Globe } from 'lucide-react';
+import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Menu, X, LogOut, Settings, Globe, ChevronRight, Package } from 'lucide-react';
 
 export default function DashboardPage() {
   const { user, tenant, signOut } = useAuth();
@@ -15,6 +15,7 @@ export default function DashboardPage() {
     weekSales: 0,
   });
   const [recentScans, setRecentScans] = useState<VINScan[]>([]);
+  const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -35,12 +36,14 @@ export default function DashboardPage() {
     if (!user?.tenant_id) return;
 
     try {
+      // Load vehicles
       const { data: vehicles } = await supabase
         .from('vehicles')
         .select('*')
         .eq('tenant_id', user.tenant_id)
         .eq('status', 'available');
 
+      // Load recent sales
       const { data: recentSales } = await supabase
         .from('sales_records')
         .select('*')
@@ -48,11 +51,22 @@ export default function DashboardPage() {
         .gte('sale_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .order('sale_date', { ascending: false });
 
+      // Load recent VIN scans (limit 5)
       const { data: scans } = await supabase
         .from('vin_scans')
         .select('*')
         .eq('tenant_id', user.tenant_id)
         .order('created_at', { ascending: false })
+        .limit(5);
+
+      // Load recommendations (vehicles with "buy" recommendation)
+      const { data: recs } = await supabase
+        .from('vin_scans')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .eq('recommendation', 'buy')
+        .gte('confidence_score', 70)
+        .order('confidence_score', { ascending: false })
         .limit(5);
 
       if (vehicles) {
@@ -71,6 +85,10 @@ export default function DashboardPage() {
 
       if (scans) {
         setRecentScans(scans);
+      }
+
+      if (recs) {
+        setRecommendations(recs);
       }
     } catch (error) {
       console.error('Error loading dashboard data:', error);
@@ -92,6 +110,7 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -99,7 +118,7 @@ export default function DashboardPage() {
               <Target className="h-8 w-8 text-blue-900" />
               <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-4 relative">
               <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
               <Link
                 to="/scan"
@@ -107,71 +126,82 @@ export default function DashboardPage() {
               >
                 Scan VIN
               </Link>
-              <button
-                onClick={() => setMenuOpen(!menuOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition"
-              >
-                {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-              </button>
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition"
+                  aria-label="Menu"
+                >
+                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
+
+                {/* Dropdown Menu - positioned relative to button */}
+                {menuOpen && (
+                  <>
+                    {/* Backdrop for mobile */}
+                    <div
+                      className="fixed inset-0 z-40 md:hidden"
+                      onClick={() => setMenuOpen(false)}
+                    />
+                    {/* Menu */}
+                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
+                      <div className="p-4 border-b border-gray-200">
+                        <p className="text-sm font-semibold text-gray-900">{user?.full_name}</p>
+                        <p className="text-xs text-gray-500">{user?.email}</p>
+                        <p className="text-xs text-gray-500 mt-1">{tenant?.name}</p>
+                      </div>
+                      <div className="py-2">
+                        <Link
+                          to="/inventory"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Car className="h-4 w-4 mr-3" />
+                          Manage Inventory
+                        </Link>
+                        <Link
+                          to="/recommendations"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Target className="h-4 w-4 mr-3" />
+                          View Recommendations
+                        </Link>
+                        <Link
+                          to="/onboarding"
+                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Globe className="h-4 w-4 mr-3" />
+                          Scan Website
+                        </Link>
+                        {user?.role === 'super_admin' && (
+                          <Link
+                            to="/admin"
+                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            onClick={() => setMenuOpen(false)}
+                          >
+                            <Settings className="h-4 w-4 mr-3" />
+                            Admin Panel
+                          </Link>
+                        )}
+                      </div>
+                      <div className="border-t border-gray-200 py-2">
+                        <button
+                          onClick={handleSignOut}
+                          className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                        >
+                          <LogOut className="h-4 w-4 mr-3" />
+                          Sign Out
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </div>
             </div>
           </div>
         </div>
-
-        {/* Dropdown Menu */}
-        {menuOpen && (
-          <div className="absolute right-4 top-16 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-            <div className="p-4 border-b border-gray-200">
-              <p className="text-sm font-semibold text-gray-900">{user?.full_name}</p>
-              <p className="text-xs text-gray-500">{user?.email}</p>
-              <p className="text-xs text-gray-500 mt-1">{tenant?.name}</p>
-            </div>
-            <div className="py-2">
-              <Link
-                to="/inventory"
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                onClick={() => setMenuOpen(false)}
-              >
-                <Car className="h-4 w-4 mr-3" />
-                Manage Inventory
-              </Link>
-              <Link
-                to="/recommendations"
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                onClick={() => setMenuOpen(false)}
-              >
-                <Target className="h-4 w-4 mr-3" />
-                View Recommendations
-              </Link>
-              <Link
-                to="/onboarding"
-                className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                onClick={() => setMenuOpen(false)}
-              >
-                <Globe className="h-4 w-4 mr-3" />
-                Scan Website
-              </Link>
-              {user?.role === 'super_admin' && (
-                <Link
-                  to="/admin"
-                  className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
-                  onClick={() => setMenuOpen(false)}
-                >
-                  <Settings className="h-4 w-4 mr-3" />
-                  Admin Panel
-                </Link>
-              )}
-            </div>
-            <div className="border-t border-gray-200 py-2">
-              <button
-                onClick={handleSignOut}
-                className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
-              >
-                <LogOut className="h-4 w-4 mr-3" />
-                Sign Out
-              </button>
-            </div>
-          </div>
-        )}
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -180,6 +210,7 @@ export default function DashboardPage() {
           <p className="text-gray-600 mt-1">{tenant?.location}</p>
         </div>
 
+        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
             <div className="flex items-center justify-between mb-2">
@@ -216,47 +247,101 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-            <div className="space-y-3">
-              <Link
-                to="/scan"
-                className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-              >
-                <Scan className="h-6 w-6 text-orange-600 mr-3" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Scan VIN at Auction</h3>
-                  <p className="text-sm text-gray-600">Get instant buy/no-buy guidance</p>
-                </div>
-              </Link>
+        {/* Quick Actions - Button Cards */}
+        <div className="mb-8">
+          <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Link
+              to="/scan"
+              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-orange-600 hover:shadow-md transition text-center"
+            >
+              <Scan className="h-8 w-8 text-orange-600 mx-auto mb-2" />
+              <h3 className="font-semibold text-gray-900 text-sm">Scan VIN</h3>
+            </Link>
 
-              <Link
-                to="/inventory"
-                className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-              >
-                <Car className="h-6 w-6 text-blue-900 mr-3" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">Manage Inventory</h3>
-                  <p className="text-sm text-gray-600">View and update your vehicles</p>
-                </div>
-              </Link>
+            <Link
+              to="/inventory"
+              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-blue-900 hover:shadow-md transition text-center"
+            >
+              <Car className="h-8 w-8 text-blue-900 mx-auto mb-2" />
+              <h3 className="font-semibold text-gray-900 text-sm">Inventory</h3>
+            </Link>
 
-              <Link
-                to="/recommendations"
-                className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition"
-              >
-                <Target className="h-6 w-6 text-blue-900 mr-3" />
-                <div>
-                  <h3 className="font-semibold text-gray-900">View Recommendations</h3>
-                  <p className="text-sm text-gray-600">See what you should buy next</p>
-                </div>
-              </Link>
-            </div>
+            <Link
+              to="/recommendations"
+              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-blue-900 hover:shadow-md transition text-center"
+            >
+              <Target className="h-8 w-8 text-blue-900 mx-auto mb-2" />
+              <h3 className="font-semibold text-gray-900 text-sm">Recommendations</h3>
+            </Link>
+
+            <Link
+              to="/onboarding"
+              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-blue-900 hover:shadow-md transition text-center"
+            >
+              <Globe className="h-8 w-8 text-blue-900 mx-auto mb-2" />
+              <h3 className="font-semibold text-gray-900 text-sm">Scan Website</h3>
+            </Link>
           </div>
+        </div>
 
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Buy Recommendations */}
+          {recommendations.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Recommended to Buy</h2>
+                <Link
+                  to="/recommendations"
+                  className="text-sm text-blue-900 hover:text-blue-800 font-semibold flex items-center"
+                >
+                  View All
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              </div>
+              <div className="space-y-3">
+                {recommendations.map((rec) => (
+                  <div key={rec.id} className="p-3 border border-green-200 bg-green-50 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center">
+                          <span className="font-semibold text-gray-900">
+                            {rec.decoded_data.year} {rec.decoded_data.make} {rec.decoded_data.model}
+                          </span>
+                          <span className="ml-2 px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800">
+                            BUY
+                          </span>
+                        </div>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Max Bid: ${rec.max_bid_suggestion?.toLocaleString() || 'N/A'}
+                        </p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm font-semibold text-green-700">
+                          {rec.confidence_score}%
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Recent VIN Scans */}
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-xl font-bold text-gray-900 mb-4">Recent VIN Scans</h2>
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-bold text-gray-900">Recent VIN Scans</h2>
+              {recentScans.length > 0 && (
+                <Link
+                  to="/vin-scans"
+                  className="text-sm text-blue-900 hover:text-blue-800 font-semibold flex items-center"
+                >
+                  View All
+                  <ChevronRight className="h-4 w-4 ml-1" />
+                </Link>
+              )}
+            </div>
             {recentScans.length === 0 ? (
               <div className="text-center py-8 text-gray-500">
                 <Scan className="h-12 w-12 mx-auto mb-3 text-gray-300" />
@@ -271,7 +356,7 @@ export default function DashboardPage() {
             ) : (
               <div className="space-y-3">
                 {recentScans.map((scan) => (
-                  <div key={scan.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg">
+                  <div key={scan.id} className="flex items-center justify-between p-3 border border-gray-200 rounded-lg hover:bg-gray-50 transition">
                     <div className="flex-1">
                       <div className="flex items-center">
                         <span className="font-semibold text-gray-900">
@@ -303,6 +388,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
+        {/* Welcome Message */}
         {stats.totalVehicles === 0 && (
           <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
             <h3 className="text-lg font-bold text-blue-900 mb-2">

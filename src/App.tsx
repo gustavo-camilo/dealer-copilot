@@ -6,6 +6,9 @@ import SignInPage from './pages/SignInPage';
 import DashboardPage from './pages/DashboardPage';
 import OnboardingPage from './pages/OnboardingPage';
 import VINScanPage from './pages/VINScanPage';
+import VINScansPage from './pages/VINScansPage';
+import ManageInventoryPage from './pages/ManageInventoryPage';
+import RecommendationsPage from './pages/RecommendationsPage';
 import AdminPage from './pages/AdminPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -94,6 +97,30 @@ function App() {
             element={
               <ProtectedRoute>
                 <VINScanPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/vin-scans"
+            element={
+              <ProtectedRoute>
+                <VINScansPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/inventory"
+            element={
+              <ProtectedRoute>
+                <ManageInventoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/recommendations"
+            element={
+              <ProtectedRoute>
+                <RecommendationsPage />
               </ProtectedRoute>
             }
           />
