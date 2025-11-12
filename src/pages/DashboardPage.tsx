@@ -135,63 +135,99 @@ export default function DashboardPage() {
                   {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
                 </button>
 
-                {/* Dropdown Menu - positioned relative to button */}
+                {/* Full-Page Mobile Menu / Dropdown for Desktop */}
                 {menuOpen && (
                   <>
-                    {/* Backdrop for mobile */}
+                    {/* Full-page overlay on mobile, backdrop on desktop */}
                     <div
-                      className="fixed inset-0 z-40 md:hidden"
+                      className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 md:hidden"
                       onClick={() => setMenuOpen(false)}
                     />
-                    {/* Menu */}
-                    <div className="absolute right-0 mt-2 w-64 bg-white rounded-lg shadow-lg border border-gray-200 z-50">
-                      <div className="p-4 border-b border-gray-200">
-                        <p className="text-sm font-semibold text-gray-900">{user?.full_name}</p>
-                        <p className="text-xs text-gray-500">{user?.email}</p>
-                        <p className="text-xs text-gray-500 mt-1">{tenant?.name}</p>
+
+                    {/* Mobile: Full-page menu, Desktop: Dropdown */}
+                    <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200">
+                      {/* Mobile Header */}
+                      <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
+                        <div className="flex items-center">
+                          <Target className="h-6 w-6 text-blue-900" />
+                          <span className="ml-2 text-lg font-bold text-gray-900">Menu</span>
+                        </div>
+                        <button
+                          onClick={() => setMenuOpen(false)}
+                          className="p-2 rounded-lg hover:bg-gray-100"
+                        >
+                          <X className="h-6 w-6" />
+                        </button>
                       </div>
-                      <div className="py-2">
+
+                      {/* User Info */}
+                      <div className="p-6 md:p-4 border-b border-gray-200">
+                        <p className="text-base md:text-sm font-semibold text-gray-900">{user?.full_name}</p>
+                        <p className="text-sm md:text-xs text-gray-500">{user?.email}</p>
+                        <p className="text-sm md:text-xs text-gray-500 mt-1">{tenant?.name}</p>
+                      </div>
+
+                      {/* Menu Items */}
+                      <div className="py-4 md:py-2">
                         <Link
-                          to="/inventory"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          to="/scan"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 md:hidden"
                           onClick={() => setMenuOpen(false)}
                         >
-                          <Car className="h-4 w-4 mr-3" />
+                          <Scan className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3 text-orange-600" />
+                          Scan VIN
+                        </Link>
+                        <Link
+                          to="/inventory"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Car className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
                           Manage Inventory
                         </Link>
                         <Link
                           to="/recommendations"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setMenuOpen(false)}
                         >
-                          <Target className="h-4 w-4 mr-3" />
+                          <Target className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
                           View Recommendations
                         </Link>
                         <Link
-                          to="/onboarding"
-                          className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                          to="/vin-scans"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
                           onClick={() => setMenuOpen(false)}
                         >
-                          <Globe className="h-4 w-4 mr-3" />
+                          <Package className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                          VIN Scan History
+                        </Link>
+                        <Link
+                          to="/onboarding"
+                          className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
+                          onClick={() => setMenuOpen(false)}
+                        >
+                          <Globe className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
                           Scan Website
                         </Link>
                         {user?.role === 'super_admin' && (
                           <Link
                             to="/admin"
-                            className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+                            className="flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50"
                             onClick={() => setMenuOpen(false)}
                           >
-                            <Settings className="h-4 w-4 mr-3" />
+                            <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
                             Admin Panel
                           </Link>
                         )}
                       </div>
-                      <div className="border-t border-gray-200 py-2">
+
+                      {/* Sign Out */}
+                      <div className="border-t border-gray-200 py-4 md:py-2 mt-auto">
                         <button
                           onClick={handleSignOut}
-                          className="flex items-center w-full px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                          className="flex items-center w-full px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-red-600 hover:bg-red-50"
                         >
-                          <LogOut className="h-4 w-4 mr-3" />
+                          <LogOut className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
                           Sign Out
                         </button>
                       </div>
@@ -208,43 +244,6 @@ export default function DashboardPage() {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">{tenant?.location}</p>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Total Vehicles</h3>
-              <Car className="h-5 w-5 text-blue-900" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{stats.totalVehicles}</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Portfolio Value</h3>
-              <BarChart3 className="h-5 w-5 text-blue-900" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">
-              ${stats.portfolioValue.toLocaleString()}
-            </p>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Avg Days on Lot</h3>
-              <Clock className="h-5 w-5 text-blue-900" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{stats.avgDaysInInventory}</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">This Week's Sales</h3>
-              <TrendingUp className="h-5 w-5 text-orange-600" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{stats.weekSales}</p>
-          </div>
         </div>
 
         {/* Quick Actions - Button Cards */}
@@ -282,6 +281,43 @@ export default function DashboardPage() {
               <Globe className="h-8 w-8 text-blue-900 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 text-sm">Scan Website</h3>
             </Link>
+          </div>
+        </div>
+
+        {/* Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Total Vehicles</h3>
+              <Car className="h-5 w-5 text-blue-900" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{stats.totalVehicles}</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Portfolio Value</h3>
+              <BarChart3 className="h-5 w-5 text-blue-900" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900">
+              ${stats.portfolioValue.toLocaleString()}
+            </p>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">Avg Days on Lot</h3>
+              <Clock className="h-5 w-5 text-blue-900" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{stats.avgDaysInInventory}</p>
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-medium text-gray-600">This Week's Sales</h3>
+              <TrendingUp className="h-5 w-5 text-orange-600" />
+            </div>
+            <p className="text-3xl font-bold text-gray-900">{stats.weekSales}</p>
           </div>
         </div>
 
