@@ -17,18 +17,21 @@ import {
 interface Recommendation {
   id: string;
   vin: string;
-  vehicle_year: number;
-  vehicle_make: string;
-  vehicle_model: string;
-  vehicle_trim: string | null;
-  scanned_at: string;
+  decoded_data: {
+    year: number;
+    make: string;
+    model: string;
+    trim?: string;
+  };
+  created_at: string;
   recommendation: 'buy' | 'caution' | 'pass';
   confidence_score: number;
-  estimated_market_value: number;
-  max_bid: number;
-  estimated_profit: number;
-  recommendation_reasons: string[];
-  risk_factors: string[];
+  estimated_profit: number | null;
+  max_bid_suggestion: number | null;
+  match_reasoning: Array<{
+    type: 'positive' | 'negative' | 'neutral';
+    message: string;
+  }>;
 }
 
 type RecommendationFilter = 'all' | 'buy' | 'caution' | 'pass';
@@ -82,9 +85,9 @@ export default function RecommendationsPage() {
       filtered = filtered.filter(
         (r) =>
           r.vin.toLowerCase().includes(query) ||
-          r.vehicle_make.toLowerCase().includes(query) ||
-          r.vehicle_model.toLowerCase().includes(query) ||
-          `${r.vehicle_year}`.includes(query)
+          r.decoded_data.make.toLowerCase().includes(query) ||
+          r.decoded_data.model.toLowerCase().includes(query) ||
+          `${r.decoded_data.year}`.includes(query)
       );
     }
 
@@ -105,7 +108,7 @@ export default function RecommendationsPage() {
         .select('*')
         .eq('tenant_id', user.tenant_id)
         .not('recommendation', 'is', null)
-        .order('scanned_at', { ascending: false });
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
 
@@ -352,24 +355,24 @@ export default function RecommendationsPage() {
                     {/* Middle: Vehicle Info */}
                     <div className="flex-1">
                       <h3 className="text-xl font-semibold text-gray-900 mb-2">
-                        {rec.vehicle_year} {rec.vehicle_make} {rec.vehicle_model}
-                        {rec.vehicle_trim && (
-                          <span className="text-gray-600 font-normal"> {rec.vehicle_trim}</span>
+                        {rec.decoded_data.year} {rec.decoded_data.make} {rec.decoded_data.model}
+                        {rec.decoded_data.trim && (
+                          <span className="text-gray-600 font-normal"> {rec.decoded_data.trim}</span>
                         )}
                       </h3>
                       <p className="text-sm text-gray-600 font-mono mb-4">{rec.vin}</p>
 
-                      {/* Reasons */}
-                      {rec.recommendation_reasons && rec.recommendation_reasons.length > 0 && (
+                      {/* Positive Reasons */}
+                      {rec.match_reasoning && rec.match_reasoning.filter(r => r.type === 'positive').length > 0 && (
                         <div className="mb-3">
                           <div className="text-sm font-medium text-gray-700 mb-1">
                             Why this recommendation:
                           </div>
                           <ul className="space-y-1">
-                            {rec.recommendation_reasons.map((reason, idx) => (
+                            {rec.match_reasoning.filter(r => r.type === 'positive').map((reason, idx) => (
                               <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
                                 <span className="text-green-600 mt-0.5">✓</span>
-                                <span>{reason}</span>
+                                <span>{reason.message}</span>
                               </li>
                             ))}
                           </ul>
@@ -377,16 +380,16 @@ export default function RecommendationsPage() {
                       )}
 
                       {/* Risk Factors */}
-                      {rec.risk_factors && rec.risk_factors.length > 0 && (
+                      {rec.match_reasoning && rec.match_reasoning.filter(r => r.type === 'negative').length > 0 && (
                         <div>
                           <div className="text-sm font-medium text-gray-700 mb-1">
                             Risk factors to consider:
                           </div>
                           <ul className="space-y-1">
-                            {rec.risk_factors.map((risk, idx) => (
+                            {rec.match_reasoning.filter(r => r.type === 'negative').map((risk, idx) => (
                               <li key={idx} className="text-sm text-gray-600 flex items-start gap-2">
                                 <span className="text-red-600 mt-0.5">⚠</span>
-                                <span>{risk}</span>
+                                <span>{risk.message}</span>
                               </li>
                             ))}
                           </ul>
@@ -395,33 +398,27 @@ export default function RecommendationsPage() {
 
                       <div className="mt-4 flex items-center gap-2 text-sm text-gray-500">
                         <Clock className="w-4 h-4" />
-                        <span>Scanned {formatDate(rec.scanned_at)}</span>
+                        <span>Scanned {formatDate(rec.created_at)}</span>
                       </div>
                     </div>
 
                     {/* Right: Financial Info */}
                     <div className="lg:min-w-[250px] lg:text-right">
-                      <div className="grid grid-cols-3 lg:grid-cols-1 gap-4">
-                        <div>
-                          <div className="text-xs text-gray-600 mb-1">Market Value</div>
-                          <div className="text-lg font-semibold text-gray-900">
-                            {formatCurrency(rec.estimated_market_value)}
-                          </div>
-                        </div>
+                      <div className="grid grid-cols-2 lg:grid-cols-1 gap-4">
                         <div>
                           <div className="text-xs text-gray-600 mb-1">Max Bid</div>
                           <div className="text-lg font-semibold text-blue-600">
-                            {formatCurrency(rec.max_bid)}
+                            {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}
                           </div>
                         </div>
                         <div>
                           <div className="text-xs text-gray-600 mb-1">Est. Profit</div>
                           <div
                             className={`text-lg font-semibold ${
-                              rec.estimated_profit > 0 ? 'text-green-600' : 'text-red-600'
+                              rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-red-600'
                             }`}
                           >
-                            {formatCurrency(rec.estimated_profit)}
+                            {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
                           </div>
                         </div>
                       </div>

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { CheckCircle, Target, Clock, RefreshCw, AlertCircle, ExternalLink, Menu, X, Car, LogOut, Settings } from 'lucide-react';
+import { CheckCircle, Target, Clock, RefreshCw, AlertCircle, ExternalLink, Menu, X, Car, LogOut, Settings, Scan } from 'lucide-react';
 
 interface ScrapingResult {
   tenant_id: string;
@@ -81,6 +81,10 @@ export default function OnboardingPage() {
         throw new Error(error.message || 'Failed to scrape website');
       }
 
+      if (!data) {
+        throw new Error('No response from scraping service');
+      }
+
       if (!data.success) {
         throw new Error(data.error || 'Scraping failed');
       }
@@ -88,7 +92,12 @@ export default function OnboardingPage() {
       setAnalysisProgress(100);
 
       // Get the result for this tenant
-      const result = data.results[0];
+      const result = data.results && data.results.length > 0 ? data.results[0] : null;
+
+      if (!result) {
+        throw new Error('No scraping results returned');
+      }
+
       setScrapingResult(result);
 
       if (result.status === 'failed') {
