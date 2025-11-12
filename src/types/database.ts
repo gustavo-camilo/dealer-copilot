@@ -12,6 +12,15 @@ export type RecommendationType = 'buy' | 'caution' | 'pass';
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid';
 
+export interface TenantCostSettings {
+  auction_fee_percent: number;
+  reconditioning_cost: number;
+  transport_cost: number;
+  floor_plan_rate: number;
+  target_margin_percent: number;
+  target_days_to_sale: number;
+}
+
 export interface Tenant {
   id: string;
   name: string;
@@ -23,6 +32,7 @@ export interface Tenant {
   plan_type: PlanType;
   max_users: number;
   max_vehicles: number;
+  cost_settings: TenantCostSettings | null;
   created_at: string;
   updated_at: string;
 }
