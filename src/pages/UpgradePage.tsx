@@ -1,13 +1,38 @@
-import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Target, Check, TrendingUp, Zap, Crown, Menu, X } from 'lucide-react';
+import { supabase } from '../lib/supabase';
+import { Target, Check, TrendingUp, Zap, Crown, Menu, X, History } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 
 export default function UpgradePage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = React.useState(false);
+  const [searchParams] = useSearchParams();
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [currentTier, setCurrentTier] = useState<string>('starter');
+
+  const feature = searchParams.get('feature');
+  const competitorId = searchParams.get('competitor');
+
+  useEffect(() => {
+    loadCurrentTier();
+  }, [tenant?.id]);
+
+  const loadCurrentTier = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('subscription_tier')
+        .eq('id', tenant?.id)
+        .single();
+
+      if (error) throw error;
+      setCurrentTier(data?.subscription_tier || 'starter');
+    } catch (error) {
+      console.error('Error loading tier:', error);
+    }
+  };
 
   const handleSignOut = async () => {
     try {
@@ -31,7 +56,7 @@ export default function UpgradePage() {
         'Up to 3 competitors',
         'Email support',
       ],
-      current: true,
+      current: currentTier === 'starter',
       color: 'gray',
     },
     {
@@ -47,7 +72,7 @@ export default function UpgradePage() {
         'Priority support',
         'API access',
       ],
-      current: false,
+      current: currentTier === 'professional',
       color: 'blue',
       comingSoon: true,
     },
@@ -66,9 +91,10 @@ export default function UpgradePage() {
         'Dedicated account manager',
         'White-label options',
       ],
-      current: false,
+      current: currentTier === 'enterprise',
       color: 'purple',
       comingSoon: true,
+      highlighted: feature === 'history', // Highlight if coming from history feature
     },
   ];
 
@@ -115,10 +141,30 @@ export default function UpgradePage() {
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+        {/* Feature-Specific Banner */}
+        {feature === 'history' && (
+          <div className="mb-8 bg-gradient-to-r from-purple-50 to-blue-50 rounded-xl p-6 border border-purple-200">
+            <div className="flex items-center gap-4">
+              <div className="p-3 bg-purple-100 rounded-lg">
+                <History className="w-8 h-8 text-purple-600" />
+              </div>
+              <div className="flex-1">
+                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                  Unlock Competitor Scan History
+                </h2>
+                <p className="text-gray-700">
+                  Track competitor inventory changes over time with full scan history and analytics.
+                  Upgrade to Enterprise to access this powerful feature.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Upgrade Your Competitive Intelligence
+            {feature === 'history' ? 'Upgrade to Access Scan History' : 'Upgrade Your Competitive Intelligence'}
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
             Choose the plan that best fits your dealership's needs and stay ahead of the competition
@@ -135,6 +181,8 @@ export default function UpgradePage() {
                 className={`relative bg-white rounded-xl shadow-lg border-2 ${
                   plan.current
                     ? 'border-green-500'
+                    : plan.highlighted
+                    ? 'border-purple-500 ring-4 ring-purple-200'
                     : plan.color === 'purple'
                     ? 'border-purple-500'
                     : 'border-gray-200'
@@ -145,7 +193,12 @@ export default function UpgradePage() {
                     Current Plan
                   </div>
                 )}
-                {plan.comingSoon && (
+                {!plan.current && plan.highlighted && (
+                  <div className="absolute top-0 right-0 bg-purple-600 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
+                    Recommended
+                  </div>
+                )}
+                {!plan.current && !plan.highlighted && plan.comingSoon && (
                   <div className="absolute top-0 right-0 bg-orange-500 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
                     Coming Soon
                   </div>

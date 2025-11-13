@@ -93,18 +93,14 @@ serve(async (req) => {
     const vehicles = parseInventoryHTML(listingHtml, inventoryUrl);
     console.log(`🚗 Found ${vehicles.length} vehicles on listing page`);
 
-    // Step 3: Sample vehicles for detail page fetching (every 3rd vehicle)
-    const sampleSize = Math.max(20, Math.ceil(vehicles.length / 3)); // At least 20 or 1/3 of total
-    const sampledVehicles = vehicles.filter((_, index) => index % 3 === 0).slice(0, sampleSize);
-    console.log(`📊 Sampling ${sampledVehicles.length} vehicles for detailed analysis`);
+    // Step 3: Fetch ALL detail pages for accurate data (no sampling)
+    console.log(`📊 Fetching detailed data for ALL ${vehicles.length} vehicles...`);
+    const detailedVehicles = await fetchDetailPages(vehicles);
+    console.log(`✅ Successfully fetched ${detailedVehicles.length} detail pages`);
 
-    // Step 4: Fetch detail pages for sampled vehicles
-    const detailedSample = await fetchDetailPages(sampledVehicles);
-    console.log(`✅ Successfully fetched ${detailedSample.length} detail pages`);
-
-    // Step 5: Calculate aggregated stats
-    const stats = calculateStats(vehicles, detailedSample);
-    console.log(`📈 Stats calculated:`, stats);
+    // Step 4: Calculate aggregated stats from complete data
+    const stats = calculateStats(detailedVehicles);
+    console.log(`📈 Stats calculated from ${detailedVehicles.length} vehicles:`, stats);
 
     const duration = Date.now() - startTime;
 
@@ -297,11 +293,11 @@ async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicl
   return detailed;
 }
 
-// Helper: Calculate aggregated stats
-function calculateStats(allVehicles: ParsedVehicle[], detailedSample: ParsedVehicle[]): CompetitorStats {
-  // Count makes from all vehicles (usually available on listing page)
+// Helper: Calculate aggregated stats from complete vehicle data
+function calculateStats(vehicles: ParsedVehicle[]): CompetitorStats {
+  // Count makes from all vehicles
   const makeCounts: Record<string, number> = {};
-  allVehicles.forEach((v) => {
+  vehicles.forEach((v) => {
     if (v.make) {
       const make = v.make.toUpperCase();
       makeCounts[make] = (makeCounts[make] || 0) + 1;
@@ -314,9 +310,9 @@ function calculateStats(allVehicles: ParsedVehicle[], detailedSample: ParsedVehi
     .slice(0, 5)
     .reduce((acc, [make, count]) => ({ ...acc, [make]: count }), {});
 
-  // Calculate price/mileage stats from detailed sample
-  const prices = detailedSample.filter((v) => v.price !== undefined).map((v) => v.price!);
-  const mileages = detailedSample.filter((v) => v.mileage !== undefined).map((v) => v.mileage!);
+  // Calculate price/mileage stats from ALL vehicles (no sampling)
+  const prices = vehicles.filter((v) => v.price !== undefined && v.price !== null).map((v) => v.price!);
+  const mileages = vehicles.filter((v) => v.mileage !== undefined && v.mileage !== null).map((v) => v.mileage!);
 
   const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
   const minPrice = prices.length > 0 ? Math.min(...prices) : null;
@@ -326,11 +322,11 @@ function calculateStats(allVehicles: ParsedVehicle[], detailedSample: ParsedVehi
   const minMileage = mileages.length > 0 ? Math.min(...mileages) : null;
   const maxMileage = mileages.length > 0 ? Math.max(...mileages) : null;
 
-  // Estimate total inventory value
-  const totalInventoryValue = avgPrice ? avgPrice * allVehicles.length : null;
+  // Calculate ACTUAL total inventory value (sum of all prices, not estimated)
+  const totalInventoryValue = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) : null;
 
   return {
-    vehicle_count: allVehicles.length,
+    vehicle_count: vehicles.length,
     avg_price: avgPrice ? Math.round(avgPrice) : null,
     min_price: minPrice,
     max_price: maxPrice,
