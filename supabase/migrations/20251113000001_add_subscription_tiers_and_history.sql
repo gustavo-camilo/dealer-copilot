@@ -73,34 +73,25 @@ COMMENT ON TABLE competitor_scan_history IS
 ALTER TABLE competitor_scan_history ENABLE ROW LEVEL SECURITY;
 
 -- Policy: Users can only view their own tenant's scan history
+-- Uses SECURITY DEFINER function to avoid any potential recursion issues
 CREATE POLICY "Users can view own tenant scan history"
   ON competitor_scan_history
   FOR SELECT
-  USING (
-    tenant_id IN (
-      SELECT tenant_id FROM users WHERE id = auth.uid()
-    )
-  );
+  USING (tenant_id = public.get_user_tenant_id());
 
 -- Policy: Users can insert scan history for their own tenant
+-- Uses SECURITY DEFINER function to avoid any potential recursion issues
 CREATE POLICY "Users can insert own tenant scan history"
   ON competitor_scan_history
   FOR INSERT
-  WITH CHECK (
-    tenant_id IN (
-      SELECT tenant_id FROM users WHERE id = auth.uid()
-    )
-  );
+  WITH CHECK (tenant_id = public.get_user_tenant_id());
 
 -- Policy: Users can delete their own tenant's scan history
+-- Uses SECURITY DEFINER function to avoid any potential recursion issues
 CREATE POLICY "Users can delete own tenant scan history"
   ON competitor_scan_history
   FOR DELETE
-  USING (
-    tenant_id IN (
-      SELECT tenant_id FROM users WHERE id = auth.uid()
-    )
-  );
+  USING (tenant_id = public.get_user_tenant_id());
 
 -- =====================================================
 -- Success Message

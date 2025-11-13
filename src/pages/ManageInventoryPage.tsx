@@ -18,6 +18,7 @@ import {
   Trash2,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
+import toast, { Toaster } from 'react-hot-toast';
 
 interface Vehicle {
   id: string;
@@ -182,24 +183,40 @@ export default function ManageInventoryPage() {
   };
 
   const handleDeleteVehicle = async (vehicleId: string, vehicleInfo: string) => {
-    if (!confirm(`Are you sure you want to delete ${vehicleInfo}? This action cannot be undone.`)) {
-      return;
-    }
+    // Use toast.promise for a better user experience
+    const deletePromise = new Promise(async (resolve, reject) => {
+      if (!user?.tenant_id) {
+        reject(new Error('No tenant ID found'));
+        return;
+      }
 
-    try {
-      const { error } = await supabase
-        .from('vehicle_history')
-        .delete()
-        .eq('id', vehicleId);
+      try {
+        const { error } = await supabase
+          .from('vehicle_history')
+          .delete()
+          .eq('id', vehicleId)
+          .eq('tenant_id', user.tenant_id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      // Reload vehicles
-      await loadVehicles();
-    } catch (error) {
-      console.error('Error deleting vehicle:', error);
-      alert('Failed to delete vehicle');
-    }
+        // Reload vehicles
+        await loadVehicles();
+        resolve(vehicleInfo);
+      } catch (error) {
+        console.error('Error deleting vehicle:', error);
+        reject(error);
+      }
+    });
+
+    // Show toast confirmation with promise
+    toast.promise(
+      deletePromise,
+      {
+        loading: `Deleting ${vehicleInfo}...`,
+        success: `${vehicleInfo} deleted successfully`,
+        error: (err) => `Failed to delete vehicle: ${err.message || 'Unknown error'}`,
+      }
+    );
   };
 
   const getStatusBadge = (status: string) => {
@@ -253,6 +270,7 @@ export default function ManageInventoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" />
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

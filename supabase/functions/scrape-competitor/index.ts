@@ -88,22 +88,16 @@ serve(async (req) => {
     const inventoryUrl = await discoverInventoryPage(normalizedUrl);
     console.log(`📄 Found inventory page: ${inventoryUrl}`);
 
-    // Step 2: Fetch and parse listing page
-    const listingHtml = await fetchPage(inventoryUrl);
-    const vehicles = parseInventoryHTML(listingHtml, inventoryUrl);
-    console.log(`🚗 Found ${vehicles.length} vehicles on listing page`);
+    // Step 2: Fetch ALL pages (follow pagination)
+    const allVehicles = await fetchAllPages(inventoryUrl);
+    console.log(`🚗 Found ${allVehicles.length} total vehicles across all pages`);
 
-    // Step 3: Sample vehicles for detail page fetching (every 3rd vehicle)
-    const sampleSize = Math.max(20, Math.ceil(vehicles.length / 3)); // At least 20 or 1/3 of total
-    const sampledVehicles = vehicles.filter((_, index) => index % 3 === 0).slice(0, sampleSize);
-    console.log(`📊 Sampling ${sampledVehicles.length} vehicles for detailed analysis`);
+    // Step 3: Fetch detail pages for ALL vehicles to get accurate data
+    const detailedVehicles = await fetchDetailPages(allVehicles);
+    console.log(`✅ Successfully fetched ${detailedVehicles.length} detail pages`);
 
-    // Step 4: Fetch detail pages for sampled vehicles
-    const detailedSample = await fetchDetailPages(sampledVehicles);
-    console.log(`✅ Successfully fetched ${detailedSample.length} detail pages`);
-
-    // Step 5: Calculate aggregated stats
-    const stats = calculateStats(vehicles, detailedSample);
+    // Step 4: Calculate aggregated stats from all detailed vehicles
+    const stats = calculateStats(detailedVehicles);
     console.log(`📈 Stats calculated:`, stats);
 
     const duration = Date.now() - startTime;
@@ -263,10 +257,148 @@ async function fetchPage(url: string): Promise<string> {
   return await response.text();
 }
 
-// Helper: Fetch detail pages for sampled vehicles
+// Helper: Fetch all pages by following pagination
+async function fetchAllPages(inventoryUrl: string): Promise<ParsedVehicle[]> {
+  const allVehicles: ParsedVehicle[] = [];
+  const seenUrls = new Set<string>();
+  let currentPage = 1;
+  const maxPages = 20; // Safety limit to prevent infinite loops
+
+  console.log(`📄 Starting pagination from: ${inventoryUrl}`);
+
+  // Fetch first page
+  let html = await fetchPage(inventoryUrl);
+  let vehicles = parseInventoryHTML(html, inventoryUrl);
+
+  vehicles.forEach(v => {
+    if (v.url && !seenUrls.has(v.url)) {
+      seenUrls.add(v.url);
+      allVehicles.push(v);
+    }
+  });
+
+  console.log(`📄 Page ${currentPage}: Found ${vehicles.length} vehicles (${allVehicles.length} total)`);
+
+  // Look for pagination links
+  while (currentPage < maxPages) {
+    const nextPageUrl = findNextPageUrl(html, inventoryUrl, currentPage);
+
+    if (!nextPageUrl) {
+      console.log(`✅ No more pages found. Total pages scanned: ${currentPage}`);
+      break;
+    }
+
+    console.log(`📄 Fetching page ${currentPage + 1}: ${nextPageUrl}`);
+
+    try {
+      html = await fetchPage(nextPageUrl);
+      vehicles = parseInventoryHTML(html, nextPageUrl);
+
+      // Check if we got any new vehicles (to detect if we've reached the end)
+      let newVehicles = 0;
+      vehicles.forEach(v => {
+        if (v.url && !seenUrls.has(v.url)) {
+          seenUrls.add(v.url);
+          allVehicles.push(v);
+          newVehicles++;
+        }
+      });
+
+      console.log(`📄 Page ${currentPage + 1}: Found ${vehicles.length} vehicles (${newVehicles} new, ${allVehicles.length} total)`);
+
+      // If no new vehicles found, we've likely reached the end
+      if (newVehicles === 0) {
+        console.log(`✅ No new vehicles on page ${currentPage + 1}. Stopping pagination.`);
+        break;
+      }
+
+      currentPage++;
+
+      // Small delay between pages to be respectful
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+    } catch (error) {
+      console.error(`Failed to fetch page ${currentPage + 1}: ${error instanceof Error ? error.message : String(error)}`);
+      break;
+    }
+  }
+
+  return allVehicles;
+}
+
+// Helper: Find the next page URL from HTML
+function findNextPageUrl(html: string, baseUrl: string, currentPage: number): string | null {
+  const url = new URL(baseUrl);
+
+  // Strategy 1: Look for "Next" button/link
+  const nextPatterns = [
+    /<a[^>]*href=["']([^"']+)["'][^>]*>(?:<[^>]*>)*\s*(?:Next|›|»|&gt;|&raquo;)\s*(?:<[^>]*>)*<\/a>/gi,
+    /<a[^>]*class="[^"]*next[^"]*"[^>]*href=["']([^"']+)["']/gi,
+  ];
+
+  for (const pattern of nextPatterns) {
+    const match = html.match(pattern);
+    if (match) {
+      const hrefMatch = match[0].match(/href=["']([^"']+)["']/);
+      if (hrefMatch) {
+        try {
+          return new URL(hrefMatch[1], baseUrl).href;
+        } catch {
+          continue;
+        }
+      }
+    }
+  }
+
+  // Strategy 2: Look for page number links (page=2, page=3, etc.)
+  const nextPage = currentPage + 1;
+  const pagePatterns = [
+    new RegExp(`<a[^>]*href=["']([^"']*[?&]page=${nextPage}[^"']*)["']`, 'i'),
+    new RegExp(`<a[^>]*href=["']([^"']*[?&]p=${nextPage}[^"']*)["']`, 'i'),
+    new RegExp(`<a[^>]*href=["']([^"']*/page/${nextPage}[^"']*)["']`, 'i'),
+  ];
+
+  for (const pattern of pagePatterns) {
+    const match = html.match(pattern);
+    if (match) {
+      try {
+        return new URL(match[1], baseUrl).href;
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  // Strategy 3: Try common pagination URL patterns
+  const commonPatterns = [
+    `${url.pathname}?page=${nextPage}`,
+    `${url.pathname}?p=${nextPage}`,
+    `${url.pathname}/page/${nextPage}`,
+    `${url.pathname}${url.pathname.includes('?') ? '&' : '?'}page=${nextPage}`,
+  ];
+
+  // Only try these if we see evidence of pagination in the HTML
+  if (html.includes('page') || html.includes('pagination') || html.includes('Next')) {
+    for (const pattern of commonPatterns) {
+      try {
+        return new URL(pattern, baseUrl).href;
+      } catch {
+        continue;
+      }
+    }
+  }
+
+  return null;
+}
+
+// Helper: Fetch detail pages for ALL vehicles
 async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicle[]> {
   const detailed: ParsedVehicle[] = [];
-  const concurrency = 3; // Reduced to 3 at a time to be more respectful
+  const concurrency = 5; // Process 5 at a time for better performance
+  let successCount = 0;
+  let failCount = 0;
+
+  console.log(`📊 Fetching details for ${vehicles.length} vehicles...`);
 
   for (let i = 0; i < vehicles.length; i += concurrency) {
     const batch = vehicles.slice(i, i + concurrency);
@@ -278,9 +410,11 @@ async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicl
         // Parse detail page
         const parsed = parseInventoryHTML(html, vehicle.url);
         // Return first parsed vehicle (detail page should have one) or original
+        successCount++;
         return parsed.length > 0 ? { ...vehicle, ...parsed[0] } : vehicle;
       } catch (error) {
-        console.error(`Failed to fetch detail page: ${vehicle.url}`, error instanceof Error ? error.message : String(error));
+        failCount++;
+        console.error(`Failed to fetch detail page ${i + batch.indexOf(vehicle) + 1}/${vehicles.length}: ${vehicle.url}`);
         return vehicle; // Return original if fetch fails
       }
     });
@@ -288,20 +422,26 @@ async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicl
     const results = await Promise.all(promises);
     detailed.push(...results);
 
+    // Progress update every 10 vehicles
+    if ((i + concurrency) % 10 === 0 || i + concurrency >= vehicles.length) {
+      console.log(`📊 Progress: ${Math.min(i + concurrency, vehicles.length)}/${vehicles.length} vehicles processed (${successCount} success, ${failCount} failed)`);
+    }
+
     // Small delay between batches to be respectful
     if (i + concurrency < vehicles.length) {
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Increased to 1 second
+      await new Promise((resolve) => setTimeout(resolve, 800));
     }
   }
 
+  console.log(`✅ Completed: ${successCount}/${vehicles.length} detail pages fetched successfully`);
   return detailed;
 }
 
-// Helper: Calculate aggregated stats
-function calculateStats(allVehicles: ParsedVehicle[], detailedSample: ParsedVehicle[]): CompetitorStats {
-  // Count makes from all vehicles (usually available on listing page)
+// Helper: Calculate aggregated stats from all detailed vehicles
+function calculateStats(vehicles: ParsedVehicle[]): CompetitorStats {
+  // Count makes from all vehicles
   const makeCounts: Record<string, number> = {};
-  allVehicles.forEach((v) => {
+  vehicles.forEach((v) => {
     if (v.make) {
       const make = v.make.toUpperCase();
       makeCounts[make] = (makeCounts[make] || 0) + 1;
@@ -314,9 +454,9 @@ function calculateStats(allVehicles: ParsedVehicle[], detailedSample: ParsedVehi
     .slice(0, 5)
     .reduce((acc, [make, count]) => ({ ...acc, [make]: count }), {});
 
-  // Calculate price/mileage stats from detailed sample
-  const prices = detailedSample.filter((v) => v.price !== undefined).map((v) => v.price!);
-  const mileages = detailedSample.filter((v) => v.mileage !== undefined).map((v) => v.mileage!);
+  // Calculate price/mileage stats from ALL vehicles
+  const prices = vehicles.filter((v) => v.price !== undefined && v.price > 0).map((v) => v.price!);
+  const mileages = vehicles.filter((v) => v.mileage !== undefined && v.mileage >= 0).map((v) => v.mileage!);
 
   const avgPrice = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : null;
   const minPrice = prices.length > 0 ? Math.min(...prices) : null;
@@ -326,11 +466,13 @@ function calculateStats(allVehicles: ParsedVehicle[], detailedSample: ParsedVehi
   const minMileage = mileages.length > 0 ? Math.min(...mileages) : null;
   const maxMileage = mileages.length > 0 ? Math.max(...mileages) : null;
 
-  // Estimate total inventory value
-  const totalInventoryValue = avgPrice ? avgPrice * allVehicles.length : null;
+  // Calculate ACTUAL total inventory value from all prices
+  const totalInventoryValue = prices.length > 0 ? prices.reduce((a, b) => a + b, 0) : null;
+
+  console.log(`📊 Stats Summary: ${vehicles.length} vehicles, ${prices.length} with prices, ${mileages.length} with mileage`);
 
   return {
-    vehicle_count: allVehicles.length,
+    vehicle_count: vehicles.length,
     avg_price: avgPrice ? Math.round(avgPrice) : null,
     min_price: minPrice,
     max_price: maxPrice,

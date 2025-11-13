@@ -18,6 +18,7 @@ import {
   Car,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
+import toast, { Toaster } from 'react-hot-toast';
 
 interface CompetitorSnapshot {
   id: string;
@@ -182,24 +183,37 @@ export default function CompetitorAnalysisPage() {
   };
 
   const handleDeleteCompetitor = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this competitor snapshot?')) {
-      return;
-    }
+    const deletePromise = new Promise(async (resolve, reject) => {
+      if (!tenant?.id) {
+        reject(new Error('No tenant ID found'));
+        return;
+      }
 
-    try {
-      const { error } = await supabase
-        .from('competitor_snapshots')
-        .delete()
-        .eq('id', id)
-        .eq('tenant_id', tenant?.id);
+      try {
+        const { error } = await supabase
+          .from('competitor_snapshots')
+          .delete()
+          .eq('id', id)
+          .eq('tenant_id', tenant.id);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      await loadCompetitors();
-    } catch (error) {
-      console.error('Error deleting competitor:', error);
-      setError('Failed to delete competitor');
-    }
+        await loadCompetitors();
+        resolve('Competitor snapshot');
+      } catch (error) {
+        console.error('Error deleting competitor:', error);
+        reject(error);
+      }
+    });
+
+    toast.promise(
+      deletePromise,
+      {
+        loading: 'Deleting competitor snapshot...',
+        success: 'Competitor snapshot deleted successfully',
+        error: (err) => `Failed to delete: ${err.message || 'Unknown error'}`,
+      }
+    );
   };
 
   const toggleHistory = (competitorUrl: string) => {
@@ -268,6 +282,7 @@ export default function CompetitorAnalysisPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Toaster position="top-right" />
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
