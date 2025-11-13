@@ -461,6 +461,32 @@ serve(async (req) => {
 
 /**
  * Process scraped vehicles and update database
+ *
+ * CRITICAL FIX: Vehicle Identifier Stability
+ * ==========================================
+ * This function generates identifiers for vehicles without VINs.
+ * The identifier MUST use only STABLE fields to prevent the same vehicle
+ * from being incorrectly marked as "new" on subsequent scans.
+ *
+ * STABLE FIELDS (use these):
+ *   ✅ VIN (if available)
+ *   ✅ Stock Number
+ *   ✅ Year + Make + Model + Trim
+ *   ✅ URL path component
+ *
+ * VOLATILE FIELDS (NEVER use these):
+ *   ❌ Price (changes frequently due to discounts, promotions)
+ *   ❌ Mileage (may be updated by dealer)
+ *   ❌ Color (may be formatted differently: "White" vs "Pearl White")
+ *
+ * WHY THIS MATTERS:
+ * If we include price/mileage/color in the identifier, the same physical
+ * vehicle will get a DIFFERENT identifier when these fields change,
+ * causing it to be marked as a "new" vehicle instead of an update.
+ * This leads to:
+ *   - Incorrect "new vehicles" counts
+ *   - Duplicate vehicle records
+ *   - Inconsistent results between scans
  */
 async function processVehicles(
   supabase: any,
@@ -476,41 +502,56 @@ async function processVehicles(
   // Process each vehicle
   for (const vehicle of vehicles) {
     // Generate a unique identifier for vehicles without VIN
-    // Use stock_number if available, otherwise generate from year/make/model/mileage/color
+    // CRITICAL: Use only STABLE fields (NO price, NO mileage, NO color)
+    // These fields change frequently and cause the same vehicle to be seen as "new"
     let identifier = vehicle.vin;
     if (!identifier) {
       if (vehicle.stock_number) {
         identifier = `STOCK_${vehicle.stock_number}`;
       } else if (vehicle.year && vehicle.make && vehicle.model) {
-        // Create a pseudo-VIN from available data
-        // Include mileage and color to differentiate similar vehicles
-        const uniqueParts = [
+        // Create identifier from STABLE data only: year, make, model, trim
+        // DO NOT include price, mileage, or color (these change between scans)
+        const stableParts = [
           vehicle.year,
           vehicle.make,
           vehicle.model,
-          vehicle.trim || '',
-          vehicle.mileage || 0,
-          vehicle.color || '',
-          vehicle.price || 0,
-        ].filter(Boolean); // Remove empty values
+          vehicle.trim || 'BASE',
+        ];
 
-        identifier = uniqueParts.join('_').replace(/\s+/g, '_').toUpperCase();
+        identifier = stableParts.join('_').replace(/\s+/g, '_').toUpperCase();
 
-        // If this identifier already exists in current batch, make it more unique with URL hash
+        // If this identifier already exists in current batch, use URL to differentiate
         const existingInBatch = vehicles.slice(0, vehicles.indexOf(vehicle)).find(v => {
+          // Calculate identifier for comparison using same stable fields
           const testId = v.vin || (v.year && v.make && v.model ?
-            [v.year, v.make, v.model, v.trim || '', v.mileage || 0, v.color || '', v.price || 0]
-              .filter(Boolean).join('_').replace(/\s+/g, '_').toUpperCase() : null);
+            [v.year, v.make, v.model, v.trim || 'BASE']
+              .join('_').replace(/\s+/g, '_').toUpperCase() : null);
           return testId === identifier;
         });
 
-        if (existingInBatch || !identifier) {
-          // Add URL hash as last resort for uniqueness
-          const urlHash = vehicle.url ?
-            vehicle.url.split('/').pop()?.replace(/[^a-zA-Z0-9]/g, '') :
-            Math.random().toString(36).substring(2, 10).toUpperCase();
-          identifier = `${identifier}_${urlHash}`;
+        if (existingInBatch) {
+          // Extract stable URL path component (e.g., "/inventory/12345" -> "12345")
+          let urlSuffix = '';
+          if (vehicle.url) {
+            const urlParts = vehicle.url.split('/').filter(p => p && p.length > 0);
+            // Get last meaningful part (usually an ID or slug)
+            urlSuffix = urlParts[urlParts.length - 1]?.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10) || '';
+          }
+
+          // Only add suffix if we have a valid URL component
+          if (urlSuffix) {
+            identifier = `${identifier}_${urlSuffix}`;
+          } else {
+            console.log(`⚠️ Warning: Duplicate vehicle in batch without unique URL: ${identifier}`);
+            // Keep the identifier without suffix - the update logic will handle it
+          }
         }
+      } else if (vehicle.url) {
+        // Last resort: use URL-based identifier for vehicles with missing data
+        const urlParts = vehicle.url.split('/').filter(p => p && p.length > 0);
+        const urlId = urlParts[urlParts.length - 1]?.replace(/[^a-zA-Z0-9]/g, '') ||
+                      Math.random().toString(36).substring(2, 10).toUpperCase();
+        identifier = `URL_${urlId}`;
       } else {
         console.log(`Skipping vehicle without enough identifying information:`, vehicle);
         continue; // Skip vehicles we can't identify
@@ -662,22 +703,26 @@ async function processVehicles(
       const vehicleIdentifier = vehicle.vin;
       if (!currentVINs.includes(vehicleIdentifier) && !vehicles.some(v => {
         // Check if any current vehicle would generate the same identifier
+        // MUST use same stable identifier logic (NO price, NO mileage, NO color)
         let currentId = v.vin;
         if (!currentId && v.stock_number) {
           currentId = `STOCK_${v.stock_number}`;
         } else if (!currentId && v.year && v.make && v.model) {
-          // Use same logic as identifier generation
-          const uniqueParts = [
+          // Use same STABLE identifier logic as above
+          const stableParts = [
             v.year,
             v.make,
             v.model,
-            v.trim || '',
-            v.mileage || 0,
-            v.color || '',
-            v.price || 0,
-          ].filter(Boolean);
-          currentId = uniqueParts.join('_').replace(/\s+/g, '_').toUpperCase();
+            v.trim || 'BASE',
+          ];
+          currentId = stableParts.join('_').replace(/\s+/g, '_').toUpperCase();
+        } else if (!currentId && v.url) {
+          const urlParts = v.url.split('/').filter(p => p && p.length > 0);
+          const urlId = urlParts[urlParts.length - 1]?.replace(/[^a-zA-Z0-9]/g, '') || '';
+          currentId = `URL_${urlId}`;
         }
+        // Match if IDs are equal OR if the stored ID starts with current ID
+        // (to handle cases where URL suffix was added)
         return currentId === vehicleIdentifier || vehicleIdentifier.startsWith(currentId + '_');
       })) {
         console.log(`Vehicle ${vehicleIdentifier} marked as sold, creating sales record...`);
