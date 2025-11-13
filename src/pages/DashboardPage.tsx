@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Vehicle, SalesRecord, VINScan } from '../types/database';
-import { BarChart3, Car, TrendingUp, Clock, Scan, Globe, ChevronRight, Package, Eye } from 'lucide-react';
-import AppHeader from '../components/AppHeader';
+import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Menu, X, Globe, ChevronRight, Package, Eye } from 'lucide-react';
+import NavigationMenu from '../components/NavigationMenu';
 
 export default function DashboardPage() {
-  const { user, tenant } = useAuth();
+  const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [stats, setStats] = useState({
     totalVehicles: 0,
     portfolioValue: 0,
@@ -18,6 +19,16 @@ export default function DashboardPage() {
   const [recentScans, setRecentScans] = useState<VINScan[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
 
   useEffect(() => {
     loadDashboardData();
@@ -101,9 +112,48 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <AppHeader />
+      {/* Header */}
+      <div className="bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <div className="flex items-center">
+              <Target className="h-8 w-8 text-blue-900" />
+              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+            </div>
+            <div className="flex items-center space-x-4 relative">
+              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+              <Link
+                to="/scan"
+                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
+              >
+                Scan VIN
+              </Link>
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition"
+                  aria-label="Menu"
+                >
+                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 mobile-safe-bottom">
+                {/* Navigation Menu */}
+                {menuOpen && (
+                  <NavigationMenu
+                    currentPath={location.pathname}
+                    onClose={() => setMenuOpen(false)}
+                    onSignOut={handleSignOut}
+                    user={user}
+                    tenantName={tenant?.name}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
           <p className="text-gray-600 mt-1">{tenant?.location}</p>
