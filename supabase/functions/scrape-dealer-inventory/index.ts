@@ -17,6 +17,7 @@ import { extractMetadata, mergeWithMetadata } from './metadataExtractor.ts';
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, GET, OPTIONS',
 };
 
 interface ScrapingResult {
@@ -232,7 +233,10 @@ async function findInventoryPages(baseUrl: string): Promise<string[]> {
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response('ok', {
+      status: 200,
+      headers: corsHeaders
+    });
   }
 
   const startTime = Date.now();
@@ -244,7 +248,14 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get request body (optional: can specify specific tenant)
-    const { tenant_id } = await req.json().catch(() => ({}));
+    let tenant_id;
+    try {
+      const body = await req.json();
+      tenant_id = body.tenant_id;
+    } catch (error) {
+      // If no body or invalid JSON, continue without tenant_id
+      tenant_id = undefined;
+    }
 
     // Get all active/trial tenants with website URLs (exclude only suspended/cancelled)
     let query = supabase
