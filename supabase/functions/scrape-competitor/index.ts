@@ -2,10 +2,11 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 // =====================================================
-// UNIFIED SCRAPER CORE - INLINED
+// UNIFIED SCRAPER CORE
 // =====================================================
-// Inlined version for Supabase Edge Functions deployment
-import { scrapeWebsite, type ParsedVehicle } from './scraper-core-inline.ts';
+// Now using shared scraper core for consistency
+import { scrapeWebsite } from '../_shared/scraper-core.ts';
+import type { ParsedVehicle } from '../_shared/types.ts';
 
 // CORS headers
 const corsHeaders = {
