@@ -203,26 +203,43 @@ export async function enrichVehicleWithVIN(vehicle: ParsedVehicle): Promise<Pars
 
 ### File Structure
 
+**IMPORTANT: Supabase Edge Functions Deployment**
+
+Supabase Edge Functions don't support importing from parent directories (like `../_shared/`). Therefore, we use an **inlined approach** where all shared code is bundled into each function.
+
 ```
 supabase/functions/
-├── _shared/                          (NEW - shared code)
-│   ├── scraper-core.ts              (Main scraping logic)
-│   ├── parser-unified.ts            (Unified HTML parser)
-│   ├── url-normalizer.ts            (URL handling)
-│   ├── vin-decoder.ts               (VIN enrichment)
-│   └── types.ts                     (Shared interfaces)
+├── _shared/                          (REFERENCE ONLY - not deployed)
+│   ├── scraper-core.ts              (Main scraping logic - REFERENCE)
+│   ├── parser-unified.ts            (Unified HTML parser - REFERENCE)
+│   ├── url-normalizer.ts            (URL handling - REFERENCE)
+│   ├── vin-decoder.ts               (VIN enrichment - REFERENCE)
+│   └── types.ts                     (Shared interfaces - REFERENCE)
 │
 ├── scrape-competitor/
-│   ├── index.ts                     (REFACTORED - uses core)
-│   ├── parser.ts                    (DEPRECATED - kept for reference)
-│   └── vinDecoder.ts                (DEPRECATED - kept for reference)
+│   ├── index.ts                     (✅ DEPLOYED - main function)
+│   ├── scraper-core-inline.ts       (✅ DEPLOYED - all shared code inlined)
+│   ├── parser.ts.backup             (BACKUP - old version)
+│   └── vinDecoder.ts.backup         (BACKUP - old version)
 │
 └── scrape-dealer-inventory/
-    ├── index.ts                     (REFACTORED - uses core)
-    ├── parser.ts                    (DEPRECATED - kept for reference)
-    ├── vinDecoder.ts                (DEPRECATED - kept for reference)
-    └── dateExtractor.ts             (KEPT - dealer-specific logic)
+    ├── index.ts                     (✅ DEPLOYED - main function)
+    ├── scraper-core-inline.ts       (✅ DEPLOYED - all shared code inlined)
+    ├── dateExtractor.ts             (✅ DEPLOYED - dealer-specific logic)
+    ├── parser.ts.backup             (BACKUP - old version)
+    └── vinDecoder.ts.backup         (BACKUP - old version)
 ```
+
+**Why Inlined Code?**
+- ✅ Supabase Edge Functions deploy each function independently
+- ✅ Cannot import from parent directories (`../_shared/`)
+- ✅ Each function must be self-contained
+- ✅ `scraper-core-inline.ts` contains ALL shared code in one file
+
+**Maintaining Consistency:**
+- The `_shared/` folder serves as **reference documentation**
+- When updating scraper logic, update `scraper-core-inline.ts` in BOTH functions
+- Keep both inline files identical to ensure consistent behavior
 
 ### Backward Compatibility
 
@@ -1016,6 +1033,106 @@ ORDER BY cached_at DESC;
 
 ---
 
+## How to Update Scraper Logic
+
+**IMPORTANT: Due to inlined deployment, changes must be made in TWO places**
+
+### Quick Update Process
+
+1. **Make changes to reference files** (optional, for documentation):
+   ```bash
+   # Edit the reference files in _shared/ if desired
+   # This helps document changes but is NOT deployed
+   ```
+
+2. **Update BOTH inline files** (required):
+   ```bash
+   # Make identical changes to:
+   supabase/functions/scrape-competitor/scraper-core-inline.ts
+   supabase/functions/scrape-dealer-inventory/scraper-core-inline.ts
+   ```
+
+3. **Deploy both functions**:
+   ```bash
+   npx supabase functions deploy scrape-competitor
+   npx supabase functions deploy scrape-dealer-inventory
+   ```
+
+### Example: Adding a New Parser Strategy
+
+**Scenario:** You want to add support for a new website structure.
+
+**Steps:**
+
+1. Edit `scraper-core-inline.ts` in **both** function folders:
+   ```typescript
+   // Add new parser function
+   function parseNewWebsiteType(html: string, baseUrl: string): ParsedVehicle[] {
+     // Your new parsing logic
+   }
+
+   // Update parseInventoryHTML to try new parser
+   export function parseInventoryHTML(html: string, baseUrl: string): ParsedVehicle[] {
+     const parsers = [
+       parseStructuredData,
+       parseVehicleCards,
+       parseNewWebsiteType,  // <-- Add here
+       parseGenericSections,
+     ];
+     // ... rest of function
+   }
+   ```
+
+2. **Copy the EXACT same changes to both files**:
+   - `scrape-competitor/scraper-core-inline.ts`
+   - `scrape-dealer-inventory/scraper-core-inline.ts`
+
+3. Test locally if possible, then deploy:
+   ```bash
+   npx supabase functions deploy scrape-competitor
+   npx supabase functions deploy scrape-dealer-inventory
+   ```
+
+### Example: Changing Scraper Configuration
+
+**Scenario:** You want to increase concurrency from 5 to 10.
+
+**Steps:**
+
+1. Edit `DEFAULT_SCRAPER_CONFIG` in **both** inline files:
+   ```typescript
+   const DEFAULT_SCRAPER_CONFIG: ScraperConfig = {
+     maxConcurrency: 10,  // Changed from 5
+     pageDelay: 800,
+     maxPages: 20,
+     timeout: 30000,
+     userAgent: 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0)',
+   };
+   ```
+
+2. Deploy both functions
+
+### Important Reminders
+
+- ⚠️ **Always update BOTH inline files** - they must remain identical
+- ⚠️ Changes to `_shared/` files have **NO EFFECT** on deployed functions
+- ⚠️ Test changes with a single website before deploying
+- ✅ Keep backup files (`.backup`) in case you need to rollback
+
+### File Comparison Tool
+
+To verify both inline files are identical:
+
+```bash
+diff supabase/functions/scrape-competitor/scraper-core-inline.ts \
+     supabase/functions/scrape-dealer-inventory/scraper-core-inline.ts
+
+# No output = files are identical ✅
+# Output = files differ ❌
+```
+
+---
+
 ## Changelog
 
 ### 2025-11-13
@@ -1023,6 +1140,8 @@ ORDER BY cached_at DESC;
 - Defined Phase 1, 2, and 3 roadmap
 - Documented scraper core design
 - Planned caching strategy
+- Implemented inlined deployment approach for Supabase compatibility
+- Added maintenance and update procedures
 
 ---
 
@@ -1030,4 +1149,5 @@ ORDER BY cached_at DESC;
 
 - [NHTSA vPIC API Documentation](https://vpic.nhtsa.dot.gov/api/)
 - [Supabase Edge Functions](https://supabase.com/docs/guides/functions)
+- [Supabase Edge Functions Limitations](https://supabase.com/docs/guides/functions/limits)
 - [pg_cron Documentation](https://github.com/citusdata/pg_cron)

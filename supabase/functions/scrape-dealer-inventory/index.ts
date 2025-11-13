@@ -7,9 +7,8 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Use unified scraper core
-import { scrapeWebsite } from '../_shared/scraper-core.ts';
-import type { ParsedVehicle } from '../_shared/types.ts';
+// Use unified scraper core - inlined version for Supabase deployment
+import { scrapeWebsite, type ParsedVehicle } from './scraper-core-inline.ts';
 
 // Keep dealer-specific date extraction logic
 import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
