@@ -197,41 +197,34 @@ function findContainingCard(html: string, linkPosition: number): string | null {
   for (const tag of containerTags) {
     // Find the nearest opening tag before the link
     const openPattern = new RegExp(`<${tag}[^>]*>`, 'gi');
-    const closePattern = new RegExp(`</${tag}>`, 'gi');
 
     let bestCard: string | null = null;
-    let bestStart = -1;
 
     // Find all opening tags before the link
     const before = searchArea.substring(0, relativePosition);
     const openMatches = [...before.matchAll(openPattern)];
 
+    // Start from nearest opening tag and work backwards
     for (let i = openMatches.length - 1; i >= 0; i--) {
       const openMatch = openMatches[i];
       const openPos = openMatch.index!;
 
-      // Find corresponding closing tag
-      const after = searchArea.substring(openPos);
-      const closeMatch = after.match(closePattern);
+      // Find the MATCHING closing tag (handles nested tags properly)
+      const closePos = findMatchingClosingTag(searchArea, openPos, tag);
 
-      if (closeMatch) {
-        const closePos = openPos + closeMatch.index! + closeMatch[0].length;
+      if (closePos !== null && closePos > relativePosition) {
+        // This container includes the link
+        const card = searchArea.substring(openPos, closePos);
 
-        // Check if this container includes the link
-        if (openPos < relativePosition && closePos > relativePosition) {
-          const card = searchArea.substring(openPos, closePos);
+        // Validate this looks like a vehicle card
+        const hasVehicleContent =
+          /\b(19|20)\d{2}\b/.test(card) || // Has year
+          /\$[\d,]+/.test(card) || // Has price
+          /\d+\s*(?:mi|miles|km)/i.test(card); // Has mileage
 
-          // Validate this looks like a vehicle card
-          const hasVehicleContent =
-            /\b(19|20)\d{2}\b/.test(card) || // Has year
-            /\$[\d,]+/.test(card) || // Has price
-            /\d+\s*(?:mi|miles|km)/i.test(card); // Has mileage
-
-          if (hasVehicleContent) {
-            bestCard = card;
-            bestStart = openPos;
-            break; // Use the nearest container
-          }
+        if (hasVehicleContent) {
+          bestCard = card;
+          break; // Use the nearest container
         }
       }
     }
@@ -245,6 +238,50 @@ function findContainingCard(html: string, linkPosition: number): string | null {
   const fallbackStart = Math.max(0, relativePosition - 1000);
   const fallbackEnd = Math.min(searchArea.length, relativePosition + 800);
   return searchArea.substring(fallbackStart, fallbackEnd);
+}
+
+/**
+ * Find the matching closing tag for a given opening tag, properly handling nested tags
+ * Example: <div><div></div></div> - returns position after the SECOND </div>
+ */
+function findMatchingClosingTag(html: string, openTagPos: number, tagName: string): number | null {
+  const openPattern = new RegExp(`<${tagName}[^>]*>`, 'gi');
+  const closePattern = new RegExp(`</${tagName}>`, 'gi');
+
+  let depth = 1; // We're already at one opening tag
+  let searchPos = openTagPos + html.substring(openTagPos).indexOf('>') + 1; // Start after the opening tag
+
+  while (depth > 0 && searchPos < html.length) {
+    // Find next opening or closing tag
+    openPattern.lastIndex = searchPos;
+    closePattern.lastIndex = searchPos;
+
+    const nextOpen = openPattern.exec(html);
+    const nextClose = closePattern.exec(html);
+
+    // No more closing tags found
+    if (!nextClose) {
+      return null;
+    }
+
+    // Check if there's an opening tag before the next closing tag
+    if (nextOpen && nextOpen.index < nextClose.index) {
+      // Found nested opening tag - increase depth
+      depth++;
+      searchPos = openPattern.lastIndex;
+    } else {
+      // Found closing tag - decrease depth
+      depth--;
+      searchPos = closePattern.lastIndex;
+
+      if (depth === 0) {
+        // Found the matching closing tag
+        return searchPos;
+      }
+    }
+  }
+
+  return null;
 }
 
 /**
