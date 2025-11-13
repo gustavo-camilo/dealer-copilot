@@ -87,7 +87,7 @@ export default function NavigationMenu({
       />
 
       {/* Mobile: Full-page menu, Desktop: Dropdown */}
-      <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200">
+      <div className="fixed inset-0 bg-white z-50 flex flex-col md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200 md:flex-none">
         {/* Mobile Header */}
         <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden">
           <div className="flex items-center">
@@ -109,8 +109,8 @@ export default function NavigationMenu({
           <p className="text-sm md:text-xs text-gray-500 mt-1">{tenantName}</p>
         </div>
 
-        {/* Menu Items */}
-        <div className="py-4 md:py-2">
+        {/* Menu Items - Scrollable on mobile */}
+        <div className="flex-1 overflow-y-auto md:flex-none md:overflow-visible py-4 md:py-2">
           {menuItems.map((item) => {
             const Icon = item.icon;
             const isActive = currentPath === item.path;
@@ -150,8 +150,8 @@ export default function NavigationMenu({
           )}
         </div>
 
-        {/* Sign Out */}
-        <div className="border-t border-gray-200 py-4 md:py-2 mt-auto">
+        {/* Sign Out - Sticky at bottom on mobile */}
+        <div className="border-t border-gray-200 py-4 md:py-2">
           <button
             onClick={onSignOut}
             className="flex items-center w-full px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-red-600 hover:bg-red-50"
