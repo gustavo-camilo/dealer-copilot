@@ -16,8 +16,6 @@ import {
   X,
   Car,
   Trash2,
-  Grid3x3,
-  List,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 import toast, { Toaster } from 'react-hot-toast';
@@ -41,9 +39,8 @@ interface Vehicle {
   price_history: Array<{ date: string; price: number }>;
 }
 
-type StatusFilter = 'all' | 'active' | 'sold' | 'recently_changed';
-type SortBy = 'recent' | 'price_asc' | 'price_desc' | 'days_newest' | 'days_oldest' | 'year_high' | 'year_low';
-type ViewMode = 'grid' | 'list';
+type StatusFilter = 'all' | 'active' | 'sold' | 'price_changed';
+type SortBy = 'recent' | 'price_asc' | 'price_desc' | 'age';
 
 export default function ManageInventoryPage() {
   const { user, tenant, signOut } = useAuth();
@@ -55,7 +52,6 @@ export default function ManageInventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('recent');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
@@ -100,16 +96,8 @@ export default function ManageInventoryPage() {
           return a.price - b.price;
         case 'price_desc':
           return b.price - a.price;
-        case 'days_newest':
-          // Newest = least days in lot (ascending by first_seen_at)
-          return new Date(b.first_seen_at).getTime() - new Date(a.first_seen_at).getTime();
-        case 'days_oldest':
-          // Oldest = most days in lot (descending by first_seen_at)
+        case 'age':
           return new Date(a.first_seen_at).getTime() - new Date(b.first_seen_at).getTime();
-        case 'year_high':
-          return b.year - a.year;
-        case 'year_low':
-          return a.year - b.year;
         case 'recent':
         default:
           return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
@@ -410,47 +398,17 @@ export default function ManageInventoryPage() {
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="recent">Recently Updated</option>
-                <option value="days_newest">Newest First</option>
-                <option value="days_oldest">Oldest First</option>
                 <option value="price_desc">Price: High to Low</option>
                 <option value="price_asc">Price: Low to High</option>
-                <option value="year_high">Year: High to Low</option>
-                <option value="year_low">Year: Low to High</option>
+                <option value="age">Oldest First</option>
               </select>
             </div>
           </div>
         </div>
 
-        {/* Results Count and View Toggle */}
-        <div className="mb-4 flex items-center justify-between">
-          <div className="text-sm text-gray-600">
-            Showing {filteredVehicles.length} of {vehicles.length} vehicles
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-gray-600 mr-2">View:</span>
-            <button
-              onClick={() => setViewMode('grid')}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === 'grid'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
-              }`}
-              title="Grid View"
-            >
-              <Grid3x3 className="w-5 h-5" />
-            </button>
-            <button
-              onClick={() => setViewMode('list')}
-              className={`p-2 rounded-lg transition-colors ${
-                viewMode === 'list'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-300'
-              }`}
-              title="List View"
-            >
-              <List className="w-5 h-5" />
-            </button>
-          </div>
+        {/* Results Count */}
+        <div className="mb-4 text-sm text-gray-600">
+          Showing {filteredVehicles.length} of {vehicles.length} vehicles
         </div>
 
         {/* Vehicles Grid */}
@@ -470,8 +428,8 @@ export default function ManageInventoryPage() {
                 : 'Start scraping your website to track inventory'}
             </p>
           </div>
-        ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-5">
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {filteredVehicles.map((vehicle) => {
               const firstImage = vehicle.image_urls && vehicle.image_urls.length > 0 ? vehicle.image_urls[0] : null;
               const daysInInventory = getDaysInInventory(vehicle.first_seen_at);
@@ -482,7 +440,7 @@ export default function ManageInventoryPage() {
                   className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   {/* Vehicle Image */}
-                  <div className="relative h-36 sm:h-44 lg:h-48 bg-gray-100">
+                  <div className="relative h-48 bg-gray-100">
                     {firstImage ? (
                       <img
                         src={firstImage}
@@ -495,7 +453,7 @@ export default function ManageInventoryPage() {
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full">
-                        <Car className="w-12 h-12 sm:w-16 sm:h-16 text-gray-300" />
+                        <Car className="w-16 h-16 text-gray-300" />
                       </div>
                     )}
                     <div className="absolute top-2 right-2">
@@ -503,30 +461,30 @@ export default function ManageInventoryPage() {
                     </div>
                     <button
                       onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
-                      className="absolute top-2 left-2 p-1.5 sm:p-2 bg-white/90 hover:bg-red-50 rounded-full shadow-sm transition-colors group"
+                      className="absolute top-2 left-2 p-2 bg-white/90 hover:bg-red-50 rounded-full shadow-sm transition-colors group"
                       title="Delete vehicle"
                     >
-                      <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-gray-500 group-hover:text-red-600" />
+                      <Trash2 className="w-4 h-4 text-gray-500 group-hover:text-red-600" />
                     </button>
                   </div>
 
                   {/* Vehicle Info */}
-                  <div className="p-2.5 sm:p-3 lg:p-4">
+                  <div className="p-4">
                     {/* Title */}
-                    <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 mb-0.5 sm:mb-1 line-clamp-2">
+                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
                       {vehicle.year} {vehicle.make} {vehicle.model}
                     </h3>
                     {vehicle.trim && (
-                      <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3 line-clamp-1">{vehicle.trim}</p>
+                      <p className="text-sm text-gray-600 mb-3">{vehicle.trim}</p>
                     )}
 
                     {/* Price and Mileage */}
-                    <div className="flex items-center justify-between mb-2 sm:mb-3 pb-2 sm:pb-3 border-b border-gray-200">
-                      <div className="text-lg sm:text-xl lg:text-2xl font-bold text-gray-900">
+                    <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200">
+                      <div className="text-2xl font-bold text-gray-900">
                         {formatCurrency(vehicle.price)}
                       </div>
                       {vehicle.mileage && (
-                        <div className="text-xs sm:text-sm text-gray-600">
+                        <div className="text-sm text-gray-600">
                           {vehicle.mileage.toLocaleString()} mi
                         </div>
                       )}
@@ -534,13 +492,13 @@ export default function ManageInventoryPage() {
 
                     {/* Price Change Indicator */}
                     {getPriceChangeIndicator(vehicle.price_history) && (
-                      <div className="mb-2 sm:mb-3">
+                      <div className="mb-3">
                         {getPriceChangeIndicator(vehicle.price_history)}
                       </div>
                     )}
 
-                    {/* Listing Date and Days - Hide on mobile for 2-column grid */}
-                    <div className="hidden sm:block space-y-1 text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3">
+                    {/* Listing Date and Days */}
+                    <div className="space-y-1 text-sm text-gray-600 mb-3">
                       <div>
                         <span className="font-medium">Listed:</span> {formatDate(vehicle.first_seen_at)}
                       </div>
@@ -549,13 +507,8 @@ export default function ManageInventoryPage() {
                       </div>
                     </div>
 
-                    {/* Mobile: Show only days */}
-                    <div className="sm:hidden text-xs text-gray-600 mb-2">
-                      <span className="font-medium">Days in lot:</span> {daysInInventory}
-                    </div>
-
-                    {/* Additional Details - Hide on mobile */}
-                    <div className="hidden lg:block text-xs text-gray-500 space-y-1 mb-3">
+                    {/* Additional Details (Collapsible) */}
+                    <div className="text-xs text-gray-500 space-y-1 mb-3">
                       {vehicle.stock_number && (
                         <div>Stock #: {vehicle.stock_number}</div>
                       )}
@@ -573,134 +526,11 @@ export default function ManageInventoryPage() {
                         href={vehicle.listing_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block w-full text-center text-xs sm:text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                        className="block w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
                       >
                         View Listing →
                       </a>
                     )}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          /* List View */
-          <div className="space-y-2">
-            {filteredVehicles.map((vehicle) => {
-              const firstImage = vehicle.image_urls && vehicle.image_urls.length > 0 ? vehicle.image_urls[0] : null;
-              const daysInInventory = getDaysInInventory(vehicle.first_seen_at);
-
-              return (
-                <div
-                  key={vehicle.id}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-md transition-shadow"
-                >
-                  <div className="flex items-center gap-3 sm:gap-4 p-2 sm:p-3">
-                    {/* Thumbnail */}
-                    <div className="relative w-16 h-16 sm:w-20 sm:h-20 lg:w-24 lg:h-24 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
-                      {firstImage ? (
-                        <img
-                          src={firstImage}
-                          alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                          className="w-full h-full object-cover"
-                          onError={(e) => {
-                            e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5"%3E%3C/path%3E%3C/svg%3E';
-                          }}
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <Car className="w-8 h-8 text-gray-300" />
-                        </div>
-                      )}
-                      <div className="absolute top-1 right-1">
-                        {getStatusBadge(vehicle)}
-                      </div>
-                    </div>
-
-                    {/* Vehicle Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-2">
-                        <div className="flex-1 min-w-0">
-                          <h3 className="text-sm sm:text-base lg:text-lg font-semibold text-gray-900 truncate">
-                            {vehicle.year} {vehicle.make} {vehicle.model}
-                          </h3>
-                          {vehicle.trim && (
-                            <p className="text-xs sm:text-sm text-gray-600 truncate hidden sm:block">{vehicle.trim}</p>
-                          )}
-                        </div>
-                        <div className="text-right flex-shrink-0">
-                          <div className="text-base sm:text-lg lg:text-xl font-bold text-gray-900">
-                            {formatCurrency(vehicle.price)}
-                          </div>
-                          {vehicle.mileage && (
-                            <div className="text-xs sm:text-sm text-gray-600 hidden sm:block">
-                              {vehicle.mileage.toLocaleString()} mi
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Additional info - Desktop only */}
-                      <div className="hidden lg:flex items-center gap-4 mt-2 text-xs text-gray-600">
-                        <div>
-                          <span className="font-medium">Days:</span> {daysInInventory}
-                        </div>
-                        <div>
-                          <span className="font-medium">Listed:</span> {formatDate(vehicle.first_seen_at)}
-                        </div>
-                        {vehicle.stock_number && (
-                          <div>Stock #: {vehicle.stock_number}</div>
-                        )}
-                        {vehicle.exterior_color && (
-                          <div>Color: {vehicle.exterior_color}</div>
-                        )}
-                        {getPriceChangeIndicator(vehicle.price_history)}
-                      </div>
-
-                      {/* Mobile: Show only essential info */}
-                      <div className="lg:hidden flex items-center gap-3 mt-1 text-xs text-gray-600">
-                        <div>
-                          <span className="font-medium">Days:</span> {daysInInventory}
-                        </div>
-                        {vehicle.mileage && (
-                          <div className="sm:hidden">
-                            {vehicle.mileage.toLocaleString()} mi
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions - Desktop */}
-                    <div className="hidden lg:flex items-center gap-2 flex-shrink-0">
-                      {vehicle.listing_url && (
-                        <a
-                          href={vehicle.listing_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="px-3 py-1.5 text-xs text-blue-600 hover:text-blue-800 font-medium hover:underline"
-                        >
-                          View Listing →
-                        </a>
-                      )}
-                      <button
-                        onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
-                        className="p-2 hover:bg-red-50 rounded-lg transition-colors group"
-                        title="Delete vehicle"
-                      >
-                        <Trash2 className="w-4 h-4 text-gray-500 group-hover:text-red-600" />
-                      </button>
-                    </div>
-
-                    {/* Actions - Mobile */}
-                    <div className="lg:hidden flex-shrink-0">
-                      <button
-                        onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
-                        className="p-1.5 hover:bg-red-50 rounded-lg transition-colors group"
-                        title="Delete vehicle"
-                      >
-                        <Trash2 className="w-4 h-4 text-gray-500 group-hover:text-red-600" />
-                      </button>
-                    </div>
                   </div>
                 </div>
               );
