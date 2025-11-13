@@ -636,14 +636,12 @@ async function processVehicles(
     }
 
     // Check if vehicle exists in history (by VIN or generated identifier)
-    // Note: We check for both 'active' and 'price_changed' status to avoid treating
-    // price-changed vehicles as new vehicles on subsequent scrapes
     const { data: existing } = await supabase
       .from('vehicle_history')
       .select('*')
       .eq('tenant_id', tenant_id)
       .eq('vin', identifier)
-      .in('status', ['active', 'price_changed'])
+      .eq('status', 'active')
       .single();
 
     if (!existing) {
@@ -740,15 +738,8 @@ async function processVehicles(
           updates.status = 'price_changed';
           console.log(`  Price changed: ${existing.price} -> ${vehicle.price}`);
         } else {
-          // Price same, just update it and reset status to active
-          // This ensures vehicles don't stay in 'price_changed' state forever
+          // Price same, just update it
           updates.price = vehicle.price;
-          updates.status = 'active';
-        }
-      } else {
-        // No price in current scrape, reset to active if it was price_changed
-        if (existing.status === 'price_changed') {
-          updates.status = 'active';
         }
       }
 
