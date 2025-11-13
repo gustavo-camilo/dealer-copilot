@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML, type ParsedVehicle } from './parser.ts';
+import { enrichVehicleWithVIN } from '../_shared/vinDecoder.ts';
 
 // CORS headers
 const corsHeaders = {
@@ -409,13 +410,20 @@ async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicl
         const html = await fetchPage(vehicle.url);
         // Parse detail page
         const parsed = parseInventoryHTML(html, vehicle.url);
-        // Return first parsed vehicle (detail page should have one) or original
+        // Merge with original vehicle data
+        const merged = parsed.length > 0 ? { ...vehicle, ...parsed[0] } : vehicle;
+
+        // If we have VIN but missing data, try VIN decoder
+        const enriched = await enrichVehicleWithVIN(merged);
+
         successCount++;
-        return parsed.length > 0 ? { ...vehicle, ...parsed[0] } : vehicle;
+        return enriched;
       } catch (error) {
         failCount++;
         console.error(`Failed to fetch detail page ${i + batch.indexOf(vehicle) + 1}/${vehicles.length}: ${vehicle.url}`);
-        return vehicle; // Return original if fetch fails
+
+        // Even if fetch fails, try VIN decoder if we have VIN
+        return await enrichVehicleWithVIN(vehicle);
       }
     });
 

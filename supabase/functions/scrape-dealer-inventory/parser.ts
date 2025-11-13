@@ -19,6 +19,34 @@ export interface ParsedVehicle {
 }
 
 /**
+ * Convert string to title case (first letter uppercase, rest lowercase)
+ * Examples: "TOYOTA" -> "Toyota", "camry" -> "Camry", "F-150" -> "F-150"
+ */
+function toTitleCase(str: string): string {
+  if (!str) return str;
+
+  // Split by spaces and hyphens but keep delimiters
+  const words = str.split(/(\s+|-)/);
+
+  return words.map(word => {
+    // Skip delimiters (spaces and hyphens)
+    if (word === ' ' || word === '-' || word.trim() === '') {
+      return word;
+    }
+
+    // Handle special cases for alphanumeric like "F-150", "RX-350"
+    if (/^[A-Z0-9]+$/i.test(word)) {
+      // If it's mixed letters and numbers, keep uppercase letters
+      if (/[A-Z]/i.test(word) && /[0-9]/.test(word)) {
+        return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+      }
+    }
+
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join('');
+}
+
+/**
  * Main parsing function with improved vehicle card extraction
  */
 export function parseInventoryHTML(html: string, baseUrl: string): ParsedVehicle[] {
@@ -38,9 +66,19 @@ export function parseInventoryHTML(html: string, baseUrl: string): ParsedVehicle
         console.log(`✅ Parser found ${vehicles.length} vehicles`);
 
         // Validate vehicles have minimum required data
-        const validVehicles = vehicles.filter(v =>
-          (v.year && v.make) || v.price || v.url
-        );
+        // Accept if:
+        // 1. Has VIN (most reliable identifier - can look up missing data)
+        // 2. Has year AND make (core vehicle identity)
+        // 3. Has URL (can fetch detail page for missing data)
+        // 4. Has price AND year (likely a vehicle even without make)
+        const validVehicles = vehicles.filter(v => {
+          const hasVIN = v.vin && v.vin.length === 17;
+          const hasYearAndMake = v.year && v.make;
+          const hasURL = v.url;
+          const hasPriceAndYear = v.price && v.year;
+
+          return hasVIN || hasYearAndMake || hasURL || hasPriceAndYear;
+        });
 
         if (validVehicles.length > 0) {
           console.log(`✅ ${validVehicles.length} valid vehicles after filtering`);
@@ -73,11 +111,14 @@ function parseStructuredData(html: string, baseUrl: string): ParsedVehicle[] {
 
         for (const item of items) {
           if (item['@type'] === 'Car' || item['@type'] === 'Vehicle') {
+            const rawMake = item.brand?.name || item.manufacturer?.name;
+            const rawModel = item.model;
+
             const vehicle: ParsedVehicle = {
               vin: item.vehicleIdentificationNumber,
               year: parseInt(item.modelDate || item.yearOfManufacture),
-              make: item.brand?.name || item.manufacturer?.name,
-              model: item.model,
+              make: rawMake ? toTitleCase(rawMake) : undefined,
+              model: rawModel ? toTitleCase(rawModel) : undefined,
               price: parseFloat(item.offers?.price || item.price),
               mileage: parseInt(item.mileageFromOdometer?.value),
               color: item.color,
@@ -121,11 +162,16 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
     const href = match[1];
     const linkText = match[2].replace(/<[^>]+>/g, '').trim();
 
-    // Skip if link doesn't look like a vehicle
+    // Check if link text or URL suggests it's a vehicle (relaxed requirement)
     const hasYear = /\b(19|20)\d{2}\b/.test(linkText);
-    const hasMake = /\b(Ford|Chevrolet|Chevy|Toyota|Honda|Nissan|Jeep|RAM|Dodge|GMC|Mazda|Subaru|Kia|Hyundai|BMW|Mercedes|Audi|Lexus|Volkswagen|VW)\b/i.test(linkText);
+    const hasMake = /\b(Acura|Alfa Romeo|Aston Martin|Audi|Bentley|BMW|Buick|Cadillac|Chevrolet|Chevy|Chrysler|Dodge|Ferrari|Fiat|Ford|Genesis|GMC|Honda|Hummer|Hyundai|Infiniti|Jaguar|Jeep|Kia|Lamborghini|Land Rover|Lexus|Lincoln|Lotus|Maserati|Mazda|McLaren|Mercedes-Benz|Mercedes|Mini|Mitsubishi|Nissan|Polestar|Porsche|RAM|Rivian|Rolls-Royce|Saab|Saturn|Scion|Smart|Subaru|Suzuki|Tesla|Toyota|Volkswagen|VW|Volvo)\b/i.test(linkText);
 
-    if (!hasYear && !hasMake) {
+    // Relaxed: Allow if has year OR make OR if URL looks like vehicle detail
+    const looksLikeVehicleUrl = href.toLowerCase().includes('/vehicle') ||
+                                 href.toLowerCase().includes('/inventory/') ||
+                                 href.toLowerCase().includes('/detail');
+
+    if (!hasYear && !hasMake && !looksLikeVehicleUrl) {
       continue;
     }
 
@@ -164,8 +210,15 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
       // Parse vehicle data from the isolated card
       const vehicle = parseVehicleFromCard(card, linkText, fullUrl, baseUrl);
 
-      if (vehicle.year && vehicle.make) {
-        console.log(`✅ Found vehicle: ${vehicle.year} ${vehicle.make} ${vehicle.model || ''} - ${fullUrl}`);
+      // Accept vehicle if it has enough identifying information
+      const hasVIN = vehicle.vin && vehicle.vin.length === 17;
+      const hasYearAndMake = vehicle.year && vehicle.make;
+      const hasPriceAndYear = vehicle.price && vehicle.year;
+
+      if (hasVIN || hasYearAndMake || hasPriceAndYear) {
+        const displayName = `${vehicle.year || '????'} ${vehicle.make || '????'} ${vehicle.model || ''}`.trim();
+        const vinInfo = vehicle.vin ? ` (VIN: ${vehicle.vin})` : '';
+        console.log(`✅ Found vehicle: ${displayName}${vinInfo} - ${fullUrl}`);
         vehicles.push(vehicle);
       }
     } catch (e) {
@@ -290,12 +343,20 @@ function findMatchingClosingTag(html: string, openTagPos: number, tagName: strin
 function parseVehicleFromCard(card: string, linkText: string, url: string, baseUrl: string): ParsedVehicle {
   const vehicle: ParsedVehicle = { url };
 
-  // Extract VIN
-  const vinPattern = /\b([A-HJ-NPR-Z0-9]{17})\b/;
-  const vinMatch = card.match(vinPattern);
-  if (vinMatch) {
-    vehicle.vin = vinMatch[1];
-    console.log(`  VIN: ${vehicle.vin}`);
+  // Extract VIN - try multiple patterns
+  const vinPatterns = [
+    /VIN[:\s#]*([A-HJ-NPR-Z0-9]{17})\b/i,
+    /vehicle identification number[:\s#]*([A-HJ-NPR-Z0-9]{17})\b/i,
+    /\b([A-HJ-NPR-Z0-9]{17})\b/, // Generic 17-char pattern
+  ];
+
+  for (const pattern of vinPatterns) {
+    const vinMatch = card.match(pattern);
+    if (vinMatch) {
+      vehicle.vin = vinMatch[1].toUpperCase();
+      console.log(`  VIN: ${vehicle.vin}`);
+      break;
+    }
   }
 
   // Extract stock number
@@ -320,11 +381,16 @@ function parseVehicleFromCard(card: string, linkText: string, url: string, baseU
     console.log(`  Year: ${vehicle.year}`);
   }
 
-  // Extract make with more patterns
-  const makePattern = /\b(Ford|Chevrolet|Chevy|Toyota|Honda|Nissan|Jeep|RAM|Dodge|GMC|Mazda|Subaru|Kia|Hyundai|BMW|Mercedes|Mercedes-Benz|Audi|Lexus|Acura|Infiniti|Cadillac|Volkswagen|VW|Volvo|Porsche|Land Rover|Jaguar|Tesla|Buick|Chrysler|Lincoln|Genesis)\b/i;
+  // Extract make with comprehensive brand list
+  const makePattern = /\b(Acura|Alfa Romeo|Aston Martin|Audi|Bentley|BMW|Buick|Cadillac|Chevrolet|Chevy|Chrysler|Dodge|Ferrari|Fiat|Ford|Genesis|GMC|Honda|Hummer|Hyundai|Infiniti|Jaguar|Jeep|Kia|Lamborghini|Land Rover|Lexus|Lincoln|Lotus|Maserati|Mazda|McLaren|Mercedes-Benz|Mercedes|Mini|Mitsubishi|Nissan|Polestar|Porsche|RAM|Rivian|Rolls-Royce|Saab|Saturn|Scion|Smart|Subaru|Suzuki|Tesla|Toyota|Volkswagen|VW|Volvo)\b/i;
   const makeMatch = card.match(makePattern);
   if (makeMatch) {
-    vehicle.make = makeMatch[1].replace('Chevy', 'Chevrolet');
+    let make = makeMatch[1]
+      .replace(/Chevy/i, 'Chevrolet')
+      .replace(/VW/i, 'Volkswagen')
+      .replace(/Mercedes-Benz/i, 'Mercedes-Benz')
+      .replace(/^Mercedes$/i, 'Mercedes-Benz');
+    vehicle.make = toTitleCase(make);
     console.log(`  Make: ${vehicle.make}`);
   }
 
@@ -336,7 +402,7 @@ function parseVehicleFromCard(card: string, linkText: string, url: string, baseU
     );
     const modelMatch = card.match(modelPattern);
     if (modelMatch) {
-      vehicle.model = modelMatch[1].trim();
+      vehicle.model = toTitleCase(modelMatch[1].trim());
       console.log(`  Model: ${vehicle.model}`);
     }
   }
@@ -429,7 +495,7 @@ function parseGenericSections(html: string, baseUrl: string): ParsedVehicle[] {
 
     const hasVehicleKeywords =
       /\b(19|20)\d{2}\b/.test(section) && // Has year
-      /\b(Ford|Chevrolet|Toyota|Honda|Nissan|Jeep|RAM|Dodge|GMC)\b/i.test(section); // Has make
+      /\b(Acura|Alfa Romeo|Aston Martin|Audi|Bentley|BMW|Buick|Cadillac|Chevrolet|Chevy|Chrysler|Dodge|Ferrari|Fiat|Ford|Genesis|GMC|Honda|Hummer|Hyundai|Infiniti|Jaguar|Jeep|Kia|Lamborghini|Land Rover|Lexus|Lincoln|Lotus|Maserati|Mazda|McLaren|Mercedes-Benz|Mercedes|Mini|Mitsubishi|Nissan|Polestar|Porsche|RAM|Rivian|Rolls-Royce|Saab|Saturn|Scion|Smart|Subaru|Suzuki|Tesla|Toyota|Volkswagen|VW|Volvo)\b/i.test(section); // Has make
 
     if (!hasVehicleKeywords) continue;
 
@@ -447,7 +513,12 @@ function parseGenericSections(html: string, baseUrl: string): ParsedVehicle[] {
     const vehicle = parseVehicleFromCard(section, '', url, baseUrl);
 
     // Only include if we got substantial data
-    if ((vehicle.year && vehicle.make) || (vehicle.price && vehicle.url)) {
+    const hasVIN = vehicle.vin && vehicle.vin.length === 17;
+    const hasYearAndMake = vehicle.year && vehicle.make;
+    const hasPriceAndYear = vehicle.price && vehicle.year;
+    const hasURLAndPrice = vehicle.price && vehicle.url;
+
+    if (hasVIN || hasYearAndMake || hasPriceAndYear || hasURLAndPrice) {
       vehicles.push(vehicle);
     }
   }

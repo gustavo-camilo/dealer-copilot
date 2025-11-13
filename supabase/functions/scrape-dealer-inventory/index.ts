@@ -8,6 +8,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML } from './parser.ts';
 import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
+import { enrichVehicleWithVIN } from '../_shared/vinDecoder.ts';
 
 // CORS headers
 const corsHeaders = {
@@ -73,7 +74,7 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
 
               if (yearMatches && makeMatches) {
                 // Safe to merge - vehicles match
-                return {
+                const merged = {
                   ...vehicle, // Keep original data as base
                   // Only override with detail data if it exists and is not empty
                   vin: detailVehicle.vin || vehicle.vin,
@@ -92,16 +93,26 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
                   imageDate: detailVehicle.imageDate || vehicle.imageDate,
                   url: vehicle.url, // Always keep the original URL
                 };
+
+                // If we have a VIN but still missing year/make/model, try VIN decoder
+                return await enrichVehicleWithVIN(merged);
               } else {
                 // Vehicles don't match - keep original data only
                 console.log(`⚠️ Vehicle mismatch: listing shows ${vehicle.year} ${vehicle.make}, detail page shows ${detailVehicle.year} ${detailVehicle.make}. Keeping listing data.`);
-                return vehicle;
+
+                // Still try VIN decoder if we have VIN but missing data
+                return await enrichVehicleWithVIN(vehicle);
               }
             }
           }
         } catch (error) {
           console.log(`Failed to fetch details for ${vehicle.url}: ${error.message}`);
         }
+      }
+
+      // If we have VIN but missing data, try VIN decoder as final fallback
+      if (vehicle.vin && (!vehicle.year || !vehicle.make || !vehicle.model)) {
+        return await enrichVehicleWithVIN(vehicle);
       }
 
       // Return vehicle as-is if we couldn't enhance it
@@ -312,10 +323,8 @@ serve(async (req) => {
 
             vehicles = vehicles.concat(pageVehicles);
 
-            // If we found vehicles, we can stop (unless we want to check all pages)
-            if (vehicles.length > 0) {
-              break;
-            }
+            // Continue checking all inventory URLs to catch pagination
+            // Don't break early - we want all vehicles from all pages
           } catch (error) {
             console.log(`Error fetching ${url}:`, error.message);
             // Continue to next URL
