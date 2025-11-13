@@ -39,7 +39,7 @@ interface Vehicle {
   price_history: Array<{ date: string; price: number }>;
 }
 
-type StatusFilter = 'all' | 'active' | 'sold' | 'price_changed';
+type StatusFilter = 'all' | 'active' | 'sold' | 'recently_changed';
 type SortBy = 'recent' | 'price_asc' | 'price_desc' | 'age';
 
 export default function ManageInventoryPage() {
