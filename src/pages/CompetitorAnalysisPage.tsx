@@ -13,6 +13,7 @@ import {
   DollarSign,
   Gauge,
   BarChart3,
+  AlertCircle,
   Loader2,
   Car,
 } from 'lucide-react';
@@ -37,21 +38,47 @@ interface CompetitorSnapshot {
   error_message: string | null;
 }
 
+interface CompetitorHistory {
+  id: string;
+  scanned_at: string;
+  vehicle_count: number;
+  avg_price: number | null;
+}
+
 export default function CompetitorAnalysisPage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [competitors, setCompetitors] = useState<CompetitorSnapshot[]>([]);
+  const [historyData, setHistoryData] = useState<Record<string, CompetitorHistory[]>>({});
+  const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [newCompetitorUrl, setNewCompetitorUrl] = useState('');
   const [newCompetitorName, setNewCompetitorName] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState<string>('starter');
 
   useEffect(() => {
     loadCompetitors();
+    loadSubscriptionTier();
   }, []);
+
+  const loadSubscriptionTier = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('tenants')
+        .select('subscription_tier')
+        .eq('id', tenant?.id)
+        .single();
+
+      if (error) throw error;
+      setSubscriptionTier(data?.subscription_tier || 'starter');
+    } catch (error) {
+      console.error('Error loading subscription tier:', error);
+    }
+  };
 
   const loadCompetitors = async () => {
     try {
@@ -72,6 +99,27 @@ export default function CompetitorAnalysisPage() {
       setError('Failed to load competitors');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadHistory = async (competitorUrl: string) => {
+    try {
+      const { data, error } = await supabase
+        .from('competitor_scan_history')
+        .select('id, scanned_at, vehicle_count, avg_price')
+        .eq('tenant_id', tenant?.id)
+        .eq('competitor_url', competitorUrl)
+        .order('scanned_at', { ascending: false })
+        .limit(10);
+
+      if (error) throw error;
+
+      setHistoryData((prev) => ({
+        ...prev,
+        [competitorUrl]: data || [],
+      }));
+    } catch (error) {
+      console.error('Error loading history:', error);
     }
   };
 
@@ -151,6 +199,23 @@ export default function CompetitorAnalysisPage() {
     } catch (error) {
       console.error('Error deleting competitor:', error);
       setError('Failed to delete competitor');
+    }
+  };
+
+  const toggleHistory = (competitorUrl: string) => {
+    if (subscriptionTier !== 'enterprise') {
+      // Redirect to upgrade page
+      navigate('/upgrade');
+      return;
+    }
+
+    if (expandedHistory === competitorUrl) {
+      setExpandedHistory(null);
+    } else {
+      setExpandedHistory(competitorUrl);
+      if (!historyData[competitorUrl]) {
+        loadHistory(competitorUrl);
+      }
     }
   };
 
@@ -458,13 +523,62 @@ export default function CompetitorAnalysisPage() {
 
                   {/* History Section */}
                   <div className="border-t border-gray-200 pt-3">
-                    <Link
-                      to={`/competitor-history/${competitor.id}`}
-                      className="w-full flex items-center justify-between px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition text-sm font-medium text-blue-700"
-                    >
-                      <span>Scan History</span>
-                      <TrendingUp className="w-4 h-4" />
-                    </Link>
+                    {subscriptionTier === 'enterprise' ? (
+                      <button
+                        onClick={() => toggleHistory(competitor.competitor_url)}
+                        className="w-full flex items-center justify-between px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition text-sm font-medium text-blue-700"
+                      >
+                        <span>View Scan History</span>
+                        <TrendingUp className="w-4 h-4" />
+                      </button>
+                    ) : (
+                      <Link
+                        to="/upgrade"
+                        className="w-full flex items-center justify-between px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-sm font-medium text-gray-600"
+                      >
+                        <span>Scan History (Enterprise Feature)</span>
+                        <AlertCircle className="w-4 h-4" />
+                      </Link>
+                    )}
+
+                    {/* History Data (Enterprise only) */}
+                    {subscriptionTier === 'enterprise' && expandedHistory === competitor.competitor_url && (
+                      <div className="mt-3 space-y-2">
+                        {historyData[competitor.competitor_url]?.length > 0 ? (
+                          <>
+                            <div className="text-xs font-medium text-gray-600 mb-2">Recent Scans</div>
+                            {historyData[competitor.competitor_url].map((history) => (
+                              <div
+                                key={history.id}
+                                className="flex items-center justify-between text-xs bg-white rounded p-2 border border-gray-200"
+                              >
+                                <span className="text-gray-600">
+                                  {formatDate(history.scanned_at)}
+                                </span>
+                                <div className="flex items-center gap-3">
+                                  <span className="text-gray-700">
+                                    {history.vehicle_count} vehicles
+                                  </span>
+                                  <span className="font-semibold text-gray-900">
+                                    {formatCurrency(history.avg_price)} avg
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                            <button
+                              onClick={() => navigate(`/competitor-history/${competitor.id}`)}
+                              className="w-full text-xs text-blue-600 hover:text-blue-800 mt-2"
+                            >
+                              View Detailed History →
+                            </button>
+                          </>
+                        ) : (
+                          <div className="text-xs text-gray-500 text-center py-2">
+                            No history available yet
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

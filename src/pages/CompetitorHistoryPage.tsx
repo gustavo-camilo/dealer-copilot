@@ -1,7 +1,6 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { supabase } from '../lib/supabase';
 import { Target, ArrowLeft, Menu, X, TrendingUp, Construction } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 
@@ -9,38 +8,7 @@ export default function CompetitorHistoryPage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
   const { competitorId } = useParams();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [subscriptionTier, setSubscriptionTier] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    checkSubscriptionTier();
-  }, [tenant?.id]);
-
-  const checkSubscriptionTier = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('tenants')
-        .select('subscription_tier')
-        .eq('id', tenant?.id)
-        .single();
-
-      if (error) throw error;
-
-      const tier = data?.subscription_tier || 'starter';
-      setSubscriptionTier(tier);
-
-      // Redirect non-enterprise users to upgrade page
-      if (tier !== 'enterprise') {
-        navigate(`/upgrade?feature=history&competitor=${competitorId}`);
-      }
-    } catch (error) {
-      console.error('Error checking subscription tier:', error);
-      navigate('/upgrade?feature=history');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [menuOpen, setMenuOpen] = React.useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -50,23 +18,6 @@ export default function CompetitorHistoryPage() {
       console.error('Error signing out:', error);
     }
   };
-
-  // Show loading while checking tier
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Only render page for enterprise users (others are redirected)
-  if (subscriptionTier !== 'enterprise') {
-    return null;
-  }
 
   return (
     <div className="min-h-screen bg-gray-50">
