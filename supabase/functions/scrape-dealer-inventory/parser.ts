@@ -3,6 +3,8 @@
 // =====================================================
 // This fixes issues with data mixing and extraction failures
 
+import { parseInventoryHTML as legacyParseInventoryHTML } from './parser-old-backup.ts';
+
 export interface ParsedVehicle {
   vin?: string;
   stock_number?: string;
@@ -88,6 +90,18 @@ export function parseInventoryHTML(html: string, baseUrl: string): ParsedVehicle
     } catch (error) {
       console.log(`❌ Parser failed: ${error.message}`);
     }
+  }
+
+  console.warn('⚠️ No vehicles found with new parser strategies, attempting legacy parser...');
+
+  try {
+    const legacyVehicles = legacyParseInventoryHTML(html, baseUrl);
+    if (legacyVehicles.length > 0) {
+      console.log(`✅ Legacy parser recovered ${legacyVehicles.length} vehicles`);
+      return legacyVehicles;
+    }
+  } catch (error) {
+    console.log(`❌ Legacy parser failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   console.warn('⚠️ No vehicles found with any parser');
