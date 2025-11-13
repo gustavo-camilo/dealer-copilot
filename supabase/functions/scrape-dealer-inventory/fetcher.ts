@@ -7,7 +7,7 @@
 // - Proper error handling
 // - Response validation
 
-import { createTimeoutSignal } from '../_shared/timeout.ts';
+import { createTimeoutSignal } from './timeout.ts';
 
 export interface FetchOptions {
   maxRetries?: number;          // Default: 3

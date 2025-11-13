@@ -4,7 +4,7 @@
 // Uses NHTSA's free vPIC API to decode VINs
 // Documentation: https://vpic.nhtsa.dot.gov/api/
 
-import { createTimeoutSignal } from '../_shared/timeout.ts';
+import { createTimeoutSignal } from './timeout.ts';
 
 export interface VINDecodedData {
   vin: string;

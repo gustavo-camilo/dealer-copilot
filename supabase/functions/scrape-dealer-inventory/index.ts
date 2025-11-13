@@ -12,7 +12,7 @@ import { enrichVehicleWithVIN } from './vinDecoder.ts';
 import { getVehicleUrlsFromSitemap } from './sitemapParser.ts';
 import { fetchWithRetry, fetchBatch } from './fetcher.ts';
 import { extractMetadata, mergeWithMetadata } from './metadataExtractor.ts';
-import { createTimeoutSignal } from '../_shared/timeout.ts';
+import { createTimeoutSignal } from './timeout.ts';
 
 // CORS headers
 const corsHeaders = {

@@ -8,7 +8,7 @@
 // 3. Faster than crawling
 // 4. Less likely to be blocked
 
-import { createTimeoutSignal } from '../_shared/timeout.ts';
+import { createTimeoutSignal } from './timeout.ts';
 
 export interface SitemapUrl {
   loc: string;           // URL

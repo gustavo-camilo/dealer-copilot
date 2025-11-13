@@ -1,7 +1,7 @@
 // =====================================================
 // TIMEOUT SIGNAL HELPERS
 // =====================================================
-// Some runtimes (older Deno Deploy versions) don't support AbortSignal.timeout.
+// Some runtimes (e.g., Supabase Edge on older Deno versions) don't support AbortSignal.timeout.
 // This helper provides a safe way to create abort signals with a manual fallback.
 
 /**

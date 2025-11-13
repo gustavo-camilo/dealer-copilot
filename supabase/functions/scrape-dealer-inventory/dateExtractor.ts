@@ -3,7 +3,7 @@
 // =====================================================
 // Hybrid approach to extract accurate listing dates from dealer websites
 
-import { createTimeoutSignal } from '../_shared/timeout.ts';
+import { createTimeoutSignal } from './timeout.ts';
 
 export interface ListingDateResult {
   date: Date;
