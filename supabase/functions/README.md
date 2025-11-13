@@ -27,7 +27,7 @@ The `vinDecoder.ts` utility is currently duplicated in:
 ## Functions Overview
 
 ### scrape-dealer-inventory
-Scrapes the tenant's own website to build vehicle inventory history and sales records.
+Scrapes the tenant's own website to build **individual vehicle tracking** with sales history.
 
 **Features:**
 - Pagination support (scrapes all inventory pages)
@@ -36,14 +36,51 @@ Scrapes the tenant's own website to build vehicle inventory history and sales re
 - VIN decoder fallback (NHTSA API)
 - Comprehensive brand support (50+ brands)
 
+**Data Stored:**
+- ✅ **Individual vehicles** in `vehicle_history` table
+- ✅ VIN-level tracking with first_seen/last_seen dates
+- ✅ Price history for each vehicle
+- ✅ Automatic sold vehicle detection
+- ✅ Sales records generation
+
+**How VIN Matching Works:**
+1. **First scrape**: Vehicle is **inserted** with its VIN (or generated ID)
+2. **Subsequent scrapes**: Same VIN → Vehicle is **updated** (not duplicated)
+3. **Price changes**: Tracked in `price_history` array
+4. **Disappeared vehicles**: Marked as "sold" after 2 days absent
+
+---
+
 ### scrape-competitor
-Scrapes competitor websites for market intelligence and pricing analysis.
+Scrapes competitor websites for **aggregate market intelligence** only.
 
 **Features:**
 - Automatic pagination
 - Parallel detail page fetching
 - VIN decoder integration
 - Aggregated statistics calculation
+
+**Data Stored:**
+- ✅ **Aggregate stats only** (no individual vehicles)
+- ✅ Total vehicle count
+- ✅ Average/min/max price and mileage
+- ✅ Top 5 makes distribution
+- ✅ Total inventory value
+- ✅ Historical snapshots in `competitor_scan_history`
+- ✅ Current snapshot in `competitor_snapshots` (upserted)
+
+**How VIN Matching Works:**
+- ❌ **No VIN-level tracking** - individual vehicles are NOT stored
+- ❌ Cannot detect price changes on specific vehicles
+- ❌ Cannot track when specific vehicles are added/removed
+- ✅ VIN decoder is used during scraping for accurate stats
+- ✅ Each scan replaces previous snapshot (no duplicates)
+
+**Why Aggregate-Only?**
+- 🚀 **Performance**: Faster scans, less storage
+- 💰 **Cost**: Minimal database usage
+- 📊 **Use case**: Market trends, not vehicle-level tracking
+- 🎯 **Focus**: "What's the competitor's average price?" not "Is this VIN still available?"
 
 ## VIN Decoder
 
