@@ -121,6 +121,9 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
 async function findInventoryPages(baseUrl: string): Promise<string[]> {
   const urls: string[] = [];
 
+  // Normalize URL: add https:// if protocol is missing
+  const normalizedUrl = baseUrl.match(/^https?:\/\//) ? baseUrl : `https://${baseUrl}`;
+
   // Common inventory page patterns
   const inventoryPaths = [
     '/inventory',
@@ -138,12 +141,12 @@ async function findInventoryPages(baseUrl: string): Promise<string[]> {
   ];
 
   // Parse base URL
-  const url = new URL(baseUrl);
+  const url = new URL(normalizedUrl);
   const baseUrlClean = `${url.protocol}//${url.host}`;
 
   // First, try to fetch the homepage and look for inventory links
   try {
-    const response = await fetch(baseUrl, {
+    const response = await fetch(normalizedUrl, {
       headers: {
         'User-Agent':
           'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',

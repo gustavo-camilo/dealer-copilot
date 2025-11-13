@@ -44,11 +44,14 @@ serve(async (req) => {
       );
     }
 
+    // Normalize URL: add https:// if protocol is missing
+    const normalizedUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+
     const startTime = Date.now();
-    console.log(`🔍 Scanning competitor: ${url}`);
+    console.log(`🔍 Scanning competitor: ${normalizedUrl}`);
 
     // Step 1: Discover inventory page
-    const inventoryUrl = await discoverInventoryPage(url);
+    const inventoryUrl = await discoverInventoryPage(normalizedUrl);
     console.log(`📄 Found inventory page: ${inventoryUrl}`);
 
     // Step 2: Fetch and parse listing page
@@ -78,8 +81,8 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         data: {
-          competitor_url: url,
-          competitor_name: name || new URL(url).hostname,
+          competitor_url: normalizedUrl,
+          competitor_name: name || new URL(normalizedUrl).hostname,
           scanned_at: new Date().toISOString(),
           vehicle_count: stats.vehicle_count,
           avg_price: stats.avg_price,
