@@ -7,6 +7,8 @@
 // - Proper error handling
 // - Response validation
 
+import { createTimeoutSignal } from '../_shared/timeout.ts';
+
 export interface FetchOptions {
   maxRetries?: number;          // Default: 3
   initialDelayMs?: number;      // Default: 1000 (1 second)
@@ -131,7 +133,7 @@ export async function fetchWithRetry(
           'Connection': 'keep-alive',
           'Upgrade-Insecure-Requests': '1',
         },
-        signal: AbortSignal.timeout(timeout),
+        signal: createTimeoutSignal(timeout),
       });
 
       // Check HTTP status

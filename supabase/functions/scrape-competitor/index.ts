@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML, type ParsedVehicle } from './parser.ts';
+import { createTimeoutSignal } from '../_shared/timeout.ts';
 
 // =====================================================
 // VIN DECODER - Inlined to avoid deployment issues
@@ -21,7 +22,7 @@ async function decodeVIN(vin: string): Promise<VINDecodedData | null> {
     const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`;
     const response = await fetch(url, {
       headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0)' },
-      signal: AbortSignal.timeout(10000),
+      signal: createTimeoutSignal(10000),
     });
 
     if (!response.ok) return null;
@@ -297,7 +298,7 @@ async function discoverInventoryPage(baseUrl: string): Promise<string> {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
         },
-        signal: AbortSignal.timeout(10000), // 10 second timeout for HEAD requests
+        signal: createTimeoutSignal(10000), // 10 second timeout for HEAD requests
       });
       if (response.ok) {
         return testUrl;
@@ -320,7 +321,7 @@ async function fetchPage(url: string): Promise<string> {
       'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'Accept-Language': 'en-US,en;q=0.5',
     },
-    signal: AbortSignal.timeout(30000), // 30 second timeout
+    signal: createTimeoutSignal(30000), // 30 second timeout
   });
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url}: ${response.status}`);

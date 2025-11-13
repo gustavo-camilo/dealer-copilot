@@ -8,6 +8,8 @@
 // 3. Faster than crawling
 // 4. Less likely to be blocked
 
+import { createTimeoutSignal } from '../_shared/timeout.ts';
+
 export interface SitemapUrl {
   loc: string;           // URL
   lastmod?: string;      // Last modified date
@@ -43,7 +45,7 @@ async function discoverSitemaps(baseUrl: string): Promise<string[]> {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
       },
-      signal: AbortSignal.timeout(10000),
+      signal: createTimeoutSignal(10000),
     });
 
     if (response.ok) {
@@ -78,7 +80,7 @@ async function discoverSitemaps(baseUrl: string): Promise<string[]> {
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
         },
-        signal: AbortSignal.timeout(5000),
+        signal: createTimeoutSignal(5000),
       });
 
       if (response.ok) {
@@ -220,7 +222,7 @@ export async function getVehicleUrlsFromSitemap(baseUrl: string): Promise<Sitema
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
         },
-        signal: AbortSignal.timeout(30000),
+        signal: createTimeoutSignal(30000),
       });
 
       if (!response.ok) {
@@ -244,7 +246,7 @@ export async function getVehicleUrlsFromSitemap(baseUrl: string): Promise<Sitema
               headers: {
                 'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
               },
-              signal: AbortSignal.timeout(30000),
+              signal: createTimeoutSignal(30000),
             });
 
             if (childResponse.ok) {

@@ -4,6 +4,8 @@
 // Uses NHTSA's free vPIC API to decode VINs
 // Documentation: https://vpic.nhtsa.dot.gov/api/
 
+import { createTimeoutSignal } from './timeout.ts';
+
 export interface VINDecodedData {
   vin: string;
   year?: number;
@@ -34,7 +36,7 @@ export async function decodeVIN(vin: string): Promise<VINDecodedData | null> {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
       },
-      signal: AbortSignal.timeout(10000), // 10 second timeout
+      signal: createTimeoutSignal(10000), // 10 second timeout
     });
 
     if (!response.ok) {

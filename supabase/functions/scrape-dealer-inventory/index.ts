@@ -12,6 +12,7 @@ import { enrichVehicleWithVIN } from './vinDecoder.ts';
 import { getVehicleUrlsFromSitemap } from './sitemapParser.ts';
 import { fetchWithRetry, fetchBatch } from './fetcher.ts';
 import { extractMetadata, mergeWithMetadata } from './metadataExtractor.ts';
+import { createTimeoutSignal } from '../_shared/timeout.ts';
 
 // CORS headers
 const corsHeaders = {
@@ -176,7 +177,7 @@ async function findInventoryPages(baseUrl: string): Promise<string[]> {
         'User-Agent':
           'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
       },
-      signal: AbortSignal.timeout(10000),
+      signal: createTimeoutSignal(10000),
     });
 
     if (response.ok) {
