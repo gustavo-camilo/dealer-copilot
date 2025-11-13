@@ -56,8 +56,18 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
             signal: AbortSignal.timeout(15000), // 15 second timeout
           });
 
-          if (response.ok) {
+          // CRITICAL: Validate response is actually a valid page
+          if (response.ok && response.status === 200) {
             const html = await response.text();
+
+            // Additional validation: Check if page contains "not found" or error indicators
+            const htmlLower = html.toLowerCase();
+            if (htmlLower.includes('page not found') ||
+                htmlLower.includes('404') ||
+                htmlLower.includes('does not exist')) {
+              console.log(`⚠️ Page appears to be an error page: ${vehicle.url}`);
+              return await enrichVehicleWithVIN(vehicle);
+            }
 
             // Parse the detail page for additional data
             const detailVehicles = parseInventoryHTML(html, vehicle.url);
@@ -333,15 +343,31 @@ serve(async (req) => {
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
+        // Deduplicate vehicles by URL (can happen if multiple pages show same vehicles)
+        const seenUrls = new Set<string>();
+        const uniqueVehicles = vehicles.filter(v => {
+          if (!v.url) return true; // Keep vehicles without URLs
+          if (seenUrls.has(v.url)) {
+            console.log(`⚠️ Skipping duplicate URL: ${v.url}`);
+            return false;
+          }
+          seenUrls.add(v.url);
+          return true;
+        });
+
+        if (uniqueVehicles.length < vehicles.length) {
+          console.log(`Removed ${vehicles.length - uniqueVehicles.length} duplicate vehicles`);
+        }
+
         // Log sample of what we found
-        if (vehicles.length > 0) {
-          const sample = vehicles[0];
+        if (uniqueVehicles.length > 0) {
+          const sample = uniqueVehicles[0];
           console.log(`Sample vehicle: ${sample.year} ${sample.make} ${sample.model} - $${sample.price} - ${sample.mileage}mi - ${sample.url} - ${sample.images?.length || 0} images`);
         }
 
         // Enhance vehicle data by fetching individual vehicle pages
         console.log('Fetching individual vehicle pages for complete data...');
-        const enhancedVehicles = await enhanceVehicleData(vehicles);
+        const enhancedVehicles = await enhanceVehicleData(uniqueVehicles);
         console.log(`Enhanced ${enhancedVehicles.length} vehicles with detailed information`);
 
         // Log enhanced sample
