@@ -5,6 +5,7 @@
 // but optimized for competitor analysis data needs
 
 export interface ParsedVehicle {
+  vin?: string;
   year?: number;
   make?: string;
   model?: string;

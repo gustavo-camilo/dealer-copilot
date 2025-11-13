@@ -8,7 +8,7 @@ import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML } from './parser.ts';
 import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
-import { enrichVehicleWithVIN } from '../_shared/vinDecoder.ts';
+import { enrichVehicleWithVIN } from './vinDecoder.ts';
 
 // CORS headers
 const corsHeaders = {

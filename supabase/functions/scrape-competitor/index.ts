@@ -1,7 +1,77 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML, type ParsedVehicle } from './parser.ts';
-import { enrichVehicleWithVIN } from '../_shared/vinDecoder.ts';
+
+// =====================================================
+// VIN DECODER - Inlined to avoid deployment issues
+// =====================================================
+
+interface VINDecodedData {
+  vin: string;
+  year?: number;
+  make?: string;
+  model?: string;
+  trim?: string;
+}
+
+async function decodeVIN(vin: string): Promise<VINDecodedData | null> {
+  if (!vin || vin.length !== 17) return null;
+
+  try {
+    const url = `https://vpic.nhtsa.dot.gov/api/vehicles/DecodeVin/${vin}?format=json`;
+    const response = await fetch(url, {
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0)' },
+      signal: AbortSignal.timeout(10000),
+    });
+
+    if (!response.ok) return null;
+    const data = await response.json();
+    if (!data.Results || !Array.isArray(data.Results)) return null;
+
+    const results = data.Results;
+    const getValueByName = (name: string) => results.find((r: { Variable: string; Value: string }) => r.Variable === name)?.Value;
+
+    const yearStr = getValueByName('Model Year');
+    const make = getValueByName('Make');
+    const model = getValueByName('Model');
+    const trim = getValueByName('Trim');
+
+    return {
+      vin,
+      year: yearStr ? parseInt(yearStr) : undefined,
+      make: make || undefined,
+      model: model || undefined,
+      trim: trim || undefined,
+    };
+  } catch {
+    return null;
+  }
+}
+
+function toTitleCase(str: string): string {
+  if (!str) return str;
+  const words = str.split(/(\s+|-)/);
+  return words.map(word => {
+    if (word === ' ' || word === '-' || word.trim() === '') return word;
+    return word.charAt(0).toUpperCase() + word.slice(1).toLowerCase();
+  }).join('');
+}
+
+async function enrichVehicleWithVIN(vehicle: ParsedVehicle): Promise<ParsedVehicle> {
+  if (!vehicle.vin || vehicle.vin.length !== 17) return vehicle;
+  if (vehicle.year && vehicle.make && vehicle.model) return vehicle;
+
+  const decoded = await decodeVIN(vehicle.vin);
+  if (!decoded) return vehicle;
+
+  return {
+    ...vehicle,
+    year: vehicle.year || decoded.year,
+    make: vehicle.make || (decoded.make ? toTitleCase(decoded.make) : undefined),
+    model: vehicle.model || (decoded.model ? toTitleCase(decoded.model) : undefined),
+    trim: vehicle.trim || decoded.trim,
+  };
+}
 
 // CORS headers
 const corsHeaders = {
