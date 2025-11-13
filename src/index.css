@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer utilities {
+  /* Add bottom padding on mobile to prevent content from being hidden behind bottom nav */
+  .mobile-safe-bottom {
+    @apply pb-20 md:pb-0;
+  }
+
+  /* For pages with scrolling content */
+  .mobile-content-wrapper {
+    @apply min-h-screen pb-20 md:pb-0;
+  }
+}
