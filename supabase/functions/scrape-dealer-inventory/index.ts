@@ -9,6 +9,9 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML } from './parser.ts';
 import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
 import { enrichVehicleWithVIN } from './vinDecoder.ts';
+import { getVehicleUrlsFromSitemap } from './sitemapParser.ts';
+import { fetchWithRetry, fetchBatch } from './fetcher.ts';
+import { extractMetadata, mergeWithMetadata } from './metadataExtractor.ts';
 
 // CORS headers
 const corsHeaders = {
@@ -48,16 +51,15 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
         try {
           console.log(`Fetching details for ${vehicle.year} ${vehicle.make} ${vehicle.model || ''} at ${vehicle.url}`);
 
-          const response = await fetch(vehicle.url, {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-            },
-            signal: AbortSignal.timeout(15000), // 15 second timeout
+          // Use robust fetcher with retry logic
+          const result = await fetchWithRetry(vehicle.url, {
+            timeout: 15000,
+            maxRetries: 2, // Reduced retries for detail pages
+            rateLimitMs: 500, // Faster for detail pages
           });
 
-          if (response.ok) {
-            const html = await response.text();
+          if (result.success && result.html) {
+            const html = result.html;
 
             // Parse the detail page for additional data
             const detailVehicles = parseInventoryHTML(html, vehicle.url);
@@ -103,7 +105,19 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
                 // Still try VIN decoder if we have VIN but missing data
                 return await enrichVehicleWithVIN(vehicle);
               }
+            } else {
+              // Parsing failed, try metadata extraction as fallback
+              console.log(`⚠️ Parsing failed for ${vehicle.url}, trying metadata extraction...`);
+              const metadata = extractMetadata(html);
+              const enriched = mergeWithMetadata(vehicle, metadata);
+
+              if (metadata.confidence !== 'low') {
+                console.log(`✅ Metadata extraction successful (${metadata.confidence} confidence)`);
+                return await enrichVehicleWithVIN(enriched);
+              }
             }
+          } else {
+            console.log(`❌ Failed to fetch ${vehicle.url}: ${result.error}`);
           }
         } catch (error) {
           console.log(`Failed to fetch details for ${vehicle.url}: ${error.message}`);
@@ -287,61 +301,124 @@ serve(async (req) => {
           throw new Error(`Failed to create snapshot: ${snapshotError.message}`);
         }
 
-        // Try to find inventory pages
-        const inventoryUrls = await findInventoryPages(tenant.website_url);
-
-        console.log(`Found ${inventoryUrls.length} inventory URL(s) to scrape`);
-
         let vehicles: any[] = [];
 
-        // Try each inventory URL
-        for (const url of inventoryUrls) {
-          try {
-            console.log(`Fetching ${url}...`);
+        // STRATEGY 1: Try sitemap first (most reliable and complete)
+        console.log('📍 Strategy 1: Attempting sitemap discovery...');
+        const sitemapVehicleUrls = await getVehicleUrlsFromSitemap(tenant.website_url);
 
-            const response = await fetch(url, {
-              headers: {
-                'User-Agent':
-                  'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-                Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-              },
-              signal: AbortSignal.timeout(30000), // 30 second timeout
-            });
+        if (sitemapVehicleUrls.length > 0) {
+          console.log(`✅ Found ${sitemapVehicleUrls.length} vehicle URLs in sitemaps!`);
 
-            if (!response.ok) {
-              console.log(`HTTP ${response.status} for ${url}, skipping...`);
-              continue;
+          // Fetch vehicles from sitemap URLs (sample first 50 to avoid overwhelming)
+          const urlsToFetch = sitemapVehicleUrls.slice(0, 50).map(u => u.loc);
+
+          const fetchResults = await fetchBatch(urlsToFetch, {
+            concurrency: 5,
+            maxRetries: 2,
+            rateLimitMs: 1000,
+          });
+
+          // Parse each fetched page
+          for (const [url, result] of fetchResults.entries()) {
+            if (result.success && result.html) {
+              const pageVehicles = parseInventoryHTML(result.html, url);
+
+              if (pageVehicles.length > 0) {
+                vehicles = vehicles.concat(pageVehicles);
+              } else {
+                // Fallback to metadata extraction
+                const metadata = extractMetadata(result.html);
+                if (metadata.year && metadata.make) {
+                  vehicles.push({
+                    url,
+                    year: metadata.year,
+                    make: metadata.make,
+                    model: metadata.model,
+                    price: metadata.price,
+                    mileage: metadata.mileage,
+                    vin: metadata.vin,
+                    images: metadata.image ? [metadata.image] : [],
+                    _fromMetadata: true,
+                    _metadataConfidence: metadata.confidence,
+                  });
+                }
+              }
             }
+          }
 
-            const html = await response.text();
+          console.log(`✅ Sitemap strategy found ${vehicles.length} vehicles`);
+        }
 
-            // Parse inventory from HTML
-            const pageVehicles = parseInventoryHTML(html, url);
+        // STRATEGY 2: Fallback to traditional inventory page scraping
+        if (vehicles.length === 0) {
+          console.log('📍 Strategy 2: Falling back to traditional scraping...');
 
-            console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
+          const inventoryUrls = await findInventoryPages(tenant.website_url);
+          console.log(`Found ${inventoryUrls.length} inventory URL(s) to scrape`);
 
-            vehicles = vehicles.concat(pageVehicles);
+          // Try each inventory URL
+          for (const url of inventoryUrls) {
+            try {
+              console.log(`Fetching ${url}...`);
 
-            // Continue checking all inventory URLs to catch pagination
-            // Don't break early - we want all vehicles from all pages
-          } catch (error) {
-            console.log(`Error fetching ${url}:`, error.message);
-            // Continue to next URL
+              // Use robust fetcher
+              const result = await fetchWithRetry(url, {
+                timeout: 30000,
+                maxRetries: 3,
+                rateLimitMs: 1000,
+              });
+
+              if (!result.success) {
+                console.log(`Failed to fetch ${url}: ${result.error}`);
+                continue;
+              }
+
+              const html = result.html!;
+
+              // Parse inventory from HTML
+              const pageVehicles = parseInventoryHTML(html, url);
+
+              console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
+
+              vehicles = vehicles.concat(pageVehicles);
+
+              // Continue checking all inventory URLs to catch pagination
+              // Don't break early - we want all vehicles from all pages
+            } catch (error) {
+              console.log(`Error fetching ${url}:`, error.message);
+              // Continue to next URL
+            }
           }
         }
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
+        // Deduplicate vehicles by URL (can happen if multiple pages show same vehicles)
+        const seenUrls = new Set<string>();
+        const uniqueVehicles = vehicles.filter(v => {
+          if (!v.url) return true; // Keep vehicles without URLs
+          if (seenUrls.has(v.url)) {
+            console.log(`⚠️ Skipping duplicate URL: ${v.url}`);
+            return false;
+          }
+          seenUrls.add(v.url);
+          return true;
+        });
+
+        if (uniqueVehicles.length < vehicles.length) {
+          console.log(`Removed ${vehicles.length - uniqueVehicles.length} duplicate vehicles`);
+        }
+
         // Log sample of what we found
-        if (vehicles.length > 0) {
-          const sample = vehicles[0];
+        if (uniqueVehicles.length > 0) {
+          const sample = uniqueVehicles[0];
           console.log(`Sample vehicle: ${sample.year} ${sample.make} ${sample.model} - $${sample.price} - ${sample.mileage}mi - ${sample.url} - ${sample.images?.length || 0} images`);
         }
 
         // Enhance vehicle data by fetching individual vehicle pages
         console.log('Fetching individual vehicle pages for complete data...');
-        const enhancedVehicles = await enhanceVehicleData(vehicles);
+        const enhancedVehicles = await enhanceVehicleData(uniqueVehicles);
         console.log(`Enhanced ${enhancedVehicles.length} vehicles with detailed information`);
 
         // Log enhanced sample
