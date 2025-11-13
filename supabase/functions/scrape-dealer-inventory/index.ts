@@ -6,9 +6,13 @@
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { parseInventoryHTML } from './parser.ts';
+
+// Use unified scraper core
+import { scrapeWebsite } from '../_shared/scraper-core.ts';
+import type { ParsedVehicle } from '../_shared/types.ts';
+
+// Keep dealer-specific date extraction logic
 import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
-import { enrichVehicleWithVIN } from './vinDecoder.ts';
 
 // CORS headers
 const corsHeaders = {
@@ -29,191 +33,9 @@ interface ScrapingResult {
   duration_ms: number;
 }
 
-/**
- * Enhance vehicle data by fetching individual vehicle pages
- * This extracts complete details including VINs, stock numbers, and additional specs
- */
-async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
-  const enhancedVehicles: any[] = [];
-
-  // Process vehicles in parallel with a concurrency limit
-  const concurrencyLimit = 5; // Fetch 5 pages at a time to be respectful
-
-  for (let i = 0; i < vehicles.length; i += concurrencyLimit) {
-    const batch = vehicles.slice(i, Math.min(i + concurrencyLimit, vehicles.length));
-
-    const batchPromises = batch.map(async (vehicle) => {
-      // If vehicle has a URL, try to fetch the detail page for VIN/mileage
-      if (vehicle.url) {
-        try {
-          console.log(`Fetching details for ${vehicle.year} ${vehicle.make} ${vehicle.model || ''} at ${vehicle.url}`);
-
-          const response = await fetch(vehicle.url, {
-            headers: {
-              'User-Agent':
-                'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-            },
-            signal: AbortSignal.timeout(15000), // 15 second timeout
-          });
-
-          if (response.ok) {
-            const html = await response.text();
-
-            // Parse the detail page for additional data
-            const detailVehicles = parseInventoryHTML(html, vehicle.url);
-
-            if (detailVehicles.length > 0) {
-              const detailVehicle = detailVehicles[0];
-
-              // CRITICAL: Validate that detail page matches the original vehicle
-              // to avoid mixing data from different vehicles
-              const yearMatches = !vehicle.year || !detailVehicle.year ||
-                                  vehicle.year === detailVehicle.year;
-              const makeMatches = !vehicle.make || !detailVehicle.make ||
-                                  vehicle.make.toLowerCase() === detailVehicle.make.toLowerCase();
-
-              if (yearMatches && makeMatches) {
-                // Safe to merge - vehicles match
-                const merged = {
-                  ...vehicle, // Keep original data as base
-                  // Only override with detail data if it exists and is not empty
-                  vin: detailVehicle.vin || vehicle.vin,
-                  stock_number: detailVehicle.stock_number || vehicle.stock_number,
-                  mileage: detailVehicle.mileage || vehicle.mileage,
-                  trim: detailVehicle.trim || vehicle.trim,
-                  color: detailVehicle.color || vehicle.color,
-                  // Prefer detail page model if listing page didn't have it
-                  model: vehicle.model || detailVehicle.model,
-                  // Use detail page image if it exists, otherwise keep listing image
-                  images: (detailVehicle.images && detailVehicle.images.length > 0)
-                          ? detailVehicle.images
-                          : (vehicle.images && vehicle.images.length > 0)
-                            ? vehicle.images
-                            : [],
-                  imageDate: detailVehicle.imageDate || vehicle.imageDate,
-                  url: vehicle.url, // Always keep the original URL
-                };
-
-                // If we have a VIN but still missing year/make/model, try VIN decoder
-                return await enrichVehicleWithVIN(merged);
-              } else {
-                // Vehicles don't match - keep original data only
-                console.log(`⚠️ Vehicle mismatch: listing shows ${vehicle.year} ${vehicle.make}, detail page shows ${detailVehicle.year} ${detailVehicle.make}. Keeping listing data.`);
-
-                // Still try VIN decoder if we have VIN but missing data
-                return await enrichVehicleWithVIN(vehicle);
-              }
-            }
-          }
-        } catch (error) {
-          console.log(`Failed to fetch details for ${vehicle.url}: ${error.message}`);
-        }
-      }
-
-      // If we have VIN but missing data, try VIN decoder as final fallback
-      if (vehicle.vin && (!vehicle.year || !vehicle.make || !vehicle.model)) {
-        return await enrichVehicleWithVIN(vehicle);
-      }
-
-      // Return vehicle as-is if we couldn't enhance it
-      return vehicle;
-    });
-
-    const batchResults = await Promise.all(batchPromises);
-    enhancedVehicles.push(...batchResults);
-  }
-
-  return enhancedVehicles;
-}
-
-/**
- * Find potential inventory pages on a dealer website
- */
-async function findInventoryPages(baseUrl: string): Promise<string[]> {
-  const urls: string[] = [];
-
-  // Normalize URL: add https:// if protocol is missing
-  const normalizedUrl = baseUrl.match(/^https?:\/\//) ? baseUrl : `https://${baseUrl}`;
-
-  // Common inventory page patterns
-  const inventoryPaths = [
-    '/inventory',
-    '/used-cars',
-    '/vehicles',
-    '/cars',
-    '/used-inventory',
-    '/pre-owned',
-    '/search',
-    '/stock',
-    '/cars-for-sale',
-    '/used-vehicles',
-    '/inventory.html',
-    '/inventory.php',
-  ];
-
-  // Parse base URL
-  const url = new URL(normalizedUrl);
-  const baseUrlClean = `${url.protocol}//${url.host}`;
-
-  // First, try to fetch the homepage and look for inventory links
-  try {
-    const response = await fetch(normalizedUrl, {
-      headers: {
-        'User-Agent':
-          'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-      },
-      signal: AbortSignal.timeout(10000),
-    });
-
-    if (response.ok) {
-      const html = await response.text();
-
-      // Look for links that might lead to inventory
-      const linkRegex = /<a[^>]*href=["']([^"']+)["'][^>]*>(.*?)<\/a>/gi;
-      const matches = [...html.matchAll(linkRegex)];
-
-      for (const match of matches) {
-        const href = match[1];
-        const text = match[2].toLowerCase();
-
-        // Check if link text suggests inventory
-        if (
-          text.includes('inventory') ||
-          text.includes('vehicles') ||
-          text.includes('cars') ||
-          text.includes('search') ||
-          text.includes('browse')
-        ) {
-          try {
-            const fullUrl = new URL(href, baseUrl).href;
-            if (!urls.includes(fullUrl)) {
-              urls.push(fullUrl);
-            }
-          } catch {
-            // Invalid URL, skip
-          }
-        }
-      }
-    }
-  } catch (error) {
-    console.log('Error fetching homepage:', error.message);
-  }
-
-  // Add common inventory paths
-  for (const path of inventoryPaths) {
-    const fullUrl = `${baseUrlClean}${path}`;
-    if (!urls.includes(fullUrl)) {
-      urls.push(fullUrl);
-    }
-  }
-
-  // If no specific URLs found, at least try the homepage
-  if (urls.length === 0) {
-    urls.push(baseUrl);
-  }
-
-  return urls;
-}
+// =====================================================
+// MAIN SERVE FUNCTION
+// =====================================================
 
 serve(async (req) => {
   // Handle CORS preflight
@@ -287,49 +109,13 @@ serve(async (req) => {
           throw new Error(`Failed to create snapshot: ${snapshotError.message}`);
         }
 
-        // Try to find inventory pages
-        const inventoryUrls = await findInventoryPages(tenant.website_url);
-
-        console.log(`Found ${inventoryUrls.length} inventory URL(s) to scrape`);
-
-        let vehicles: any[] = [];
-
-        // Try each inventory URL
-        for (const url of inventoryUrls) {
-          try {
-            console.log(`Fetching ${url}...`);
-
-            const response = await fetch(url, {
-              headers: {
-                'User-Agent':
-                  'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-                Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-              },
-              signal: AbortSignal.timeout(30000), // 30 second timeout
-            });
-
-            if (!response.ok) {
-              console.log(`HTTP ${response.status} for ${url}, skipping...`);
-              continue;
-            }
-
-            const html = await response.text();
-
-            // Parse inventory from HTML
-            const pageVehicles = parseInventoryHTML(html, url);
-
-            console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
-
-            vehicles = vehicles.concat(pageVehicles);
-
-            // Continue checking all inventory URLs to catch pagination
-            // Don't break early - we want all vehicles from all pages
-          } catch (error) {
-            console.log(`Error fetching ${url}:`, error.message);
-            // Continue to next URL
-          }
-        }
+        // Use unified scraper core - handles URL discovery, pagination, detail pages, and VIN enrichment
+        const vehicles = await scrapeWebsite(tenant.website_url, {
+          maxConcurrency: 5,
+          pageDelay: 800,
+          maxPages: 20,
+          timeout: 30000,
+        });
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
@@ -337,17 +123,6 @@ serve(async (req) => {
         if (vehicles.length > 0) {
           const sample = vehicles[0];
           console.log(`Sample vehicle: ${sample.year} ${sample.make} ${sample.model} - $${sample.price} - ${sample.mileage}mi - ${sample.url} - ${sample.images?.length || 0} images`);
-        }
-
-        // Enhance vehicle data by fetching individual vehicle pages
-        console.log('Fetching individual vehicle pages for complete data...');
-        const enhancedVehicles = await enhanceVehicleData(vehicles);
-        console.log(`Enhanced ${enhancedVehicles.length} vehicles with detailed information`);
-
-        // Log enhanced sample
-        if (enhancedVehicles.length > 0) {
-          const sample = enhancedVehicles[0];
-          console.log(`Enhanced sample: ${sample.year} ${sample.make} ${sample.model} - $${sample.price} - ${sample.mileage}mi - ${sample.url} - ${sample.images?.length || 0} images`);
         }
 
         // Get sitemap cache for accurate date extraction
@@ -358,7 +133,7 @@ serve(async (req) => {
         const { newVehicles, updatedVehicles, soldVehicles } = await processVehicles(
           supabase,
           tenant.id,
-          enhancedVehicles,
+          vehicles,
           sitemapCache
         );
 
@@ -366,10 +141,10 @@ serve(async (req) => {
         await supabase
           .from('inventory_snapshots')
           .update({
-            vehicles_found: enhancedVehicles.length,
+            vehicles_found: vehicles.length,
             status: 'success',
             scraping_duration_ms: Date.now() - tenantStartTime,
-            raw_data: enhancedVehicles,
+            raw_data: vehicles,
           })
           .eq('id', snapshot.id);
 
@@ -378,7 +153,7 @@ serve(async (req) => {
           tenant_id: tenant.id,
           snapshot_id: snapshot.id,
           log_level: 'info',
-          message: `Successfully scraped ${enhancedVehicles.length} vehicles`,
+          message: `Successfully scraped ${vehicles.length} vehicles`,
           details: {
             new: newVehicles,
             updated: updatedVehicles,
@@ -390,7 +165,7 @@ serve(async (req) => {
           tenant_id: tenant.id,
           tenant_name: tenant.name,
           website_url: tenant.website_url,
-          vehicles_found: enhancedVehicles.length,
+          vehicles_found: vehicles.length,
           new_vehicles: newVehicles,
           updated_vehicles: updatedVehicles,
           sold_vehicles: soldVehicles,
