@@ -636,12 +636,16 @@ async function processVehicles(
     }
 
     // Check if vehicle exists in history (by VIN or generated identifier)
+    // Note: We check for 'active', 'sold', and 'price_changed' (legacy) status to handle:
+    // - Active vehicles that need updates
+    // - Sold vehicles that reappear (sale fell through, dealer bought back, etc.)
+    // - Price_changed status (legacy support, being phased out)
     const { data: existing } = await supabase
       .from('vehicle_history')
       .select('*')
       .eq('tenant_id', tenant_id)
       .eq('vin', identifier)
-      .eq('status', 'active')
+      .in('status', ['active', 'sold', 'price_changed'])
       .single();
 
     if (!existing) {
@@ -735,12 +739,21 @@ async function processVehicles(
           });
           updates.price = vehicle.price;
           updates.price_history = priceHistory;
-          updates.status = 'price_changed';
           console.log(`  Price changed: ${existing.price} -> ${vehicle.price}`);
         } else {
           // Price same, just update it
           updates.price = vehicle.price;
         }
+      }
+
+      // If vehicle reappeared after being sold, mark it as active again
+      // (sale fell through, dealer bought it back, etc.)
+      if (existing.status === 'sold') {
+        updates.status = 'active';
+        console.log(`  Vehicle reactivated (was previously sold)`);
+      } else if (existing.status === 'price_changed') {
+        // Legacy: reset old price_changed status to active
+        updates.status = 'active';
       }
 
       // Upgrade VIN if we now have a real VIN and previously had a generated identifier

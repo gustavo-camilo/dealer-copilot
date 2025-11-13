@@ -156,9 +156,10 @@ function extractFromText(text: string): Partial<ExtractedMetadata> {
   }
 
   // Extract mileage
-  const mileageMatch = text.match(/([\d,]+)\s*(?:mi|miles|km)\b/i);
+  // Note: Support both comma (123,456) and dot (123.456) as thousands separators
+  const mileageMatch = text.match(/([\d,.]+)\s*(?:mi|miles|km)\b/i);
   if (mileageMatch) {
-    const mileage = parseInt(mileageMatch[1].replace(/,/g, ''));
+    const mileage = parseInt(mileageMatch[1].replace(/[,.]/g, ''));
     if (mileage >= 0 && mileage <= 500000) {
       data.mileage = mileage;
       data.sources?.push('text:mileage');
