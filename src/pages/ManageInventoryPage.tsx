@@ -37,7 +37,7 @@ interface Vehicle {
   image_urls: string[] | null;
   first_seen_at: string;
   last_seen_at: string;
-  status: 'active' | 'sold' | 'price_changed'; // price_changed is legacy, being phased out
+  status: 'active' | 'sold' | 'price_changed';
   price_history: Array<{ date: string; price: number }>;
 }
 
@@ -77,13 +77,7 @@ export default function ManageInventoryPage() {
 
     // Apply status filter
     if (statusFilter !== 'all') {
-      if (statusFilter === 'recently_changed') {
-        // Filter vehicles with price changes in last 7 days
-        filtered = filtered.filter((v) => hasRecentPriceChange(v.price_history));
-      } else {
-        // Filter by status (active or sold)
-        filtered = filtered.filter((v) => v.status === statusFilter);
-      }
+      filtered = filtered.filter((v) => v.status === statusFilter);
     }
 
     // Apply search filter
@@ -143,11 +137,11 @@ export default function ManageInventoryPage() {
         setVehicles(data);
 
         // Calculate stats
-        const active = data.filter((v) => v.status === 'active' || v.status === 'price_changed').length;
+        const active = data.filter((v) => v.status === 'active').length;
         const sold = data.filter((v) => v.status === 'sold').length;
-        const priceChanged = data.filter((v) => hasRecentPriceChange(v.price_history)).length;
+        const priceChanged = data.filter((v) => v.status === 'price_changed').length;
         const totalValue = data
-          .filter((v) => v.status === 'active' || v.status === 'price_changed')
+          .filter((v) => v.status === 'active')
           .reduce((sum, v) => sum + v.price, 0);
         const avgPrice = active > 0 ? totalValue / active : 0;
 
@@ -189,13 +183,6 @@ export default function ManageInventoryPage() {
       (Date.now() - new Date(firstSeen).getTime()) / (1000 * 60 * 60 * 24)
     );
     return days;
-  };
-
-  const hasRecentPriceChange = (priceHistory: Array<{ date: string; price: number }>) => {
-    if (!priceHistory || priceHistory.length < 2) return false;
-    const lastChange = new Date(priceHistory[priceHistory.length - 1].date);
-    const daysSinceChange = (Date.now() - lastChange.getTime()) / (1000 * 60 * 60 * 24);
-    return daysSinceChange <= 7; // Changed in last 7 days
   };
 
   const handleSignOut = async () => {
@@ -244,37 +231,26 @@ export default function ManageInventoryPage() {
     );
   };
 
-  const getStatusBadge = (vehicle: Vehicle) => {
-    // Check if vehicle has recent price change (within 7 days)
-    const recentlyChanged = hasRecentPriceChange(vehicle.price_history);
-
-    if (recentlyChanged) {
-      return (
-        <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
-          Price Changed
-        </span>
-      );
-    }
-
+  const getStatusBadge = (status: string) => {
     const badges = {
       active: 'bg-green-100 text-green-800',
       sold: 'bg-blue-100 text-blue-800',
-      price_changed: 'bg-yellow-100 text-yellow-800', // legacy support
+      price_changed: 'bg-yellow-100 text-yellow-800',
     };
 
     const labels = {
       active: 'Active',
       sold: 'Sold',
-      price_changed: 'Price Changed', // legacy support
+      price_changed: 'Price Changed',
     };
 
     return (
       <span
         className={`px-2 py-1 rounded-full text-xs font-medium ${
-          badges[vehicle.status as keyof typeof badges]
+          badges[status as keyof typeof badges]
         }`}
       >
-        {labels[vehicle.status as keyof typeof labels]}
+        {labels[status as keyof typeof labels]}
       </span>
     );
   };
@@ -422,7 +398,7 @@ export default function ManageInventoryPage() {
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="sold">Sold</option>
-                <option value="recently_changed">Recently Changed (7 days)</option>
+                <option value="price_changed">Price Changed</option>
               </select>
             </div>
 
@@ -523,7 +499,7 @@ export default function ManageInventoryPage() {
                       </div>
                     )}
                     <div className="absolute top-2 right-2">
-                      {getStatusBadge(vehicle)}
+                      {getStatusBadge(vehicle.status)}
                     </div>
                     <button
                       onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
