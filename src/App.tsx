@@ -9,6 +9,8 @@ import VINScanPage from './pages/VINScanPage';
 import VINScansPage from './pages/VINScansPage';
 import ManageInventoryPage from './pages/ManageInventoryPage';
 import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage';
+import CompetitorHistoryPage from './pages/CompetitorHistoryPage';
+import UpgradePage from './pages/UpgradePage';
 import RecommendationsPage from './pages/RecommendationsPage';
 import AdminPage from './pages/AdminPage';
 
@@ -122,6 +124,22 @@ function App() {
             element={
               <ProtectedRoute>
                 <CompetitorAnalysisPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/competitor-history/:competitorId"
+            element={
+              <ProtectedRoute>
+                <CompetitorHistoryPage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/upgrade"
+            element={
+              <ProtectedRoute>
+                <UpgradePage />
               </ProtectedRoute>
             }
           />

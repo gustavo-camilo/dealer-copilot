@@ -1,4 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML, type ParsedVehicle } from './parser.ts';
 
 // CORS headers
@@ -26,6 +27,48 @@ serve(async (req) => {
   }
 
   try {
+    // Initialize Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Get authorization header to identify the user
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Authorization required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Extract token and get user
+    const token = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Invalid authorization' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Get user's tenant
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('tenant_id, tenants(subscription_tier)')
+      .eq('id', user.id)
+      .single();
+
+    if (userError || !userData) {
+      return new Response(
+        JSON.stringify({ error: 'User not found' }),
+        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const tenantId = userData.tenant_id;
+    const subscriptionTier = userData.tenants?.subscription_tier || 'starter';
+
     const { url, name } = await req.json();
 
     if (!url) {
@@ -39,7 +82,7 @@ serve(async (req) => {
     const normalizedUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
 
     const startTime = Date.now();
-    console.log(`🔍 Scanning competitor: ${normalizedUrl}`);
+    console.log(`🔍 Scanning competitor: ${normalizedUrl} for tenant: ${tenantId}`);
 
     // Step 1: Discover inventory page
     const inventoryUrl = await discoverInventoryPage(normalizedUrl);
@@ -65,16 +108,30 @@ serve(async (req) => {
 
     const duration = Date.now() - startTime;
 
-    // Return results directly (no database storage for public competitor research)
-    console.log(`✅ Competitor scan complete in ${duration}ms`);
+    const scanData = {
+      competitor_url: normalizedUrl,
+      competitor_name: name || new URL(normalizedUrl).hostname,
+      scanned_at: new Date().toISOString(),
+      vehicle_count: stats.vehicle_count,
+      avg_price: stats.avg_price,
+      min_price: stats.min_price,
+      max_price: stats.max_price,
+      avg_mileage: stats.avg_mileage,
+      min_mileage: stats.min_mileage,
+      max_mileage: stats.max_mileage,
+      total_inventory_value: stats.total_inventory_value,
+      top_makes: stats.top_makes,
+      scraping_duration_ms: duration,
+    };
 
-    return new Response(
-      JSON.stringify({
-        success: true,
-        data: {
+    // Save to history table (for all tiers, but only Enterprise can view history)
+    try {
+      await supabase
+        .from('competitor_scan_history')
+        .insert({
+          tenant_id: tenantId,
           competitor_url: normalizedUrl,
           competitor_name: name || new URL(normalizedUrl).hostname,
-          scanned_at: new Date().toISOString(),
           vehicle_count: stats.vehicle_count,
           avg_price: stats.avg_price,
           min_price: stats.min_price,
@@ -85,8 +142,59 @@ serve(async (req) => {
           total_inventory_value: stats.total_inventory_value,
           top_makes: stats.top_makes,
           scraping_duration_ms: duration,
-        },
+          status: 'success',
+        });
+      console.log(`✅ Saved scan to history for tenant: ${tenantId}`);
+    } catch (historyError) {
+      console.error('Failed to save scan history:', historyError);
+      // Continue even if history save fails
+    }
+
+    // Update or insert into competitor_snapshots (current snapshot)
+    try {
+      const { error: upsertError } = await supabase
+        .from('competitor_snapshots')
+        .upsert(
+          {
+            tenant_id: tenantId,
+            competitor_url: normalizedUrl,
+            competitor_name: name || new URL(normalizedUrl).hostname,
+            vehicle_count: stats.vehicle_count,
+            avg_price: stats.avg_price,
+            min_price: stats.min_price,
+            max_price: stats.max_price,
+            avg_mileage: stats.avg_mileage,
+            min_mileage: stats.min_mileage,
+            max_mileage: stats.max_mileage,
+            total_inventory_value: stats.total_inventory_value,
+            top_makes: stats.top_makes,
+            scraping_duration_ms: duration,
+            status: 'success',
+            scanned_at: new Date().toISOString(),
+          },
+          {
+            onConflict: 'tenant_id,competitor_url',
+          }
+        );
+
+      if (upsertError) {
+        console.error('Failed to update snapshot:', upsertError);
+      } else {
+        console.log(`✅ Updated current snapshot for tenant: ${tenantId}`);
+      }
+    } catch (snapshotError) {
+      console.error('Failed to update snapshot:', snapshotError);
+      // Continue even if snapshot update fails
+    }
+
+    console.log(`✅ Competitor scan complete in ${duration}ms`);
+
+    return new Response(
+      JSON.stringify({
+        success: true,
+        data: scanData,
         message: `Scanned ${stats.vehicle_count} vehicles in ${(duration / 1000).toFixed(1)}s`,
+        subscription_tier: subscriptionTier,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
@@ -119,12 +227,19 @@ async function discoverInventoryPage(baseUrl: string): Promise<string> {
   for (const path of possiblePaths) {
     const testUrl = `${url.protocol}//${url.host}${path}`;
     try {
-      const response = await fetch(testUrl, { method: 'HEAD' });
+      const response = await fetch(testUrl, {
+        method: 'HEAD',
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+        },
+        signal: AbortSignal.timeout(10000), // 10 second timeout for HEAD requests
+      });
       if (response.ok) {
         return testUrl;
       }
     } catch (error) {
       // Continue to next path
+      console.log(`Failed to check ${testUrl}: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
 
@@ -134,7 +249,14 @@ async function discoverInventoryPage(baseUrl: string): Promise<string> {
 
 // Helper: Fetch page HTML
 async function fetchPage(url: string): Promise<string> {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      'Accept-Language': 'en-US,en;q=0.5',
+    },
+    signal: AbortSignal.timeout(30000), // 30 second timeout
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
@@ -144,7 +266,7 @@ async function fetchPage(url: string): Promise<string> {
 // Helper: Fetch detail pages for sampled vehicles
 async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicle[]> {
   const detailed: ParsedVehicle[] = [];
-  const concurrency = 5; // Fetch 5 at a time
+  const concurrency = 3; // Reduced to 3 at a time to be more respectful
 
   for (let i = 0; i < vehicles.length; i += concurrency) {
     const batch = vehicles.slice(i, i + concurrency);
@@ -158,7 +280,7 @@ async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicl
         // Return first parsed vehicle (detail page should have one) or original
         return parsed.length > 0 ? { ...vehicle, ...parsed[0] } : vehicle;
       } catch (error) {
-        console.error(`Failed to fetch detail page: ${vehicle.url}`, error);
+        console.error(`Failed to fetch detail page: ${vehicle.url}`, error instanceof Error ? error.message : String(error));
         return vehicle; // Return original if fetch fails
       }
     });
@@ -168,7 +290,7 @@ async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicl
 
     // Small delay between batches to be respectful
     if (i + concurrency < vehicles.length) {
-      await new Promise((resolve) => setTimeout(resolve, 500));
+      await new Promise((resolve) => setTimeout(resolve, 1000)); // Increased to 1 second
     }
   }
 
