@@ -3,8 +3,6 @@
 // =====================================================
 // Hybrid approach to extract accurate listing dates from dealer websites
 
-import { createTimeoutSignal } from './timeout.ts';
-
 export interface ListingDateResult {
   date: Date;
   confidence: 'high' | 'medium' | 'low' | 'estimated';
@@ -275,7 +273,7 @@ export async function fetchSitemap(baseUrl: string): Promise<SitemapCache> {
             'User-Agent':
               'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
           },
-          signal: createTimeoutSignal(10000),
+          signal: AbortSignal.timeout(10000),
         });
 
         if (!response.ok) {
@@ -324,7 +322,7 @@ export async function fetchSitemap(baseUrl: string): Promise<SitemapCache> {
           ) {
             try {
               const childResponse = await fetch(childSitemapUrl, {
-                signal: createTimeoutSignal(10000),
+                signal: AbortSignal.timeout(10000),
               });
 
               if (childResponse.ok) {

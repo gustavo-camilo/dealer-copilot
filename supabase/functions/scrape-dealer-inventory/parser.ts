@@ -3,8 +3,6 @@
 // =====================================================
 // This fixes issues with data mixing and extraction failures
 
-import { parseInventoryHTML as legacyParseInventoryHTML } from './parser-old-backup.ts';
-
 export interface ParsedVehicle {
   vin?: string;
   stock_number?: string;
@@ -90,18 +88,6 @@ export function parseInventoryHTML(html: string, baseUrl: string): ParsedVehicle
     } catch (error) {
       console.log(`❌ Parser failed: ${error.message}`);
     }
-  }
-
-  console.warn('⚠️ No vehicles found with new parser strategies, attempting legacy parser...');
-
-  try {
-    const legacyVehicles = legacyParseInventoryHTML(html, baseUrl);
-    if (legacyVehicles.length > 0) {
-      console.log(`✅ Legacy parser recovered ${legacyVehicles.length} vehicles`);
-      return legacyVehicles;
-    }
-  } catch (error) {
-    console.log(`❌ Legacy parser failed: ${error instanceof Error ? error.message : String(error)}`);
   }
 
   console.warn('⚠️ No vehicles found with any parser');
@@ -453,17 +439,15 @@ function parseVehicleFromCard(card: string, linkText: string, url: string, baseU
   }
 
   // Extract mileage - improved patterns
-  // Note: Support both comma (123,456) and dot (123.456) as thousands separators
   const mileagePatterns = [
-    /([\d,.]+)\s*(?:mi|miles)\b/i,
-    /mileage[:\s]+([\d,.]+)/i,
-    /odometer[:\s]+([\d,.]+)/i,
+    /([\d,]+)\s*(?:mi|miles)\b/i,
+    /mileage[:\s]+([\d,]+)/i,
+    /odometer[:\s]+([\d,]+)/i,
   ];
   for (const pattern of mileagePatterns) {
     const match = card.match(pattern);
     if (match) {
-      // Remove both commas and dots (thousands separators)
-      const mileage = parseInt(match[1].replace(/[,.]/g, ''));
+      const mileage = parseInt(match[1].replace(/,/g, ''));
       if (mileage >= 0 && mileage < 999999) {
         vehicle.mileage = mileage;
         console.log(`  Mileage: ${vehicle.mileage} mi`);
