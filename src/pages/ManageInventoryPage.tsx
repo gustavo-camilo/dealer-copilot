@@ -5,7 +5,6 @@ import { useAuth } from '../contexts/AuthContext';
 import {
   Package,
   TrendingUp,
-  TrendingDown,
   AlertCircle,
   Search,
   Filter,
@@ -16,6 +15,8 @@ import {
   X,
   Car,
   Trash2,
+  LayoutGrid,
+  List,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 import toast, { Toaster } from 'react-hot-toast';
@@ -35,12 +36,13 @@ interface Vehicle {
   image_urls: string[] | null;
   first_seen_at: string;
   last_seen_at: string;
-  status: 'active' | 'sold' | 'price_changed';
+  status: 'active' | 'sold';
   price_history: Array<{ date: string; price: number }>;
 }
 
-type StatusFilter = 'all' | 'active' | 'sold' | 'price_changed';
-type SortBy = 'recent' | 'price_asc' | 'price_desc' | 'age';
+type StatusFilter = 'all' | 'active' | 'sold';
+type SortBy = 'recent' | 'price_asc' | 'price_desc' | 'oldest' | 'newest' | 'year_desc' | 'year_asc';
+type ViewMode = 'grid' | 'list';
 
 export default function ManageInventoryPage() {
   const { user, tenant, signOut } = useAuth();
@@ -52,12 +54,12 @@ export default function ManageInventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('recent');
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
     active: 0,
     sold: 0,
-    priceChanged: 0,
     avgPrice: 0,
     totalValue: 0,
   });
@@ -96,8 +98,16 @@ export default function ManageInventoryPage() {
           return a.price - b.price;
         case 'price_desc':
           return b.price - a.price;
-        case 'age':
-          return new Date(a.first_seen_at).getTime() - new Date(b.first_seen_at).getTime();
+        case 'oldest':
+          // Days in lot: highest first (oldest)
+          return getDaysInInventory(b.first_seen_at) - getDaysInInventory(a.first_seen_at);
+        case 'newest':
+          // Days in lot: lowest first (newest)
+          return getDaysInInventory(a.first_seen_at) - getDaysInInventory(b.first_seen_at);
+        case 'year_desc':
+          return b.year - a.year;
+        case 'year_asc':
+          return a.year - b.year;
         case 'recent':
         default:
           return new Date(b.last_seen_at).getTime() - new Date(a.last_seen_at).getTime();
@@ -127,7 +137,6 @@ export default function ManageInventoryPage() {
         // Calculate stats
         const active = data.filter((v) => v.status === 'active').length;
         const sold = data.filter((v) => v.status === 'sold').length;
-        const priceChanged = data.filter((v) => v.status === 'price_changed').length;
         const totalValue = data
           .filter((v) => v.status === 'active')
           .reduce((sum, v) => sum + v.price, 0);
@@ -137,7 +146,6 @@ export default function ManageInventoryPage() {
           total: data.length,
           active,
           sold,
-          priceChanged,
           avgPrice,
           totalValue,
         });
@@ -223,13 +231,11 @@ export default function ManageInventoryPage() {
     const badges = {
       active: 'bg-green-100 text-green-800',
       sold: 'bg-blue-100 text-blue-800',
-      price_changed: 'bg-yellow-100 text-yellow-800',
     };
 
     const labels = {
       active: 'Active',
       sold: 'Sold',
-      price_changed: 'Price Changed',
     };
 
     return (
@@ -240,31 +246,6 @@ export default function ManageInventoryPage() {
       >
         {labels[status as keyof typeof labels]}
       </span>
-    );
-  };
-
-  const getPriceChangeIndicator = (priceHistory: Array<{ date: string; price: number }>) => {
-    if (!priceHistory || priceHistory.length < 2) return null;
-
-    const current = priceHistory[priceHistory.length - 1].price;
-    const previous = priceHistory[priceHistory.length - 2].price;
-    const change = current - previous;
-    const percentChange = (change / previous) * 100;
-
-    if (change === 0) return null;
-
-    return (
-      <div
-        className={`flex items-center gap-1 text-sm ${
-          change > 0 ? 'text-red-600' : 'text-green-600'
-        }`}
-      >
-        {change > 0 ? <TrendingUp className="w-4 h-4" /> : <TrendingDown className="w-4 h-4" />}
-        <span>
-          {change > 0 ? '+' : ''}
-          {formatCurrency(change)} ({percentChange.toFixed(1)}%)
-        </span>
-      </div>
     );
   };
 
@@ -322,7 +303,7 @@ export default function ManageInventoryPage() {
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-2">
               <Package className="w-5 h-5 text-blue-600" />
@@ -386,7 +367,6 @@ export default function ManageInventoryPage() {
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
                 <option value="sold">Sold</option>
-                <option value="price_changed">Price Changed</option>
               </select>
             </div>
 
@@ -398,10 +378,35 @@ export default function ManageInventoryPage() {
                 className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
                 <option value="recent">Recently Updated</option>
+                <option value="oldest">Oldest First</option>
+                <option value="newest">Newest First</option>
                 <option value="price_desc">Price: High to Low</option>
                 <option value="price_asc">Price: Low to High</option>
-                <option value="age">Oldest First</option>
+                <option value="year_desc">Year: High to Low</option>
+                <option value="year_asc">Year: Low to High</option>
               </select>
+            </div>
+
+            {/* View Toggle */}
+            <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setViewMode('grid')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="Grid View"
+              >
+                <LayoutGrid className="w-5 h-5" />
+              </button>
+              <button
+                onClick={() => setViewMode('list')}
+                className={`p-2 rounded-md transition-colors ${
+                  viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900'
+                }`}
+                title="List View"
+              >
+                <List className="w-5 h-5" />
+              </button>
             </div>
           </div>
         </div>
@@ -411,7 +416,7 @@ export default function ManageInventoryPage() {
           Showing {filteredVehicles.length} of {vehicles.length} vehicles
         </div>
 
-        {/* Vehicles Grid */}
+        {/* Vehicles Grid or List */}
         {loading ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
@@ -428,8 +433,9 @@ export default function ManageInventoryPage() {
                 : 'Start scraping your website to track inventory'}
             </p>
           </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        ) : viewMode === 'grid' ? (
+          /* Grid View */
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
             {filteredVehicles.map((vehicle) => {
               const firstImage = vehicle.image_urls && vehicle.image_urls.length > 0 ? vehicle.image_urls[0] : null;
               const daysInInventory = getDaysInInventory(vehicle.first_seen_at);
@@ -440,7 +446,7 @@ export default function ManageInventoryPage() {
                   className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
                 >
                   {/* Vehicle Image */}
-                  <div className="relative h-48 bg-gray-100">
+                  <div className="relative h-40 md:h-48 bg-gray-100">
                     {firstImage ? (
                       <img
                         src={firstImage}
@@ -453,7 +459,7 @@ export default function ManageInventoryPage() {
                       />
                     ) : (
                       <div className="flex items-center justify-center h-full">
-                        <Car className="w-16 h-16 text-gray-300" />
+                        <Car className="w-12 h-12 md:w-16 md:h-16 text-gray-300" />
                       </div>
                     )}
                     <div className="absolute top-2 right-2">
@@ -461,44 +467,34 @@ export default function ManageInventoryPage() {
                     </div>
                     <button
                       onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
-                      className="absolute top-2 left-2 p-2 bg-white/90 hover:bg-red-50 rounded-full shadow-sm transition-colors group"
+                      className="absolute top-2 left-2 p-1.5 md:p-2 bg-white/90 hover:bg-red-50 rounded-full shadow-sm transition-colors group"
                       title="Delete vehicle"
                     >
-                      <Trash2 className="w-4 h-4 text-gray-500 group-hover:text-red-600" />
+                      <Trash2 className="w-3 h-3 md:w-4 md:h-4 text-gray-500 group-hover:text-red-600" />
                     </button>
                   </div>
 
                   {/* Vehicle Info */}
-                  <div className="p-4">
+                  <div className="p-3 md:p-4">
                     {/* Title */}
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                    <h3 className="text-sm md:text-lg font-semibold text-gray-900 mb-1 md:mb-2 line-clamp-2">
                       {vehicle.year} {vehicle.make} {vehicle.model}
                     </h3>
-                    {vehicle.trim && (
-                      <p className="text-sm text-gray-600 mb-3">{vehicle.trim}</p>
-                    )}
 
                     {/* Price and Mileage */}
-                    <div className="flex items-center justify-between mb-3 pb-3 border-b border-gray-200">
-                      <div className="text-2xl font-bold text-gray-900">
+                    <div className="flex items-center justify-between mb-2 md:mb-3 pb-2 md:pb-3 border-b border-gray-200">
+                      <div className="text-lg md:text-2xl font-bold text-gray-900">
                         {formatCurrency(vehicle.price)}
                       </div>
                       {vehicle.mileage && (
-                        <div className="text-sm text-gray-600">
+                        <div className="text-xs md:text-sm text-gray-600">
                           {vehicle.mileage.toLocaleString()} mi
                         </div>
                       )}
                     </div>
 
-                    {/* Price Change Indicator */}
-                    {getPriceChangeIndicator(vehicle.price_history) && (
-                      <div className="mb-3">
-                        {getPriceChangeIndicator(vehicle.price_history)}
-                      </div>
-                    )}
-
                     {/* Listing Date and Days */}
-                    <div className="space-y-1 text-sm text-gray-600 mb-3">
+                    <div className="space-y-1 text-xs md:text-sm text-gray-600 mb-2 md:mb-3">
                       <div>
                         <span className="font-medium">Listed:</span> {formatDate(vehicle.first_seen_at)}
                       </div>
@@ -508,14 +504,14 @@ export default function ManageInventoryPage() {
                     </div>
 
                     {/* Additional Details (Collapsible) */}
-                    <div className="text-xs text-gray-500 space-y-1 mb-3">
+                    <div className="text-xs text-gray-500 space-y-1 mb-2 md:mb-3">
                       {vehicle.stock_number && (
-                        <div>Stock #: {vehicle.stock_number}</div>
+                        <div className="hidden md:block">Stock #: {vehicle.stock_number}</div>
                       )}
                       {vehicle.exterior_color && (
-                        <div>Color: {vehicle.exterior_color}</div>
+                        <div className="hidden md:block">Color: {vehicle.exterior_color}</div>
                       )}
-                      <div className="font-mono truncate" title={vehicle.vin}>
+                      <div className="font-mono truncate hidden md:block" title={vehicle.vin}>
                         VIN: {vehicle.vin}
                       </div>
                     </div>
@@ -526,11 +522,72 @@ export default function ManageInventoryPage() {
                         href={vehicle.listing_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="block w-full text-center text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                        className="block w-full text-center text-xs md:text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
                       >
                         View Listing →
                       </a>
                     )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* List View */
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+            {filteredVehicles.map((vehicle) => {
+              const firstImage = vehicle.image_urls && vehicle.image_urls.length > 0 ? vehicle.image_urls[0] : null;
+              const daysInInventory = getDaysInInventory(vehicle.first_seen_at);
+
+              return (
+                <div
+                  key={vehicle.id}
+                  className="flex items-center gap-3 md:gap-4 p-3 md:p-4 hover:bg-gray-50 transition-colors"
+                >
+                  {/* Thumbnail */}
+                  <div className="relative w-16 h-16 md:w-20 md:h-20 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
+                    {firstImage ? (
+                      <img
+                        src={firstImage}
+                        alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
+                        className="w-full h-full object-cover"
+                        onError={(e) => {
+                          e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5"%3E%3C/path%3E%3C/svg%3E';
+                        }}
+                      />
+                    ) : (
+                      <div className="flex items-center justify-center h-full">
+                        <Car className="w-8 h-8 text-gray-300" />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Vehicle Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <h3 className="text-sm md:text-base font-semibold text-gray-900 truncate">
+                          {vehicle.year} {vehicle.make} {vehicle.model}
+                        </h3>
+                        <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-600 mt-1">
+                          <span className="font-bold text-gray-900">{formatCurrency(vehicle.price)}</span>
+                          {vehicle.mileage && (
+                            <span className="hidden md:inline">{vehicle.mileage.toLocaleString()} mi</span>
+                          )}
+                          <span className="hidden md:inline">{daysInInventory} days</span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        {getStatusBadge(vehicle.status)}
+                        <button
+                          onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
+                          className="p-1.5 hover:bg-red-50 rounded-full transition-colors group"
+                          title="Delete vehicle"
+                        >
+                          <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600" />
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
