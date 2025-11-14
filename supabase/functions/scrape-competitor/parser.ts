@@ -120,11 +120,20 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
     const href = match[1];
     const linkText = match[2].replace(/<[^>]+>/g, '').trim();
 
-    // Skip if link doesn't look like a vehicle
+    // Check if link text or URL suggests it's a vehicle (relaxed requirement)
     const hasYear = /\b(19|20)\d{2}\b/.test(linkText);
-    const hasMake = /\b(Ford|Chevrolet|Chevy|Toyota|Honda|Nissan|Jeep|RAM|Dodge|GMC|Mazda|Subaru|Kia|Hyundai|BMW|Mercedes|Audi|Lexus|Volkswagen|VW)\b/i.test(linkText);
+    const hasMake = /\b(Acura|Alfa Romeo|Aston Martin|Audi|Bentley|BMW|Buick|Cadillac|Chevrolet|Chevy|Chrysler|Dodge|Ferrari|Fiat|Ford|Genesis|GMC|Honda|Hummer|Hyundai|Infiniti|Jaguar|Jeep|Kia|Lamborghini|Land Rover|Lexus|Lincoln|Lotus|Maserati|Mazda|McLaren|Mercedes-Benz|Mercedes|Mini|Mitsubishi|Nissan|Polestar|Porsche|RAM|Rivian|Rolls-Royce|Saab|Saturn|Scion|Smart|Subaru|Suzuki|Tesla|Toyota|Volkswagen|VW|Volvo)\b/i.test(linkText);
 
-    if (!hasYear && !hasMake) {
+    // Relaxed: Allow if has year OR make OR if URL looks like vehicle detail
+    const looksLikeVehicleUrl = href.toLowerCase().includes('/vehicle') ||
+                                 href.toLowerCase().includes('/inventory/') ||
+                                 href.toLowerCase().includes('/products/') ||
+                                 href.toLowerCase().includes('/collections/') ||
+                                 href.toLowerCase().includes('/detail') ||
+                                 href.toLowerCase().includes('/details/') ||
+                                 href.toLowerCase().includes('/cars-for-sale/');
+
+    if (!hasYear && !hasMake && !looksLikeVehicleUrl) {
       continue;
     }
 
@@ -134,11 +143,13 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
       lowerHref.includes('/vehicle') ||
       lowerHref.includes('/inventory/') ||
       lowerHref.includes('/products/') ||
+      lowerHref.includes('/collections/') ||
       lowerHref.includes('/cars/') ||
       lowerHref.includes('/used-') ||
       lowerHref.includes('-for-sale') ||
       lowerHref.includes('/detail') ||
       lowerHref.includes('/details/') ||
+      lowerHref.includes('/cars-for-sale/') ||
       /\/\d+/.test(href);
 
     if (!isVehicleUrl || lowerHref.includes('/search') || lowerHref === '/' || href.startsWith('#')) {
@@ -164,8 +175,15 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
       // Parse vehicle data from the isolated card
       const vehicle = parseVehicleFromCard(card, linkText, fullUrl, baseUrl);
 
-      if (vehicle.year && vehicle.make) {
-        console.log(`✅ Found: ${vehicle.year} ${vehicle.make} ${vehicle.model || ''} - $${vehicle.price || '?'} - ${vehicle.mileage || '?'} mi`);
+      // Accept vehicle if it has enough identifying information (same logic as dealer parser)
+      const hasVIN = vehicle.vin && vehicle.vin.length === 17;
+      const hasYearAndMake = vehicle.year && vehicle.make;
+      const hasPriceAndYear = vehicle.price && vehicle.year;
+
+      if (hasVIN || hasYearAndMake || hasPriceAndYear) {
+        const displayName = `${vehicle.year || '????'} ${vehicle.make || '????'} ${vehicle.model || ''}`.trim();
+        const vinInfo = vehicle.vin ? ` (VIN: ${vehicle.vin})` : '';
+        console.log(`✅ Found vehicle: ${displayName}${vinInfo} - ${fullUrl}`);
         vehicles.push(vehicle);
       }
     } catch (e) {
