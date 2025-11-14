@@ -170,6 +170,7 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
     const looksLikeVehicleUrl = href.toLowerCase().includes('/vehicle') ||
                                  href.toLowerCase().includes('/inventory/') ||
                                  href.toLowerCase().includes('/products/') ||
+                                 href.toLowerCase().includes('/collections/') ||
                                  href.toLowerCase().includes('/detail') ||
                                  href.toLowerCase().includes('/details/') ||
                                  href.toLowerCase().includes('/cars-for-sale/');
@@ -184,6 +185,7 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
       lowerHref.includes('/vehicle') ||
       lowerHref.includes('/inventory/') ||
       lowerHref.includes('/products/') ||
+      lowerHref.includes('/collections/') ||
       lowerHref.includes('/cars/') ||
       lowerHref.includes('/used-') ||
       lowerHref.includes('-for-sale') ||

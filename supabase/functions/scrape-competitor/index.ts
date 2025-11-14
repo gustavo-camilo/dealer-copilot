@@ -313,20 +313,54 @@ async function discoverInventoryPage(baseUrl: string): Promise<string> {
   return baseUrl;
 }
 
-// Helper: Fetch page HTML
-async function fetchPage(url: string): Promise<string> {
-  const response = await fetch(url, {
-    headers: {
-      'User-Agent': 'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-      'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-      'Accept-Language': 'en-US,en;q=0.5',
-    },
-    signal: AbortSignal.timeout(30000), // 30 second timeout
-  });
-  if (!response.ok) {
-    throw new Error(`Failed to fetch ${url}: ${response.status}`);
+// Helper: Fetch page HTML with retry logic for 403 errors
+async function fetchPage(url: string, retryCount = 0): Promise<string> {
+  const maxRetries = 3;
+  const userAgents = [
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+    'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:121.0) Gecko/20100101 Firefox/121.0',
+    'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+  ];
+
+  const userAgent = userAgents[retryCount % userAgents.length];
+
+  try {
+    const response = await fetch(url, {
+      headers: {
+        'User-Agent': userAgent,
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.5',
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Cache-Control': 'no-cache',
+        'Pragma': 'no-cache',
+      },
+      signal: AbortSignal.timeout(30000), // 30 second timeout
+    });
+
+    // If we get a 403 and haven't exhausted retries, try again with different User-Agent
+    if (response.status === 403 && retryCount < maxRetries) {
+      console.log(`⚠️ Got 403 for ${url}, retrying with different User-Agent (attempt ${retryCount + 1}/${maxRetries})...`);
+      const delay = Math.pow(2, retryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchPage(url, retryCount + 1);
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch ${url}: ${response.status}`);
+    }
+
+    return await response.text();
+  } catch (error) {
+    // Network errors - retry with exponential backoff
+    if (retryCount < maxRetries && error instanceof TypeError) {
+      console.log(`⚠️ Network error for ${url}, retrying (attempt ${retryCount + 1}/${maxRetries})...`);
+      const delay = Math.pow(2, retryCount) * 1000;
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchPage(url, retryCount + 1);
+    }
+    throw error;
   }
-  return await response.text();
 }
 
 // Helper: Fetch all pages by following pagination
