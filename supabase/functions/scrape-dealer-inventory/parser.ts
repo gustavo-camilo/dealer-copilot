@@ -169,7 +169,9 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
     // Relaxed: Allow if has year OR make OR if URL looks like vehicle detail
     const looksLikeVehicleUrl = href.toLowerCase().includes('/vehicle') ||
                                  href.toLowerCase().includes('/inventory/') ||
-                                 href.toLowerCase().includes('/detail');
+                                 href.toLowerCase().includes('/products/') ||
+                                 href.toLowerCase().includes('/detail') ||
+                                 href.toLowerCase().includes('/details/');
 
     if (!hasYear && !hasMake && !looksLikeVehicleUrl) {
       continue;
@@ -180,10 +182,12 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
     const isVehicleUrl =
       lowerHref.includes('/vehicle') ||
       lowerHref.includes('/inventory/') ||
+      lowerHref.includes('/products/') ||
       lowerHref.includes('/cars/') ||
       lowerHref.includes('/used-') ||
       lowerHref.includes('-for-sale') ||
       lowerHref.includes('/detail') ||
+      lowerHref.includes('/details/') ||
       /\/\d+/.test(href);
 
     if (!isVehicleUrl || lowerHref.includes('/search') || lowerHref === '/' || href.startsWith('#')) {
@@ -343,19 +347,24 @@ function findMatchingClosingTag(html: string, openTagPos: number, tagName: strin
 function parseVehicleFromCard(card: string, linkText: string, url: string, baseUrl: string): ParsedVehicle {
   const vehicle: ParsedVehicle = { url };
 
-  // Extract VIN - try multiple patterns
+  // Extract VIN - try multiple patterns with flexible matching
   const vinPatterns = [
-    /VIN[:\s#]*([A-HJ-NPR-Z0-9]{17})\b/i,
-    /vehicle identification number[:\s#]*([A-HJ-NPR-Z0-9]{17})\b/i,
+    /VIN[:\s#]*([A-HJ-NPR-Z0-9]{17})/i,
+    /vehicle identification number[:\s#]*([A-HJ-NPR-Z0-9]{17})/i,
+    /vin number[:\s#]*([A-HJ-NPR-Z0-9]{17})/i,
     /\b([A-HJ-NPR-Z0-9]{17})\b/, // Generic 17-char pattern
   ];
 
   for (const pattern of vinPatterns) {
     const vinMatch = card.match(pattern);
     if (vinMatch) {
-      vehicle.vin = vinMatch[1].toUpperCase();
-      console.log(`  VIN: ${vehicle.vin}`);
-      break;
+      // Remove any spaces or dashes that might be in the VIN
+      const cleanVin = vinMatch[1].replace(/[\s\-]/g, '').toUpperCase();
+      if (cleanVin.length === 17) {
+        vehicle.vin = cleanVin;
+        console.log(`  VIN: ${vehicle.vin}`);
+        break;
+      }
     }
   }
 
@@ -440,9 +449,10 @@ function parseVehicleFromCard(card: string, linkText: string, url: string, baseU
 
   // Extract mileage - improved patterns to handle various formats (123456, 123,456, 123.456)
   const mileagePatterns = [
-    /([\d,.]+)\s*(?:mi|miles)\b/i,
-    /mileage[:\s]+([\d,.]+)/i,
-    /odometer[:\s]+([\d,.]+)/i,
+    /mileage[:\s]+([\d,.]+)(?:\s*(?:mi|miles|km|kilometers|<br|<\/|\||$))/i,
+    /odometer[:\s]+([\d,.]+)(?:\s*(?:mi|miles|km|kilometers|<br|<\/|\||$))/i,
+    /([\d,.]+)\s*(?:mi|miles|km|kilometers)\b/i,
+    /miles[:\s]+([\d,.]+)/i,
   ];
   for (const pattern of mileagePatterns) {
     const match = card.match(pattern);
