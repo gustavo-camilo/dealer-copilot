@@ -333,16 +333,17 @@ function parseVehicleFromCard(card: string, linkText: string, url: string, baseU
     }
   }
 
-  // Extract mileage
+  // Extract mileage - handle various formats (123456, 123,456, 123.456)
   const mileagePatterns = [
-    /([\d,]+)\s*(?:mi|miles)\b/i,
-    /mileage[:\s]+([\d,]+)/i,
-    /odometer[:\s]+([\d,]+)/i,
+    /([\d,.]+)\s*(?:mi|miles)\b/i,
+    /mileage[:\s]+([\d,.]+)/i,
+    /odometer[:\s]+([\d,.]+)/i,
   ];
   for (const pattern of mileagePatterns) {
     const match = card.match(pattern);
     if (match) {
-      const mileage = parseInt(match[1].replace(/,/g, ''));
+      // Remove both commas and dots to parse the number
+      const mileage = parseInt(match[1].replace(/[,.]/g, ''));
       if (mileage >= 0 && mileage < 999999) {
         vehicle.mileage = mileage;
         break;
