@@ -139,6 +139,7 @@ function parseVehicleCards(html: string, baseUrl: string): ParsedVehicle[] {
       lowerHref.includes('-for-sale') ||
       lowerHref.includes('/detail') ||
       lowerHref.includes('/details/') ||
+      lowerHref.includes('/cars-for-sale/') ||
       /\/\d+/.test(href);
 
     if (!isVehicleUrl || lowerHref.includes('/search') || lowerHref === '/' || href.startsWith('#')) {
