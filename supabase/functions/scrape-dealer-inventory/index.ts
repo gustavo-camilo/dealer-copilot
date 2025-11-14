@@ -9,9 +9,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML } from './parser.ts';
 import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
 import { enrichVehicleWithVIN } from './vinDecoder.ts';
-import { getVehicleUrlsFromSitemap } from './sitemapParser.ts';
-import { fetchWithRetry, fetchBatch } from './fetcher.ts';
-import { extractMetadata, mergeWithMetadata } from './metadataExtractor.ts';
 
 // CORS headers
 const corsHeaders = {
@@ -51,15 +48,16 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
         try {
           console.log(`Fetching details for ${vehicle.year} ${vehicle.make} ${vehicle.model || ''} at ${vehicle.url}`);
 
-          // Use robust fetcher with retry logic
-          const result = await fetchWithRetry(vehicle.url, {
-            timeout: 15000,
-            maxRetries: 2, // Reduced retries for detail pages
-            rateLimitMs: 500, // Faster for detail pages
+          const response = await fetch(vehicle.url, {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+            },
+            signal: AbortSignal.timeout(15000), // 15 second timeout
           });
 
-          if (result.success && result.html) {
-            const html = result.html;
+          if (response.ok) {
+            const html = await response.text();
 
             // Parse the detail page for additional data
             const detailVehicles = parseInventoryHTML(html, vehicle.url);
@@ -105,19 +103,7 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
                 // Still try VIN decoder if we have VIN but missing data
                 return await enrichVehicleWithVIN(vehicle);
               }
-            } else {
-              // Parsing failed, try metadata extraction as fallback
-              console.log(`⚠️ Parsing failed for ${vehicle.url}, trying metadata extraction...`);
-              const metadata = extractMetadata(html);
-              const enriched = mergeWithMetadata(vehicle, metadata);
-
-              if (metadata.confidence !== 'low') {
-                console.log(`✅ Metadata extraction successful (${metadata.confidence} confidence)`);
-                return await enrichVehicleWithVIN(enriched);
-              }
             }
-          } else {
-            console.log(`❌ Failed to fetch ${vehicle.url}: ${result.error}`);
           }
         } catch (error) {
           console.log(`Failed to fetch details for ${vehicle.url}: ${error.message}`);
@@ -301,124 +287,61 @@ serve(async (req) => {
           throw new Error(`Failed to create snapshot: ${snapshotError.message}`);
         }
 
+        // Try to find inventory pages
+        const inventoryUrls = await findInventoryPages(tenant.website_url);
+
+        console.log(`Found ${inventoryUrls.length} inventory URL(s) to scrape`);
+
         let vehicles: any[] = [];
 
-        // STRATEGY 1: Try sitemap first (most reliable and complete)
-        console.log('📍 Strategy 1: Attempting sitemap discovery...');
-        const sitemapVehicleUrls = await getVehicleUrlsFromSitemap(tenant.website_url);
+        // Try each inventory URL
+        for (const url of inventoryUrls) {
+          try {
+            console.log(`Fetching ${url}...`);
 
-        if (sitemapVehicleUrls.length > 0) {
-          console.log(`✅ Found ${sitemapVehicleUrls.length} vehicle URLs in sitemaps!`);
+            const response = await fetch(url, {
+              headers: {
+                'User-Agent':
+                  'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+                Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+              },
+              signal: AbortSignal.timeout(30000), // 30 second timeout
+            });
 
-          // Fetch vehicles from sitemap URLs (sample first 50 to avoid overwhelming)
-          const urlsToFetch = sitemapVehicleUrls.slice(0, 50).map(u => u.loc);
-
-          const fetchResults = await fetchBatch(urlsToFetch, {
-            concurrency: 5,
-            maxRetries: 2,
-            rateLimitMs: 1000,
-          });
-
-          // Parse each fetched page
-          for (const [url, result] of fetchResults.entries()) {
-            if (result.success && result.html) {
-              const pageVehicles = parseInventoryHTML(result.html, url);
-
-              if (pageVehicles.length > 0) {
-                vehicles = vehicles.concat(pageVehicles);
-              } else {
-                // Fallback to metadata extraction
-                const metadata = extractMetadata(result.html);
-                if (metadata.year && metadata.make) {
-                  vehicles.push({
-                    url,
-                    year: metadata.year,
-                    make: metadata.make,
-                    model: metadata.model,
-                    price: metadata.price,
-                    mileage: metadata.mileage,
-                    vin: metadata.vin,
-                    images: metadata.image ? [metadata.image] : [],
-                    _fromMetadata: true,
-                    _metadataConfidence: metadata.confidence,
-                  });
-                }
-              }
+            if (!response.ok) {
+              console.log(`HTTP ${response.status} for ${url}, skipping...`);
+              continue;
             }
-          }
 
-          console.log(`✅ Sitemap strategy found ${vehicles.length} vehicles`);
-        }
+            const html = await response.text();
 
-        // STRATEGY 2: Fallback to traditional inventory page scraping
-        if (vehicles.length === 0) {
-          console.log('📍 Strategy 2: Falling back to traditional scraping...');
+            // Parse inventory from HTML
+            const pageVehicles = parseInventoryHTML(html, url);
 
-          const inventoryUrls = await findInventoryPages(tenant.website_url);
-          console.log(`Found ${inventoryUrls.length} inventory URL(s) to scrape`);
+            console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
 
-          // Try each inventory URL
-          for (const url of inventoryUrls) {
-            try {
-              console.log(`Fetching ${url}...`);
+            vehicles = vehicles.concat(pageVehicles);
 
-              // Use robust fetcher
-              const result = await fetchWithRetry(url, {
-                timeout: 30000,
-                maxRetries: 3,
-                rateLimitMs: 1000,
-              });
-
-              if (!result.success) {
-                console.log(`Failed to fetch ${url}: ${result.error}`);
-                continue;
-              }
-
-              const html = result.html!;
-
-              // Parse inventory from HTML
-              const pageVehicles = parseInventoryHTML(html, url);
-
-              console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
-
-              vehicles = vehicles.concat(pageVehicles);
-
-              // Continue checking all inventory URLs to catch pagination
-              // Don't break early - we want all vehicles from all pages
-            } catch (error) {
-              console.log(`Error fetching ${url}:`, error.message);
-              // Continue to next URL
-            }
+            // Continue checking all inventory URLs to catch pagination
+            // Don't break early - we want all vehicles from all pages
+          } catch (error) {
+            console.log(`Error fetching ${url}:`, error.message);
+            // Continue to next URL
           }
         }
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
-        // Deduplicate vehicles by URL (can happen if multiple pages show same vehicles)
-        const seenUrls = new Set<string>();
-        const uniqueVehicles = vehicles.filter(v => {
-          if (!v.url) return true; // Keep vehicles without URLs
-          if (seenUrls.has(v.url)) {
-            console.log(`⚠️ Skipping duplicate URL: ${v.url}`);
-            return false;
-          }
-          seenUrls.add(v.url);
-          return true;
-        });
-
-        if (uniqueVehicles.length < vehicles.length) {
-          console.log(`Removed ${vehicles.length - uniqueVehicles.length} duplicate vehicles`);
-        }
-
         // Log sample of what we found
-        if (uniqueVehicles.length > 0) {
-          const sample = uniqueVehicles[0];
+        if (vehicles.length > 0) {
+          const sample = vehicles[0];
           console.log(`Sample vehicle: ${sample.year} ${sample.make} ${sample.model} - $${sample.price} - ${sample.mileage}mi - ${sample.url} - ${sample.images?.length || 0} images`);
         }
 
         // Enhance vehicle data by fetching individual vehicle pages
         console.log('Fetching individual vehicle pages for complete data...');
-        const enhancedVehicles = await enhanceVehicleData(uniqueVehicles);
+        const enhancedVehicles = await enhanceVehicleData(vehicles);
         console.log(`Enhanced ${enhancedVehicles.length} vehicles with detailed information`);
 
         // Log enhanced sample
@@ -538,32 +461,6 @@ serve(async (req) => {
 
 /**
  * Process scraped vehicles and update database
- *
- * CRITICAL FIX: Vehicle Identifier Stability
- * ==========================================
- * This function generates identifiers for vehicles without VINs.
- * The identifier MUST use only STABLE fields to prevent the same vehicle
- * from being incorrectly marked as "new" on subsequent scans.
- *
- * STABLE FIELDS (use these):
- *   ✅ VIN (if available)
- *   ✅ Stock Number
- *   ✅ Year + Make + Model + Trim
- *   ✅ URL path component
- *
- * VOLATILE FIELDS (NEVER use these):
- *   ❌ Price (changes frequently due to discounts, promotions)
- *   ❌ Mileage (may be updated by dealer)
- *   ❌ Color (may be formatted differently: "White" vs "Pearl White")
- *
- * WHY THIS MATTERS:
- * If we include price/mileage/color in the identifier, the same physical
- * vehicle will get a DIFFERENT identifier when these fields change,
- * causing it to be marked as a "new" vehicle instead of an update.
- * This leads to:
- *   - Incorrect "new vehicles" counts
- *   - Duplicate vehicle records
- *   - Inconsistent results between scans
  */
 async function processVehicles(
   supabase: any,
@@ -579,56 +476,41 @@ async function processVehicles(
   // Process each vehicle
   for (const vehicle of vehicles) {
     // Generate a unique identifier for vehicles without VIN
-    // CRITICAL: Use only STABLE fields (NO price, NO mileage, NO color)
-    // These fields change frequently and cause the same vehicle to be seen as "new"
+    // Use stock_number if available, otherwise generate from year/make/model/mileage/color
     let identifier = vehicle.vin;
     if (!identifier) {
       if (vehicle.stock_number) {
         identifier = `STOCK_${vehicle.stock_number}`;
       } else if (vehicle.year && vehicle.make && vehicle.model) {
-        // Create identifier from STABLE data only: year, make, model, trim
-        // DO NOT include price, mileage, or color (these change between scans)
-        const stableParts = [
+        // Create a pseudo-VIN from available data
+        // Include mileage and color to differentiate similar vehicles
+        const uniqueParts = [
           vehicle.year,
           vehicle.make,
           vehicle.model,
-          vehicle.trim || 'BASE',
-        ];
+          vehicle.trim || '',
+          vehicle.mileage || 0,
+          vehicle.color || '',
+          vehicle.price || 0,
+        ].filter(Boolean); // Remove empty values
 
-        identifier = stableParts.join('_').replace(/\s+/g, '_').toUpperCase();
+        identifier = uniqueParts.join('_').replace(/\s+/g, '_').toUpperCase();
 
-        // If this identifier already exists in current batch, use URL to differentiate
+        // If this identifier already exists in current batch, make it more unique with URL hash
         const existingInBatch = vehicles.slice(0, vehicles.indexOf(vehicle)).find(v => {
-          // Calculate identifier for comparison using same stable fields
           const testId = v.vin || (v.year && v.make && v.model ?
-            [v.year, v.make, v.model, v.trim || 'BASE']
-              .join('_').replace(/\s+/g, '_').toUpperCase() : null);
+            [v.year, v.make, v.model, v.trim || '', v.mileage || 0, v.color || '', v.price || 0]
+              .filter(Boolean).join('_').replace(/\s+/g, '_').toUpperCase() : null);
           return testId === identifier;
         });
 
-        if (existingInBatch) {
-          // Extract stable URL path component (e.g., "/inventory/12345" -> "12345")
-          let urlSuffix = '';
-          if (vehicle.url) {
-            const urlParts = vehicle.url.split('/').filter(p => p && p.length > 0);
-            // Get last meaningful part (usually an ID or slug)
-            urlSuffix = urlParts[urlParts.length - 1]?.replace(/[^a-zA-Z0-9]/g, '').substring(0, 10) || '';
-          }
-
-          // Only add suffix if we have a valid URL component
-          if (urlSuffix) {
-            identifier = `${identifier}_${urlSuffix}`;
-          } else {
-            console.log(`⚠️ Warning: Duplicate vehicle in batch without unique URL: ${identifier}`);
-            // Keep the identifier without suffix - the update logic will handle it
-          }
+        if (existingInBatch || !identifier) {
+          // Add URL hash as last resort for uniqueness
+          const urlHash = vehicle.url ?
+            vehicle.url.split('/').pop()?.replace(/[^a-zA-Z0-9]/g, '') :
+            Math.random().toString(36).substring(2, 10).toUpperCase();
+          identifier = `${identifier}_${urlHash}`;
         }
-      } else if (vehicle.url) {
-        // Last resort: use URL-based identifier for vehicles with missing data
-        const urlParts = vehicle.url.split('/').filter(p => p && p.length > 0);
-        const urlId = urlParts[urlParts.length - 1]?.replace(/[^a-zA-Z0-9]/g, '') ||
-                      Math.random().toString(36).substring(2, 10).toUpperCase();
-        identifier = `URL_${urlId}`;
       } else {
         console.log(`Skipping vehicle without enough identifying information:`, vehicle);
         continue; // Skip vehicles we can't identify
@@ -780,26 +662,22 @@ async function processVehicles(
       const vehicleIdentifier = vehicle.vin;
       if (!currentVINs.includes(vehicleIdentifier) && !vehicles.some(v => {
         // Check if any current vehicle would generate the same identifier
-        // MUST use same stable identifier logic (NO price, NO mileage, NO color)
         let currentId = v.vin;
         if (!currentId && v.stock_number) {
           currentId = `STOCK_${v.stock_number}`;
         } else if (!currentId && v.year && v.make && v.model) {
-          // Use same STABLE identifier logic as above
-          const stableParts = [
+          // Use same logic as identifier generation
+          const uniqueParts = [
             v.year,
             v.make,
             v.model,
-            v.trim || 'BASE',
-          ];
-          currentId = stableParts.join('_').replace(/\s+/g, '_').toUpperCase();
-        } else if (!currentId && v.url) {
-          const urlParts = v.url.split('/').filter(p => p && p.length > 0);
-          const urlId = urlParts[urlParts.length - 1]?.replace(/[^a-zA-Z0-9]/g, '') || '';
-          currentId = `URL_${urlId}`;
+            v.trim || '',
+            v.mileage || 0,
+            v.color || '',
+            v.price || 0,
+          ].filter(Boolean);
+          currentId = uniqueParts.join('_').replace(/\s+/g, '_').toUpperCase();
         }
-        // Match if IDs are equal OR if the stored ID starts with current ID
-        // (to handle cases where URL suffix was added)
         return currentId === vehicleIdentifier || vehicleIdentifier.startsWith(currentId + '_');
       })) {
         console.log(`Vehicle ${vehicleIdentifier} marked as sold, creating sales record...`);

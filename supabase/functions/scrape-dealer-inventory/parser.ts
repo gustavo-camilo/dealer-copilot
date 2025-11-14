@@ -66,17 +66,18 @@ export function parseInventoryHTML(html: string, baseUrl: string): ParsedVehicle
         console.log(`✅ Parser found ${vehicles.length} vehicles`);
 
         // Validate vehicles have minimum required data
-        // STRICTER VALIDATION: Require meaningful vehicle data, not just a URL
         // Accept if:
         // 1. Has VIN (most reliable identifier - can look up missing data)
         // 2. Has year AND make (core vehicle identity)
-        // 3. Has year AND price (likely a vehicle listing)
+        // 3. Has URL (can fetch detail page for missing data)
+        // 4. Has price AND year (likely a vehicle even without make)
         const validVehicles = vehicles.filter(v => {
           const hasVIN = v.vin && v.vin.length === 17;
           const hasYearAndMake = v.year && v.make;
-          const hasYearAndPrice = v.year && v.price && v.price >= 1000;
+          const hasURL = v.url;
+          const hasPriceAndYear = v.price && v.year;
 
-          return hasVIN || hasYearAndMake || hasYearAndPrice;
+          return hasVIN || hasYearAndMake || hasURL || hasPriceAndYear;
         });
 
         if (validVehicles.length > 0) {
