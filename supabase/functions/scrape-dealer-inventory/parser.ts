@@ -447,8 +447,8 @@ function parseVehicleFromCard(card: string, linkText: string, url: string, baseU
 
   // Extract mileage - improved patterns to handle various formats (123456, 123,456, 123.456)
   const mileagePatterns = [
-    /mileage[:\s]+([\d,.]+)/i,
-    /odometer[:\s]+([\d,.]+)/i,
+    /mileage[:\s]+([\d,.]+)(?:\s*(?:mi|miles|km|kilometers|<br|<\/|\||$))/i,
+    /odometer[:\s]+([\d,.]+)(?:\s*(?:mi|miles|km|kilometers|<br|<\/|\||$))/i,
     /([\d,.]+)\s*(?:mi|miles|km|kilometers)\b/i,
     /miles[:\s]+([\d,.]+)/i,
   ];
