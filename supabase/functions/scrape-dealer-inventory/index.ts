@@ -607,7 +607,7 @@ async function processVehicles(
         console.log(`  Preserving existing image`);
       }
 
-      // Check if price changed (keep price history)
+      // Update price (keep price history for tracking, but don't change status)
       if (vehicle.price !== undefined && vehicle.price !== null) {
         if (existing.price !== vehicle.price) {
           const priceHistory = existing.price_history || [];
@@ -617,7 +617,7 @@ async function processVehicles(
           });
           updates.price = vehicle.price;
           updates.price_history = priceHistory;
-          updates.status = 'price_changed';
+          // Keep status as 'active' - no more price_changed status
           console.log(`  Price changed: ${existing.price} -> ${vehicle.price}`);
         } else {
           // Price same, just update it

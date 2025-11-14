@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { parseInventoryHTML, type ParsedVehicle } from './parser.ts';
+import { getActualListingDate, type ListingDateResult } from '../scrape-dealer-inventory/dateExtractor.ts';
 
 // =====================================================
 // VIN DECODER - Inlined to avoid deployment issues
@@ -482,6 +483,22 @@ async function fetchDetailPages(vehicles: ParsedVehicle[]): Promise<ParsedVehicl
         const parsed = parseInventoryHTML(html, vehicle.url);
         // Merge with original vehicle data
         const merged = parsed.length > 0 ? { ...vehicle, ...parsed[0] } : vehicle;
+
+        // Extract listing date from URL and HTML
+        console.log(`Extracting listing date for: ${vehicle.url}`);
+        const listingDateResult = await getActualListingDate(
+          html,
+          vehicle.url || '',
+          {}, // No sitemap cache for competitors
+          merged.imageDate // Pass image date if extracted
+        );
+
+        // Add listing date information to vehicle
+        merged.listingDate = listingDateResult.date;
+        merged.listingDateConfidence = listingDateResult.confidence;
+        merged.listingDateSource = listingDateResult.source;
+
+        console.log(`  Listing date: ${listingDateResult.date.toISOString()} (${listingDateResult.confidence}, ${listingDateResult.source})`);
 
         // If we have VIN but missing data, try VIN decoder
         const enriched = await enrichVehicleWithVIN(merged);
