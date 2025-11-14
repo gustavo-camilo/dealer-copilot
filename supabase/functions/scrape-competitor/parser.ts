@@ -13,6 +13,11 @@ export interface ParsedVehicle {
   price?: number;
   mileage?: number;
   url?: string;
+  images?: string[];
+  imageDate?: Date;
+  listingDate?: Date;
+  listingDateConfidence?: 'high' | 'medium' | 'low' | 'estimated';
+  listingDateSource?: string;
 }
 
 /**
@@ -345,7 +350,99 @@ function parseVehicleFromCard(card: string, linkText: string, url: string, baseU
     }
   }
 
+  // Extract images (first good image from THIS CARD ONLY)
+  const images = extractFirstGoodImage(card, baseUrl);
+  if (images.length > 0) {
+    vehicle.images = images;
+    vehicle.imageDate = extractDateFromImageFilename(images[0]);
+  }
+
   return vehicle;
+}
+
+/**
+ * Extract first good vehicle image (filter out logos/icons)
+ */
+function extractFirstGoodImage(html: string, baseUrl: string): string[] {
+  const imgRegex = /<img[^>]*src=["']([^"']+)["'][^>]*>/gi;
+  const matches = [...html.matchAll(imgRegex)];
+
+  for (const match of matches) {
+    const imgTag = match[0];
+    const imgSrc = match[1];
+    const lowerSrc = imgSrc.toLowerCase();
+    const lowerTag = imgTag.toLowerCase();
+
+    // Filter out non-vehicle images
+    if (
+      lowerSrc.includes('logo') ||
+      lowerSrc.includes('icon') ||
+      lowerSrc.includes('badge') ||
+      lowerSrc.includes('social') ||
+      lowerSrc.includes('nav') ||
+      lowerSrc.includes('menu') ||
+      lowerSrc.includes('header') ||
+      lowerSrc.includes('footer') ||
+      lowerSrc.includes('banner') ||
+      lowerSrc.includes('button') ||
+      lowerSrc.includes('avatar') ||
+      lowerSrc.includes('thumbnail') && lowerSrc.includes('user') ||
+      lowerSrc.includes('.svg') ||
+      lowerSrc.includes('.gif') ||
+      lowerSrc.includes('placeholder') ||
+      lowerTag.includes('class="icon') ||
+      lowerTag.includes('alt="icon')
+    ) {
+      continue;
+    }
+
+    // Check dimensions (skip tiny images)
+    const widthMatch = imgTag.match(/width=["']?(\d+)/i);
+    const heightMatch = imgTag.match(/height=["']?(\d+)/i);
+    if (widthMatch && heightMatch) {
+      const width = parseInt(widthMatch[1]);
+      const height = parseInt(heightMatch[1]);
+      if (width < 100 || height < 100) continue;
+    } else if (widthMatch) {
+      const width = parseInt(widthMatch[1]);
+      if (width < 100) continue;
+    }
+
+    try {
+      const url = new URL(imgSrc, baseUrl).href;
+      return [url]; // Return only first good image
+    } catch {
+      continue;
+    }
+  }
+
+  return [];
+}
+
+/**
+ * Extract date from image filename
+ */
+function extractDateFromImageFilename(imageUrl: string): Date | undefined {
+  const patterns = [
+    /IMG[-_](\d{4})(\d{2})(\d{2})/i,
+    /photo[-_](\d{4})(\d{2})(\d{2})/i,
+    /(\d{4})(\d{2})(\d{2})/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = imageUrl.match(pattern);
+    if (match) {
+      const year = parseInt(match[1]);
+      const month = parseInt(match[2]);
+      const day = parseInt(match[3]);
+
+      if (year >= 2020 && year <= 2030 && month >= 1 && month <= 12 && day >= 1 && day <= 31) {
+        return new Date(year, month - 1, day);
+      }
+    }
+  }
+
+  return undefined;
 }
 
 /**
