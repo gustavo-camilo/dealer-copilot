@@ -29,6 +29,12 @@ export class SelectorDiscovery {
       'article',
       '[itemtype*="Vehicle"]',
       '[itemtype*="Car"]',
+      // Shopify-specific selectors
+      '.product-card',
+      '.grid-product',
+      '.grid__item .product',
+      '[data-product]',
+      '[data-product-id]',
     ];
 
     let bestResult: { selector: string; vehicles: Vehicle[] } | null = null;

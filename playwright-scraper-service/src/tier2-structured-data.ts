@@ -90,6 +90,15 @@ export class StructuredDataParser {
       }
     }
 
+    // Check if this is a Shopify Product (could be a car)
+    if (type === 'Product') {
+      console.log('🛍️  Found Shopify Product schema, attempting to parse as vehicle...');
+      const vehicle = this.parseProductAsVehicle(data, pageUrl);
+      if (vehicle) {
+        vehicles.push(vehicle);
+      }
+    }
+
     // Check for ItemList containing vehicles
     if (type === 'ItemList') {
       const items = data.itemListElement || data.items || [];
@@ -288,6 +297,100 @@ export class StructuredDataParser {
 
     if (metaData.image) {
       vehicle.image_url = metaData.image;
+    }
+
+    return vehicle;
+  }
+
+  /**
+   * Parse a Shopify Product schema as a vehicle
+   */
+  private parseProductAsVehicle(data: any, pageUrl: string): Vehicle | null {
+    if (!data.name) return null;
+
+    // Extract year/make/model from product name (e.g., "2020 Toyota Camry")
+    const name = String(data.name);
+
+    // Try to extract year (first 4-digit number)
+    const yearMatch = name.match(/\b(19|20)\d{2}\b/);
+    const year = yearMatch ? parseInt(yearMatch[0]) : null;
+
+    // Common car manufacturers for pattern matching
+    const makes = ['toyota', 'ford', 'chevrolet', 'chevy', 'honda', 'nissan', 'bmw', 'mercedes', 'audi', 'volkswagen', 'vw', 'mazda', 'subaru', 'hyundai', 'kia', 'jeep', 'ram', 'gmc', 'dodge', 'lexus', 'acura', 'infiniti', 'cadillac', 'buick', 'lincoln', 'tesla', 'volvo', 'porsche'];
+
+    let make: string | null = null;
+    let model: string | null = null;
+
+    const nameLower = name.toLowerCase();
+    for (const m of makes) {
+      if (nameLower.includes(m)) {
+        make = m.charAt(0).toUpperCase() + m.slice(1);
+        // Extract model (words after make)
+        const makeIndex = nameLower.indexOf(m);
+        const afterMake = name.substring(makeIndex + m.length).trim();
+        const modelParts = afterMake.split(' ').filter(p => p && !/^\d+$/.test(p));
+        if (modelParts.length > 0) {
+          model = modelParts[0];
+        }
+        break;
+      }
+    }
+
+    // Get price from offers
+    let price: number | undefined;
+    if (data.offers) {
+      const offers = Array.isArray(data.offers) ? data.offers : [data.offers];
+      for (const offer of offers) {
+        if (offer.price) {
+          const priceNum = parseFloat(String(offer.price).replace(/[^0-9.]/g, ''));
+          if (!isNaN(priceNum)) {
+            price = priceNum;
+            break;
+          }
+        }
+      }
+    }
+
+    // Get image URL
+    let image_url: string | undefined;
+    if (data.image) {
+      if (typeof data.image === 'string') {
+        image_url = data.image;
+      } else if (Array.isArray(data.image) && data.image.length > 0) {
+        image_url = String(data.image[0]);
+      } else if (data.image.url) {
+        image_url = data.image.url;
+      }
+    }
+
+    // Extract mileage from description
+    let mileage: number | undefined;
+    if (data.description) {
+      const mileageMatch = data.description.match(/(\d{1,3}(?:,\d{3})*)\s*(miles?|mi|km)/i);
+      if (mileageMatch) {
+        mileage = parseInt(mileageMatch[1].replace(/,/g, ''));
+      }
+    }
+
+    // Need at least year and make, or a price to indicate it's a vehicle
+    if ((!year || !make) && !price) {
+      return null;
+    }
+
+    const vehicle: Vehicle = {
+      url: data.url || pageUrl,
+    };
+
+    if (year) vehicle.year = year;
+    if (make) vehicle.make = make;
+    if (model) vehicle.model = model;
+    if (price) vehicle.price = price;
+    if (mileage) vehicle.mileage = mileage;
+    if (image_url) vehicle.image_url = image_url;
+
+    // Use SKU as stock number if available
+    if (data.sku) {
+      vehicle.stock_number = String(data.sku);
     }
 
     return vehicle;
