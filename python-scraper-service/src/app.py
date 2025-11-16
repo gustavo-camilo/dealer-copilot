@@ -5,7 +5,7 @@ Compatible with existing Playwright service endpoints
 
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-from scraper import VehicleScraper
+from .scraper import VehicleScraper
 import os
 
 app = Flask(__name__)
