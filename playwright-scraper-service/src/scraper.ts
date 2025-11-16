@@ -107,14 +107,20 @@ export class RobustScraper {
       await page.waitForTimeout(2000);
 
       // Check if this is a Shopify store and proactively fetch products API
-      const isShopify = await page.evaluate(() => {
-        return !!(window as any).Shopify || document.querySelector('[data-shopify]') !== null;
-      });
+      let isShopify = false;
+      try {
+        isShopify = await page.evaluate(() => {
+          return !!(window as any).Shopify || document.querySelector('[data-shopify]') !== null;
+        }).catch(() => false);
+      } catch (e) {
+        // Page might have navigated, continue without Shopify detection
+        console.log('⚠️ Could not detect Shopify (page might have navigated)');
+      }
 
       if (isShopify) {
         console.log('🛍️ Detected Shopify store, fetching products API...');
         try {
-          // Fetch products API directly without navigation to preserve page state
+          // Fetch products API using Playwright's native request context (more reliable)
           const currentUrl = new URL(request.url);
           const apiUrls = [
             `${currentUrl.origin}/products.json`,
@@ -123,28 +129,29 @@ export class RobustScraper {
 
           for (const apiUrl of apiUrls) {
             try {
-              const response = await page.evaluate(async (url) => {
-                const res = await fetch(url);
-                return await res.json();
-              }, apiUrl);
+              // Use context.request instead of page.evaluate to avoid execution context issues
+              const response = await context.request.get(apiUrl);
 
-              if (response && response.products) {
-                console.log(`✅ Fetched Shopify API: ${apiUrl} (${response.products.length} products)`);
-                // Manually trigger the API interceptor with this data
-                apiInterceptor['apiResponses'].push({
-                  url: apiUrl,
-                  data: response,
-                  method: 'GET'
-                });
-                break;
+              if (response.ok()) {
+                const data = await response.json();
+                if (data && data.products) {
+                  console.log(`✅ Fetched Shopify API: ${apiUrl} (${data.products.length} products)`);
+                  // Manually inject into API interceptor
+                  apiInterceptor['apiResponses'].push({
+                    url: apiUrl,
+                    data: data,
+                    method: 'GET'
+                  });
+                  break;
+                }
               }
             } catch (e: any) {
               // Try next URL
               console.log(`⚠️ Failed to fetch ${apiUrl}: ${e?.message || 'Unknown error'}`);
             }
           }
-        } catch (error) {
-          console.log('⚠️ Failed to fetch Shopify API, continuing...');
+        } catch (error: any) {
+          console.log(`⚠️ Failed to fetch Shopify API: ${error?.message || 'Unknown error'}, continuing...`);
         }
       }
 
