@@ -292,8 +292,38 @@ export class RobustScraper {
         }
       }
 
-      // If still no result, return failure
+      // If still no result, return failure with debug info
       if (!result) {
+        // Debug: Log what we're actually seeing on the page
+        try {
+          const pageUrl = page.url();
+          const pageTitle = await page.title();
+          const bodyText = await page.evaluate(() => document.body?.innerText?.substring(0, 500) || '');
+          const htmlLength = await page.evaluate(() => document.documentElement?.outerHTML?.length || 0);
+
+          console.log('\n❌ EXTRACTION FAILED - Debug Info:');
+          console.log(`   Current URL: ${pageUrl}`);
+          console.log(`   Page Title: ${pageTitle}`);
+          console.log(`   HTML Length: ${htmlLength} chars`);
+          console.log(`   Body Text (first 500 chars): ${bodyText}`);
+
+          // Check for common bot detection indicators
+          const indicators = await page.evaluate(() => {
+            const text = document.body?.innerText?.toLowerCase() || '';
+            return {
+              hasAccessDenied: text.includes('access denied') || text.includes('forbidden'),
+              hasCaptcha: text.includes('captcha') || text.includes('verify you are human'),
+              hasCloudflare: text.includes('cloudflare') || text.includes('checking your browser'),
+              hasBlankPage: document.body?.innerText?.trim().length < 50,
+              hasRedirect: text.includes('redirect'),
+            };
+          });
+
+          console.log('   Bot Detection Indicators:', indicators);
+        } catch (e) {
+          console.log('   Could not gather debug info');
+        }
+
         return {
           success: false,
           vehicles: [],
