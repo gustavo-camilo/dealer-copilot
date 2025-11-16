@@ -10,7 +10,9 @@ import { parseInventoryHTML } from './parser.ts';
 import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
 import { enrichVehicleWithVIN } from './vinDecoder.ts';
 
-// Playwright service URL (deployed on DigitalOcean)
+// Scraper service URLs (deployed on DigitalOcean)
+// Python scraper has better bot detection bypass, try it first
+const PYTHON_SCRAPER_URL = Deno.env.get('PYTHON_SCRAPER_URL') || '';
 const PLAYWRIGHT_SERVICE_URL = Deno.env.get('PLAYWRIGHT_SERVICE_URL') || 'https://squid-app-vew3y.ondigitalocean.app';
 
 // CORS headers
@@ -30,9 +32,9 @@ interface ScrapingResult {
   status: 'success' | 'partial' | 'failed';
   error?: string;
   duration_ms: number;
-  scraper_method?: 'playwright' | 'html_parser' | 'mixed';
-  playwright_tier?: string;
-  playwright_confidence?: string;
+  scraper_method?: 'python' | 'playwright' | 'html_parser' | 'mixed';
+  scraper_tier?: string;
+  scraper_confidence?: string;
 }
 
 /**
@@ -137,12 +139,59 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
 }
 
 /**
+ * Call Python scraper service (undetected-chromedriver)
+ * Better bot detection bypass than Playwright
+ */
+async function scrapeWithPython(url: string): Promise<{ vehicles: any[], tier?: string, confidence?: string }> {
+  try {
+    if (!PYTHON_SCRAPER_URL) {
+      console.log('⚠️  Python scraper URL not configured, skipping...');
+      return { vehicles: [] };
+    }
+
+    console.log(`🐍 Calling Python scraper (priority) for: ${url}`);
+
+    const response = await fetch(`${PYTHON_SCRAPER_URL}/scrape`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url }),
+      signal: AbortSignal.timeout(120000), // 2 minute timeout
+    });
+
+    if (!response.ok) {
+      throw new Error(`Python scraper returned ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success || result.vehicles.length === 0) {
+      console.log('⚠️  Python scraper returned no vehicles');
+      return { vehicles: [], tier: result.tier, confidence: result.confidence };
+    }
+
+    console.log(`✅ Python scraper found ${result.vehicles.length} vehicles using Tier ${result.tier} (${result.confidence} confidence)`);
+    console.log(`   Duration: ${result.duration}ms`);
+
+    return {
+      vehicles: result.vehicles,
+      tier: result.tier,
+      confidence: result.confidence
+    };
+  } catch (error) {
+    console.error('❌ Python scraper failed:', error.message);
+    return { vehicles: [] };
+  }
+}
+
+/**
  * Call Playwright service to scrape a website
  * This uses the new 4-tier extraction system for more robust scraping
  */
 async function scrapeWithPlaywright(url: string): Promise<{ vehicles: any[], tier?: string, confidence?: string }> {
   try {
-    console.log(`📞 Calling Playwright service for: ${url}`);
+    console.log(`📞 Calling Playwright service (fallback) for: ${url}`);
 
     const response = await fetch(`${PLAYWRIGHT_SERVICE_URL}/scrape`, {
       method: 'POST',
@@ -356,48 +405,72 @@ serve(async (req) => {
         console.log(`Found ${inventoryUrls.length} inventory URL(s) to scrape`);
 
         let vehicles: any[] = [];
+        let usedPython = false;
         let usedPlaywright = false;
         let usedHtmlParser = false;
-        let playwrightTier: string | undefined;
-        let playwrightConfidence: string | undefined;
+        let scraperTier: string | undefined;
+        let scraperConfidence: string | undefined;
 
-        // Try each inventory URL with Playwright service
+        // Try each inventory URL with cascading fallback system
+        // Priority: Python (best bot bypass) → Playwright → HTML parser
         for (const url of inventoryUrls) {
           try {
             console.log(`Fetching ${url}...`);
 
-            // Try Playwright service first (more robust, handles JS-rendered content)
-            const playwrightResult = await scrapeWithPlaywright(url);
-            let pageVehicles = playwrightResult.vehicles;
+            let pageVehicles: any[] = [];
 
-            // Fallback to old HTML parsing if Playwright service fails
-            if (pageVehicles.length === 0) {
-              console.log('⚠️  Playwright service returned no vehicles, falling back to HTML parsing...');
-              usedHtmlParser = true;
+            // TIER 1: Try Python scraper first (best bot detection bypass)
+            const pythonResult = await scrapeWithPython(url);
+            pageVehicles = pythonResult.vehicles;
 
-              const response = await fetch(url, {
-                headers: {
-                  'User-Agent':
-                    'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-                  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                  'Accept-Language': 'en-US,en;q=0.5',
-                },
-                signal: AbortSignal.timeout(30000), // 30 second timeout
-              });
-
-              if (!response.ok) {
-                console.log(`HTTP ${response.status} for ${url}, skipping...`);
-                continue;
-              }
-
-              const html = await response.text();
-
-              // Parse inventory from HTML
-              pageVehicles = parseInventoryHTML(html, url);
+            if (pageVehicles.length > 0) {
+              usedPython = true;
+              scraperTier = pythonResult.tier;
+              scraperConfidence = pythonResult.confidence;
+              console.log(`✅ Python scraper succeeded with ${pageVehicles.length} vehicles`);
             } else {
-              usedPlaywright = true;
-              playwrightTier = playwrightResult.tier;
-              playwrightConfidence = playwrightResult.confidence;
+              // TIER 2: Fallback to Playwright if Python fails
+              console.log('⚠️  Python scraper returned no vehicles, trying Playwright...');
+
+              const playwrightResult = await scrapeWithPlaywright(url);
+              pageVehicles = playwrightResult.vehicles;
+
+              if (pageVehicles.length > 0) {
+                usedPlaywright = true;
+                scraperTier = playwrightResult.tier;
+                scraperConfidence = playwrightResult.confidence;
+                console.log(`✅ Playwright succeeded with ${pageVehicles.length} vehicles`);
+              } else {
+                // TIER 3: Final fallback to basic HTML parsing
+                console.log('⚠️  Playwright returned no vehicles, falling back to HTML parsing...');
+                usedHtmlParser = true;
+
+                const response = await fetch(url, {
+                  headers: {
+                    'User-Agent':
+                      'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+                    Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Language': 'en-US,en;q=0.5',
+                  },
+                  signal: AbortSignal.timeout(30000), // 30 second timeout
+                });
+
+                if (!response.ok) {
+                  console.log(`HTTP ${response.status} for ${url}, skipping...`);
+                  continue;
+                }
+
+                const html = await response.text();
+
+                // Parse inventory from HTML
+                pageVehicles = parseInventoryHTML(html, url);
+
+                if (pageVehicles.length > 0) {
+                  console.log(`✅ HTML parser succeeded with ${pageVehicles.length} vehicles`);
+                } else {
+                  console.log(`❌ All extraction methods failed for ${url}`);
+                }
+              }
             }
 
             console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
@@ -415,12 +488,24 @@ serve(async (req) => {
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
 
         // Log which scraper method was used
-        if (usedPlaywright && !usedHtmlParser) {
-          console.log(`🚀 Used Playwright scraper - Tier ${playwrightTier} (${playwrightConfidence} confidence)`);
-        } else if (usedPlaywright && usedHtmlParser) {
-          console.log(`🔀 Used mixed scraping - Playwright (Tier ${playwrightTier}) + HTML Parser`);
+        let scraperMethod: 'python' | 'playwright' | 'html_parser' | 'mixed' = 'html_parser';
+
+        if (usedPython && !usedPlaywright && !usedHtmlParser) {
+          console.log(`🐍 Used Python scraper - Tier ${scraperTier} (${scraperConfidence} confidence)`);
+          scraperMethod = 'python';
+        } else if (usedPlaywright && !usedPython && !usedHtmlParser) {
+          console.log(`🚀 Used Playwright scraper - Tier ${scraperTier} (${scraperConfidence} confidence)`);
+          scraperMethod = 'playwright';
+        } else if (usedPython || usedPlaywright || usedHtmlParser) {
+          const methods = [];
+          if (usedPython) methods.push(`Python (Tier ${scraperTier})`);
+          if (usedPlaywright) methods.push(`Playwright (Tier ${scraperTier})`);
+          if (usedHtmlParser) methods.push('HTML Parser');
+          console.log(`🔀 Used mixed scraping - ${methods.join(' + ')}`);
+          scraperMethod = 'mixed';
         } else {
           console.log(`📄 Used legacy HTML parser`);
+          scraperMethod = 'html_parser';
         }
 
         // Log sample of what we found
@@ -476,14 +561,6 @@ serve(async (req) => {
           },
         });
 
-        // Determine which scraper method was used
-        let scraperMethod: 'playwright' | 'html_parser' | 'mixed' = 'html_parser';
-        if (usedPlaywright && !usedHtmlParser) {
-          scraperMethod = 'playwright';
-        } else if (usedPlaywright && usedHtmlParser) {
-          scraperMethod = 'mixed';
-        }
-
         results.push({
           tenant_id: tenant.id,
           tenant_name: tenant.name,
@@ -495,8 +572,8 @@ serve(async (req) => {
           status: 'success',
           duration_ms: Date.now() - tenantStartTime,
           scraper_method: scraperMethod,
-          playwright_tier: playwrightTier,
-          playwright_confidence: playwrightConfidence,
+          scraper_tier: scraperTier,
+          scraper_confidence: scraperConfidence,
         });
       } catch (error) {
         console.error(`Error scraping ${tenant.name}:`, error);
