@@ -8,12 +8,12 @@ This guide walks you through deploying the Playwright Scraper Service to product
 
 **Issues Resolved:**
 - ✅ Fixed `TLS_error:CERTIFICATE_VERIFY_FAILED` errors in DigitalOcean App Platform
-- ✅ Updated Claude model from deprecated `claude-3-5-sonnet-20240620` to stable `claude-3-5-sonnet-20241022`
+- ✅ Updated Claude model from deprecated `claude-3-5-sonnet-20240620` to latest `claude-sonnet-4-5-20250929`
 - ✅ Added browser flags for containerized environments
 
 **Files Changed:**
 - `src/scraper.ts` - Added SSL/TLS certificate handling flags
-- `src/tier4-llm-vision.ts` - Updated Claude API model version
+- `src/tier4-llm-vision.ts` - Updated Claude API model to claude-sonnet-4-5-20250929
 
 **Action Required:** If you're experiencing scraping failures, redeploy immediately using instructions below.
 
