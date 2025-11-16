@@ -102,6 +102,39 @@ export class RobustScraper {
       // Wait a bit for dynamic content
       await page.waitForTimeout(2000);
 
+      // Check if this is a Shopify store and proactively fetch products API
+      const isShopify = await page.evaluate(() => {
+        return !!(window as any).Shopify || document.querySelector('[data-shopify]') !== null;
+      });
+
+      if (isShopify) {
+        console.log('🛍️ Detected Shopify store, fetching products API...');
+        try {
+          // Try to fetch products from collection or all products
+          const currentUrl = new URL(request.url);
+          const apiUrls = [
+            `${currentUrl.origin}${currentUrl.pathname}.json`,
+            `${currentUrl.origin}/products.json`,
+            `${currentUrl.origin}/collections/all/products.json`,
+          ];
+
+          for (const apiUrl of apiUrls) {
+            try {
+              await page.goto(apiUrl, { waitUntil: 'networkidle', timeout: 10000 });
+              console.log(`✅ Fetched Shopify API: ${apiUrl}`);
+              break;
+            } catch (e) {
+              // Try next URL
+            }
+          }
+
+          // Go back to original page
+          await page.goto(request.url, { waitUntil: 'networkidle', timeout: 10000 });
+        } catch (error) {
+          console.log('⚠️ Failed to fetch Shopify API, continuing...');
+        }
+      }
+
       let result: ScrapeResponse | null = null;
 
       // TIER 1: Try cached pattern first (if available and same tier)

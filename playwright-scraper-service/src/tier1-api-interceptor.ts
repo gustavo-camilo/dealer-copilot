@@ -36,6 +36,8 @@ export class APIInterceptor {
         url.includes('/vehicles') ||
         url.includes('/search') ||
         url.includes('.json') ||
+        url.includes('/products.json') ||
+        url.includes('/collections/') ||
         response.headers()['content-type']?.includes('application/json');
 
       if (isAPI && (method === 'GET' || method === 'POST')) {
@@ -111,6 +113,12 @@ export class APIInterceptor {
   private looksLikeVehicleData(data: any): boolean {
     if (!data) return false;
 
+    // Check for Shopify products structure
+    if (data.products && Array.isArray(data.products)) {
+      console.log(`🛍️ Detected Shopify products structure`);
+      return true;
+    }
+
     // Check if it's an array of objects with vehicle-like properties
     const checkArray = (arr: any[]): boolean => {
       if (arr.length === 0) return false;
@@ -147,6 +155,18 @@ export class APIInterceptor {
    */
   private parseVehicleData(data: any): Vehicle[] {
     const vehicles: Vehicle[] = [];
+
+    // Check for Shopify products structure
+    if (data.products && Array.isArray(data.products)) {
+      console.log(`🛍️ Parsing Shopify products as vehicles...`);
+      for (const product of data.products) {
+        const vehicle = this.parseShopifyProduct(product);
+        if (vehicle) {
+          vehicles.push(vehicle);
+        }
+      }
+      return vehicles;
+    }
 
     // Find the array of vehicles
     let vehicleArray: any[] = [];
@@ -292,6 +312,98 @@ export class APIInterceptor {
       } else if (typeof image === 'object' && image.url) {
         vehicle.image_url = String(image.url);
       }
+    }
+
+    return vehicle;
+  }
+
+  /**
+   * Parse a Shopify product as a vehicle
+   */
+  private parseShopifyProduct(product: any): Vehicle | null {
+    if (!product || !product.title) return null;
+
+    // Extract year/make/model from title (e.g., "2020 Toyota Camry")
+    const title = String(product.title);
+    const titleParts = title.split(' ');
+
+    // Try to extract year (first 4-digit number)
+    const yearMatch = title.match(/\b(19|20)\d{2}\b/);
+    const year = yearMatch ? parseInt(yearMatch[0]) : null;
+
+    // Common car manufacturers for pattern matching
+    const makes = ['toyota', 'ford', 'chevrolet', 'chevy', 'honda', 'nissan', 'bmw', 'mercedes', 'audi', 'volkswagen', 'vw', 'mazda', 'subaru', 'hyundai', 'kia', 'jeep', 'ram', 'gmc', 'dodge', 'lexus', 'acura', 'infiniti', 'cadillac', 'buick', 'lincoln', 'tesla', 'volvo', 'porsche', 'land rover', 'jaguar', 'mini', 'fiat', 'alfa romeo', 'maserati', 'bentley', 'rolls-royce', 'ferrari', 'lamborghini', 'mclaren', 'aston martin'];
+
+    let make: string | null = null;
+    let model: string | null = null;
+
+    // Find make in title
+    const titleLower = title.toLowerCase();
+    for (const m of makes) {
+      if (titleLower.includes(m)) {
+        make = m.charAt(0).toUpperCase() + m.slice(1);
+        // Extract model (words after make)
+        const makeIndex = titleLower.indexOf(m);
+        const afterMake = title.substring(makeIndex + m.length).trim();
+        const modelParts = afterMake.split(' ').filter(p => p && !/^\d+$/.test(p));
+        if (modelParts.length > 0) {
+          model = modelParts[0];
+        }
+        break;
+      }
+    }
+
+    // Get price from first variant
+    let price: number | undefined;
+    if (product.variants && product.variants.length > 0) {
+      const priceStr = product.variants[0].price;
+      if (priceStr) {
+        price = parseFloat(String(priceStr));
+      }
+    }
+
+    // Get image URL
+    let image_url: string | undefined;
+    if (product.images && product.images.length > 0) {
+      image_url = product.images[0].src || product.images[0];
+    } else if (product.image && product.image.src) {
+      image_url = product.image.src;
+    }
+
+    // Extract mileage from title or body_html
+    let mileage: number | undefined;
+    const mileageMatch = title.match(/(\d{1,3}(?:,\d{3})*)\s*(miles?|mi|km)/i);
+    if (mileageMatch) {
+      mileage = parseInt(mileageMatch[1].replace(/,/g, ''));
+    } else if (product.body_html) {
+      const bodyMatch = product.body_html.match(/(\d{1,3}(?:,\d{3})*)\s*(miles?|mi|km)/i);
+      if (bodyMatch) {
+        mileage = parseInt(bodyMatch[1].replace(/,/g, ''));
+      }
+    }
+
+    // Build URL from handle
+    const url = product.handle ? `/products/${product.handle}` : undefined;
+
+    // Need at least year and make, or a price (to indicate it's a vehicle)
+    if ((!year || !make) && !price) {
+      return null;
+    }
+
+    const vehicle: Vehicle = {
+      url: url || '',
+    };
+
+    if (year) vehicle.year = year;
+    if (make) vehicle.make = make;
+    if (model) vehicle.model = model;
+    if (price) vehicle.price = price;
+    if (mileage) vehicle.mileage = mileage;
+    if (image_url) vehicle.image_url = image_url;
+
+    // Use product ID as stock number if available
+    if (product.id) {
+      vehicle.stock_number = String(product.id);
     }
 
     return vehicle;
