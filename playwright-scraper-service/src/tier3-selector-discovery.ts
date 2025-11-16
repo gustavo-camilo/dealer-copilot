@@ -117,7 +117,7 @@ export class SelectorDiscovery {
 
           // Try tag-based selection (dt/dd pairs)
           const dts = element.querySelectorAll('dt, .label, .key');
-          for (const dt of dts) {
+          for (const dt of Array.from(dts)) {
             const text = dt.textContent?.toLowerCase() || '';
             for (const keyword of keywords) {
               if (text.includes(keyword)) {
