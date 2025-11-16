@@ -10,6 +10,9 @@ import { parseInventoryHTML } from './parser.ts';
 import { getSitemapCache, getActualListingDate, type SitemapCache } from './dateExtractor.ts';
 import { enrichVehicleWithVIN } from './vinDecoder.ts';
 
+// Playwright service URL (deployed on DigitalOcean)
+const PLAYWRIGHT_SERVICE_URL = Deno.env.get('PLAYWRIGHT_SERVICE_URL') || 'https://squid-app-vew3y.ondigitalocean.app';
+
 // CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -124,6 +127,48 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
   }
 
   return enhancedVehicles;
+}
+
+/**
+ * Call Playwright service to scrape a website
+ * This uses the new 4-tier extraction system for more robust scraping
+ */
+async function scrapeWithPlaywright(url: string): Promise<any[]> {
+  try {
+    console.log(`📞 Calling Playwright service for: ${url}`);
+
+    const response = await fetch(`${PLAYWRIGHT_SERVICE_URL}/scrape`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        url: url,
+        useCachedPattern: true, // Use cached patterns for speed
+        maxPages: 5, // Limit pagination to avoid long scrapes
+      }),
+      signal: AbortSignal.timeout(120000), // 2 minute timeout for Playwright
+    });
+
+    if (!response.ok) {
+      throw new Error(`Playwright service returned ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      console.error('❌ Playwright scrape failed:', result.error);
+      return [];
+    }
+
+    console.log(`✅ Playwright found ${result.vehicles.length} vehicles using Tier ${result.tier} (${result.confidence} confidence)`);
+    console.log(`   Duration: ${result.duration}ms`);
+
+    return result.vehicles;
+  } catch (error) {
+    console.error('❌ Failed to call Playwright service:', error.message);
+    return [];
+  }
 }
 
 /**
@@ -294,30 +339,38 @@ serve(async (req) => {
 
         let vehicles: any[] = [];
 
-        // Try each inventory URL
+        // Try each inventory URL with Playwright service
         for (const url of inventoryUrls) {
           try {
             console.log(`Fetching ${url}...`);
 
-            const response = await fetch(url, {
-              headers: {
-                'User-Agent':
-                  'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
-                Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-              },
-              signal: AbortSignal.timeout(30000), // 30 second timeout
-            });
+            // Try Playwright service first (more robust, handles JS-rendered content)
+            let pageVehicles = await scrapeWithPlaywright(url);
 
-            if (!response.ok) {
-              console.log(`HTTP ${response.status} for ${url}, skipping...`);
-              continue;
+            // Fallback to old HTML parsing if Playwright service fails
+            if (pageVehicles.length === 0) {
+              console.log('⚠️  Playwright service returned no vehicles, falling back to HTML parsing...');
+
+              const response = await fetch(url, {
+                headers: {
+                  'User-Agent':
+                    'Mozilla/5.0 (compatible; DealerCopilotBot/1.0; +https://dealer-copilot.com/bot)',
+                  Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                  'Accept-Language': 'en-US,en;q=0.5',
+                },
+                signal: AbortSignal.timeout(30000), // 30 second timeout
+              });
+
+              if (!response.ok) {
+                console.log(`HTTP ${response.status} for ${url}, skipping...`);
+                continue;
+              }
+
+              const html = await response.text();
+
+              // Parse inventory from HTML
+              pageVehicles = parseInventoryHTML(html, url);
             }
-
-            const html = await response.text();
-
-            // Parse inventory from HTML
-            const pageVehicles = parseInventoryHTML(html, url);
 
             console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
 
