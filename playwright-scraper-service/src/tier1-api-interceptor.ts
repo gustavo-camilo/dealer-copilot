@@ -372,14 +372,38 @@ export class APIInterceptor {
 
     // Extract mileage from title or body_html
     let mileage: number | undefined;
-    const mileageMatch = title.match(/(\d{1,3}(?:,\d{3})*)\s*(miles?|mi|km)/i);
+    const mileageMatch = title.match(/(\d{1,3}(?:,\d{3})*)\s*(miles?|mi)\b/i);
     if (mileageMatch) {
-      mileage = parseInt(mileageMatch[1].replace(/,/g, ''));
-    } else if (product.body_html) {
-      const bodyMatch = product.body_html.match(/(\d{1,3}(?:,\d{3})*)\s*(miles?|mi|km)/i);
-      if (bodyMatch) {
-        mileage = parseInt(bodyMatch[1].replace(/,/g, ''));
+      const miles = parseInt(mileageMatch[1].replace(/,/g, ''));
+      // Sanity check: mileage should be reasonable (not year or price)
+      if (miles >= 100 && miles <= 500000) {
+        mileage = miles;
       }
+    } else if (product.body_html) {
+      const bodyMatch = product.body_html.match(/(\d{1,3}(?:,\d{3})*)\s*(miles?|mi)\b/i);
+      if (bodyMatch) {
+        const miles = parseInt(bodyMatch[1].replace(/,/g, ''));
+        if (miles >= 100 && miles <= 500000) {
+          mileage = miles;
+        }
+      }
+    }
+
+    // Extract VIN from body_html if available
+    let vin: string | undefined;
+    if (product.body_html) {
+      const vinMatch = product.body_html.match(/\bVIN[:\s#]*([A-HJ-NPR-Z0-9]{17})\b/i);
+      if (vinMatch) {
+        vin = vinMatch[1].toUpperCase();
+      }
+    }
+
+    // Extract listing date from published_at or created_at
+    let listing_date: Date | undefined;
+    if (product.published_at) {
+      listing_date = new Date(product.published_at);
+    } else if (product.created_at) {
+      listing_date = new Date(product.created_at);
     }
 
     // Build URL from handle
@@ -400,11 +424,15 @@ export class APIInterceptor {
     if (price) vehicle.price = price;
     if (mileage) vehicle.mileage = mileage;
     if (image_url) vehicle.image_url = image_url;
+    if (vin) vehicle.vin = vin;
+    if (listing_date) vehicle.listing_date = listing_date;
 
     // Use product ID as stock number if available
     if (product.id) {
       vehicle.stock_number = String(product.id);
     }
+
+    console.log(`  📦 Extracted: ${year || '?'} ${make || '?'} ${model || '?'} ${vin ? `VIN:${vin.slice(-6)}` : 'no VIN'} ${listing_date ? `Listed:${listing_date.toISOString().split('T')[0]}` : ''}`);
 
     return vehicle;
   }
