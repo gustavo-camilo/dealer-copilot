@@ -2,6 +2,23 @@
 
 This guide walks you through deploying the Playwright Scraper Service to production.
 
+## 🚨 Recent Updates (IMPORTANT)
+
+### Latest Fix: SSL/TLS Certificate Errors (2024-11-16)
+
+**Issues Resolved:**
+- ✅ Fixed `TLS_error:CERTIFICATE_VERIFY_FAILED` errors in DigitalOcean App Platform
+- ✅ Updated Claude model from deprecated `claude-3-5-sonnet-20240620` to latest `claude-sonnet-4-5-20250929`
+- ✅ Added browser flags for containerized environments
+
+**Files Changed:**
+- `src/scraper.ts` - Added SSL/TLS certificate handling flags
+- `src/tier4-llm-vision.ts` - Updated Claude API model to claude-sonnet-4-5-20250929
+
+**Action Required:** If you're experiencing scraping failures, redeploy immediately using instructions below.
+
+---
+
 ## Prerequisites
 
 - [ ] Supabase project with database access
@@ -178,6 +195,142 @@ git push
 
 # Railway will automatically redeploy
 ```
+
+---
+
+## Deploy to DigitalOcean App Platform
+
+DigitalOcean App Platform is a good alternative to Railway with competitive pricing and good performance.
+
+### 1. Prerequisites
+
+- DigitalOcean account (sign up at https://cloud.digitalocean.com)
+- GitHub repository with your code (already done if following this guide)
+- Payment method added to DigitalOcean
+
+### 2. Create New App
+
+1. Go to https://cloud.digitalocean.com/apps
+2. Click **Create App**
+3. Select **GitHub** as source
+4. Choose your repository
+5. Select the branch (e.g., `main` or your feature branch)
+6. Click **Next**
+
+### 3. Configure App
+
+**App Settings:**
+- **Type**: Web Service
+- **Dockerfile Path**: `Dockerfile` (auto-detected)
+- **HTTP Port**: 3000
+- **HTTP Request Routes**: `/`
+
+**Resources:**
+- **Plan**: Basic ($5/month minimum)
+- **RAM**: 512 MB (minimum) or 1 GB (recommended)
+- **CPU**: 1 vCPU
+
+Click **Next**
+
+### 4. Set Environment Variables
+
+Click **Edit** next to Environment Variables and add:
+
+```
+SUPABASE_URL=https://YOUR_PROJECT.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
+ANTHROPIC_API_KEY=sk-ant-your-api-key
+PORT=3000
+```
+
+**Important**: Mark sensitive variables (API keys) as **Encrypted**
+
+Click **Next**
+
+### 5. Deploy
+
+1. Review your configuration
+2. Click **Create Resources**
+3. Wait 5-10 minutes for deployment
+4. Once deployed, you'll get a URL like: `https://your-app-name.ondigitalocean.app`
+
+### 6. Test Deployment
+
+```bash
+# Test health endpoint
+curl https://your-app-name.ondigitalocean.app/health
+
+# Test scraping
+curl -X POST https://your-app-name.ondigitalocean.app/scrape \
+  -H "Content-Type: application/json" \
+  -d '{"url":"https://rpm-motors.us","useCachedPattern":true}'
+```
+
+### 7. Update Existing Deployment (IMPORTANT FOR FIXES)
+
+If you've already deployed and need to apply the latest SSL/TLS fixes:
+
+**Option A: Force Rebuild (Fastest)**
+1. Go to your app in DigitalOcean dashboard
+2. Click **Settings** tab
+3. Scroll to **App-Level Configuration**
+4. Click **Force Rebuild and Deploy**
+5. Confirm - this will pull latest code and rebuild
+
+**Option B: Trigger via Git Push**
+1. Push your latest changes to GitHub
+2. DigitalOcean auto-deploys on git push (if enabled)
+3. Monitor deployment in **Activity** tab
+
+**Option C: Using doctl CLI**
+```bash
+# Install doctl
+brew install doctl  # macOS
+# or
+snap install doctl  # Linux
+
+# Authenticate
+doctl auth init
+
+# List apps
+doctl apps list
+
+# Create deployment
+doctl apps create-deployment <APP_ID>
+```
+
+### 8. Monitor Logs
+
+1. Go to your app dashboard
+2. Click **Runtime Logs** tab
+3. Look for:
+   ```
+   ✅ Browser initialized
+   🚀 Playwright Scraper Service
+   Running on port 3000
+   ✅ Ready to accept requests
+   ```
+
+### DigitalOcean Troubleshooting
+
+**Issue: "Build failed"**
+- Check build logs for specific error
+- Verify Dockerfile is correct
+- Ensure all npm packages are in package.json
+
+**Issue: "App crashes on startup"**
+- Check environment variables are set
+- View runtime logs for error messages
+- Common cause: missing env vars (service exits immediately)
+
+**Issue: "Out of memory"**
+- Upgrade to 1 GB RAM plan
+- Go to Settings → Resources → Edit Plan
+
+**Issue: "SSL/TLS certificate errors"**
+- Ensure you've deployed the latest code with certificate fixes
+- Force rebuild if needed (see step 7)
+- Check that browser flags are present in `scraper.ts`
 
 ---
 
