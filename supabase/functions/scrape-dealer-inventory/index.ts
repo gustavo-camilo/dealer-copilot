@@ -30,6 +30,9 @@ interface ScrapingResult {
   status: 'success' | 'partial' | 'failed';
   error?: string;
   duration_ms: number;
+  scraper_method?: 'playwright' | 'html_parser' | 'mixed';
+  playwright_tier?: string;
+  playwright_confidence?: string;
 }
 
 /**
@@ -133,7 +136,7 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
  * Call Playwright service to scrape a website
  * This uses the new 4-tier extraction system for more robust scraping
  */
-async function scrapeWithPlaywright(url: string): Promise<any[]> {
+async function scrapeWithPlaywright(url: string): Promise<{ vehicles: any[], tier?: string, confidence?: string }> {
   try {
     console.log(`📞 Calling Playwright service for: ${url}`);
 
@@ -158,16 +161,20 @@ async function scrapeWithPlaywright(url: string): Promise<any[]> {
 
     if (!result.success) {
       console.error('❌ Playwright scrape failed:', result.error);
-      return [];
+      return { vehicles: [], tier: result.tier, confidence: result.confidence };
     }
 
     console.log(`✅ Playwright found ${result.vehicles.length} vehicles using Tier ${result.tier} (${result.confidence} confidence)`);
     console.log(`   Duration: ${result.duration}ms`);
 
-    return result.vehicles;
+    return {
+      vehicles: result.vehicles,
+      tier: result.tier,
+      confidence: result.confidence
+    };
   } catch (error) {
     console.error('❌ Failed to call Playwright service:', error.message);
-    return [];
+    return { vehicles: [] };
   }
 }
 
@@ -338,6 +345,10 @@ serve(async (req) => {
         console.log(`Found ${inventoryUrls.length} inventory URL(s) to scrape`);
 
         let vehicles: any[] = [];
+        let usedPlaywright = false;
+        let usedHtmlParser = false;
+        let playwrightTier: string | undefined;
+        let playwrightConfidence: string | undefined;
 
         // Try each inventory URL with Playwright service
         for (const url of inventoryUrls) {
@@ -345,11 +356,13 @@ serve(async (req) => {
             console.log(`Fetching ${url}...`);
 
             // Try Playwright service first (more robust, handles JS-rendered content)
-            let pageVehicles = await scrapeWithPlaywright(url);
+            const playwrightResult = await scrapeWithPlaywright(url);
+            let pageVehicles = playwrightResult.vehicles;
 
             // Fallback to old HTML parsing if Playwright service fails
             if (pageVehicles.length === 0) {
               console.log('⚠️  Playwright service returned no vehicles, falling back to HTML parsing...');
+              usedHtmlParser = true;
 
               const response = await fetch(url, {
                 headers: {
@@ -370,6 +383,10 @@ serve(async (req) => {
 
               // Parse inventory from HTML
               pageVehicles = parseInventoryHTML(html, url);
+            } else {
+              usedPlaywright = true;
+              playwrightTier = playwrightResult.tier;
+              playwrightConfidence = playwrightResult.confidence;
             }
 
             console.log(`Found ${pageVehicles.length} vehicles on ${url}`);
@@ -385,6 +402,15 @@ serve(async (req) => {
         }
 
         console.log(`Found ${vehicles.length} vehicles on ${tenant.name}`);
+
+        // Log which scraper method was used
+        if (usedPlaywright && !usedHtmlParser) {
+          console.log(`🚀 Used Playwright scraper - Tier ${playwrightTier} (${playwrightConfidence} confidence)`);
+        } else if (usedPlaywright && usedHtmlParser) {
+          console.log(`🔀 Used mixed scraping - Playwright (Tier ${playwrightTier}) + HTML Parser`);
+        } else {
+          console.log(`📄 Used legacy HTML parser`);
+        }
 
         // Log sample of what we found
         if (vehicles.length > 0) {
@@ -439,6 +465,14 @@ serve(async (req) => {
           },
         });
 
+        // Determine which scraper method was used
+        let scraperMethod: 'playwright' | 'html_parser' | 'mixed' = 'html_parser';
+        if (usedPlaywright && !usedHtmlParser) {
+          scraperMethod = 'playwright';
+        } else if (usedPlaywright && usedHtmlParser) {
+          scraperMethod = 'mixed';
+        }
+
         results.push({
           tenant_id: tenant.id,
           tenant_name: tenant.name,
@@ -449,6 +483,9 @@ serve(async (req) => {
           sold_vehicles: soldVehicles,
           status: 'success',
           duration_ms: Date.now() - tenantStartTime,
+          scraper_method: scraperMethod,
+          playwright_tier: playwrightTier,
+          playwright_confidence: playwrightConfidence,
         });
       } catch (error) {
         console.error(`Error scraping ${tenant.name}:`, error);
