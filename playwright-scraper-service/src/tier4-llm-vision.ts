@@ -33,7 +33,7 @@ export class LLMVisionExtractor {
 
       // Call Claude Vision API
       const response = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 4096,
         messages: [
           {
@@ -143,7 +143,7 @@ Return ONLY the JSON array, no other text.`,
 
       // Ask Claude to identify the selectors used
       const response = await this.anthropic.messages.create({
-        model: 'claude-3-5-sonnet-20240620',
+        model: 'claude-3-5-sonnet-20241022',
         max_tokens: 1024,
         messages: [
           {

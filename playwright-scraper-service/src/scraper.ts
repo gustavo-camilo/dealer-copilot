@@ -37,6 +37,10 @@ export class RobustScraper {
           '--disable-setuid-sandbox',
           '--disable-dev-shm-usage',
           '--disable-blink-features=AutomationControlled',
+          '--disable-web-security',
+          '--disable-features=IsolateOrigins,site-per-process',
+          '--ignore-certificate-errors',
+          '--allow-insecure-localhost',
         ],
       });
       console.log('✅ Browser initialized');
