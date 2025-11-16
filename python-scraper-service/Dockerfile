@@ -26,12 +26,13 @@ RUN apt-get update && apt-get install -y \
     xdg-utils \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Chrome
-RUN wget -q -O - https://dl-ssl.google.com/linux/linux_signing_key.pub | apt-key add - \
-    && echo "deb http://dl.google.com/linux/chrome/deb/ stable main" >> /etc/apt/sources.list.d/google.list \
+# Install Chrome (modern apt key method for Debian 13+)
+RUN wget -q -O /tmp/google-chrome-key.pub https://dl-ssl.google.com/linux/linux_signing_key.pub \
+    && gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg /tmp/google-chrome-key.pub \
+    && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list \
     && apt-get update \
     && apt-get install -y google-chrome-stable \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* /tmp/google-chrome-key.pub
 
 # Set working directory
 WORKDIR /app
@@ -51,5 +52,6 @@ ENV PORT=3000
 EXPOSE 3000
 
 # Run with gunicorn for production
-# Using 1 worker for Basic plan (512MB RAM) - increase to 2-4 for Professional plan
-CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "1", "--timeout", "120", "--worker-class", "sync", "src.app:app"]
+# Optimized for Professional plan (1GB RAM, 2 workers for concurrent scrapes)
+# For Basic plan (512MB): reduce --workers to 1
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "2", "--timeout", "120", "src.app:app"]
