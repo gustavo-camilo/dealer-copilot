@@ -44,6 +44,17 @@ class VehicleScraper:
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--window-size=1920,1080')
 
+        # Memory optimization for Basic plan (512MB RAM)
+        options.add_argument('--disable-gpu')
+        options.add_argument('--disable-software-rasterizer')
+        options.add_argument('--disable-extensions')
+        options.add_argument('--disable-plugins')
+        options.add_argument('--single-process')  # Risky but saves memory
+        options.add_argument('--no-zygote')  # Reduces memory footprint
+
+        # Set memory limits
+        options.add_argument('--js-flags=--max-old-space-size=256')  # Limit JS heap
+
         # Use undetected-chromedriver (better bot bypass than Playwright)
         self.driver = uc.Chrome(options=options, version_main=None)
 
@@ -300,8 +311,8 @@ class VehicleScraper:
             if product.get('images') and len(product['images']) > 0:
                 image_url = product['images'][0].get('src')
 
-            # Detail URL
-            detail_url = f"{base_url}/products/{product.get('handle', '')}" if product.get('handle') else None
+            # Detail URL (Edge Function expects 'url' field)
+            url = f"{base_url}/products/{product.get('handle', '')}" if product.get('handle') else None
 
             # Listing date
             listing_date = None
@@ -318,7 +329,7 @@ class VehicleScraper:
                 "mileage": mileage,
                 "vin": vin,
                 "image_url": image_url,
-                "detail_url": detail_url,
+                "url": url,  # Edge Function expects 'url' not 'detail_url'
                 "listing_date": listing_date,
                 "stock_number": str(product.get('id', '')),
                 "title": title
@@ -505,11 +516,11 @@ class VehicleScraper:
             mileage_match = re.search(r'(\d{1,3}(?:,\d{3})*)\s*(?:miles|mi)', text, re.IGNORECASE)
             mileage = int(mileage_match.group(1).replace(',', '')) if mileage_match else None
 
-            # Try to get link
-            detail_url = None
+            # Try to get link (Edge Function expects 'url' field)
+            url = None
             try:
                 link = element.find_element(By.TAG_NAME, 'a')
-                detail_url = link.get_attribute('href')
+                url = link.get_attribute('href')
             except:
                 pass
 
@@ -517,7 +528,7 @@ class VehicleScraper:
                 "year": year,
                 "price": price,
                 "mileage": mileage,
-                "detail_url": detail_url,
+                "url": url,
                 "title": text[:100]
             }
 

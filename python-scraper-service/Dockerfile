@@ -51,4 +51,5 @@ ENV PORT=3000
 EXPOSE 3000
 
 # Run with gunicorn for production
-CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "2", "--timeout", "120", "src.app:app"]
+# Using 1 worker for Basic plan (512MB RAM) - increase to 2-4 for Professional plan
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "1", "--timeout", "120", "--worker-class", "sync", "src.app:app"]
