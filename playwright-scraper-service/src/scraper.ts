@@ -3,13 +3,18 @@
  * Coordinates all 4 extraction tiers and manages browser automation
  */
 
-import { chromium, Browser, Page } from 'playwright';
+import { chromium } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { Browser, Page } from 'playwright';
 import { APIInterceptor } from './tier1-api-interceptor.js';
 import { StructuredDataParser } from './tier2-structured-data.js';
 import { SelectorDiscovery } from './tier3-selector-discovery.js';
 import { LLMVisionExtractor } from './tier4-llm-vision.js';
 import { PatternCache } from './pattern-cache.js';
 import { Vehicle, ScrapeRequest, ScrapeResponse, DomainPattern } from './types.js';
+
+// Enable stealth plugin to avoid bot detection
+chromium.use(StealthPlugin());
 
 export class RobustScraper {
   private browser: Browser | null = null;
@@ -43,7 +48,7 @@ export class RobustScraper {
           '--allow-insecure-localhost',
         ],
       });
-      console.log('✅ Browser initialized');
+      console.log('✅ Browser initialized with stealth mode');
     }
   }
 
