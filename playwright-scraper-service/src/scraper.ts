@@ -3,13 +3,18 @@
  * Coordinates all 4 extraction tiers and manages browser automation
  */
 
-import { chromium, Browser, Page } from 'playwright';
+import { chromium } from 'playwright-extra';
+import StealthPlugin from 'puppeteer-extra-plugin-stealth';
+import { Browser, Page } from 'playwright';
 import { APIInterceptor } from './tier1-api-interceptor.js';
 import { StructuredDataParser } from './tier2-structured-data.js';
 import { SelectorDiscovery } from './tier3-selector-discovery.js';
 import { LLMVisionExtractor } from './tier4-llm-vision.js';
 import { PatternCache } from './pattern-cache.js';
 import { Vehicle, ScrapeRequest, ScrapeResponse, DomainPattern } from './types.js';
+
+// Enable stealth plugin to avoid bot detection
+chromium.use(StealthPlugin());
 
 export class RobustScraper {
   private browser: Browser | null = null;
@@ -43,7 +48,7 @@ export class RobustScraper {
           '--allow-insecure-localhost',
         ],
       });
-      console.log('✅ Browser initialized');
+      console.log('✅ Browser initialized with stealth mode');
     }
   }
 
@@ -63,6 +68,8 @@ export class RobustScraper {
    */
   async scrape(request: ScrapeRequest): Promise<ScrapeResponse> {
     const startTime = Date.now();
+    let context;
+    let page;
 
     try {
       await this.initialize();
@@ -79,14 +86,14 @@ export class RobustScraper {
         cachedPattern = await this.patternCache.get(domain);
       }
 
-      const context = await this.browser!.newContext({
+      context = await this.browser!.newContext({
         userAgent:
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         viewport: { width: 1920, height: 1080 },
         locale: 'en-US',
       });
 
-      const page = await context.newPage();
+      page = await context.newPage();
 
       // Set up API interceptor before navigation
       const apiInterceptor = new APIInterceptor();
@@ -107,14 +114,20 @@ export class RobustScraper {
       await page.waitForTimeout(2000);
 
       // Check if this is a Shopify store and proactively fetch products API
-      const isShopify = await page.evaluate(() => {
-        return !!(window as any).Shopify || document.querySelector('[data-shopify]') !== null;
-      });
+      let isShopify = false;
+      try {
+        isShopify = await page.evaluate(() => {
+          return !!(window as any).Shopify || document.querySelector('[data-shopify]') !== null;
+        }).catch(() => false);
+      } catch (e) {
+        // Page might have navigated, continue without Shopify detection
+        console.log('⚠️ Could not detect Shopify (page might have navigated)');
+      }
 
       if (isShopify) {
         console.log('🛍️ Detected Shopify store, fetching products API...');
         try {
-          // Fetch products API directly without navigation to preserve page state
+          // Fetch products API using Playwright's native request context (more reliable)
           const currentUrl = new URL(request.url);
           const apiUrls = [
             `${currentUrl.origin}/products.json`,
@@ -123,28 +136,29 @@ export class RobustScraper {
 
           for (const apiUrl of apiUrls) {
             try {
-              const response = await page.evaluate(async (url) => {
-                const res = await fetch(url);
-                return await res.json();
-              }, apiUrl);
+              // Use context.request instead of page.evaluate to avoid execution context issues
+              const response = await context.request.get(apiUrl);
 
-              if (response && response.products) {
-                console.log(`✅ Fetched Shopify API: ${apiUrl} (${response.products.length} products)`);
-                // Manually trigger the API interceptor with this data
-                apiInterceptor['apiResponses'].push({
-                  url: apiUrl,
-                  data: response,
-                  method: 'GET'
-                });
-                break;
+              if (response.ok()) {
+                const data = await response.json();
+                if (data && data.products) {
+                  console.log(`✅ Fetched Shopify API: ${apiUrl} (${data.products.length} products)`);
+                  // Manually inject into API interceptor
+                  apiInterceptor['apiResponses'].push({
+                    url: apiUrl,
+                    data: data,
+                    method: 'GET'
+                  });
+                  break;
+                }
               }
             } catch (e: any) {
               // Try next URL
               console.log(`⚠️ Failed to fetch ${apiUrl}: ${e?.message || 'Unknown error'}`);
             }
           }
-        } catch (error) {
-          console.log('⚠️ Failed to fetch Shopify API, continuing...');
+        } catch (error: any) {
+          console.log(`⚠️ Failed to fetch Shopify API: ${error?.message || 'Unknown error'}, continuing...`);
         }
       }
 
@@ -278,8 +292,6 @@ export class RobustScraper {
         }
       }
 
-      await context.close();
-
       // If still no result, return failure
       if (!result) {
         return {
@@ -309,6 +321,15 @@ export class RobustScraper {
         pagesScraped: 0,
         duration: Date.now() - startTime,
       };
+    } finally {
+      // Always close context to prevent resource leaks
+      try {
+        if (context) {
+          await context.close();
+        }
+      } catch (e) {
+        // Ignore cleanup errors
+      }
     }
   }
 
