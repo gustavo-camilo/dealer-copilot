@@ -49,10 +49,14 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
     const batch = vehicles.slice(i, Math.min(i + concurrencyLimit, vehicles.length));
 
     const batchPromises = batch.map(async (vehicle) => {
-      // If vehicle has a URL, try to fetch the detail page for VIN/mileage
-      if (vehicle.url) {
+      // Check if we have all critical data already
+      const hasCriticalData = vehicle.year && vehicle.make && vehicle.model &&
+                              vehicle.price && vehicle.mileage && vehicle.vin;
+
+      // Only fetch detail page if missing critical information
+      if (vehicle.url && !hasCriticalData) {
         try {
-          console.log(`Fetching details for ${vehicle.year} ${vehicle.make} ${vehicle.model || ''} at ${vehicle.url}`);
+          console.log(`⚠️ Missing critical data for ${vehicle.year} ${vehicle.make} ${vehicle.model || ''} - fetching details...`);
 
           const response = await fetch(vehicle.url, {
             headers: {
@@ -86,20 +90,17 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
                   vin: detailVehicle.vin || vehicle.vin,
                   stock_number: detailVehicle.stock_number || vehicle.stock_number,
                   mileage: detailVehicle.mileage || vehicle.mileage,
-                  trim: detailVehicle.trim || vehicle.trim,
-                  color: detailVehicle.color || vehicle.color,
+                  // Don't fetch trim/color - not needed
                   // Prefer detail page model if listing page didn't have it
                   model: vehicle.model || detailVehicle.model,
-                  // Use detail page image if it exists, otherwise keep listing image
-                  images: (detailVehicle.images && detailVehicle.images.length > 0)
-                          ? detailVehicle.images
-                          : (vehicle.images && vehicle.images.length > 0)
-                            ? vehicle.images
-                            : [],
-                  imageDate: detailVehicle.imageDate || vehicle.imageDate,
+                  // Only keep first image - use detail page first image if exists
+                  image_url: vehicle.image_url || (detailVehicle.images && detailVehicle.images.length > 0
+                                                   ? detailVehicle.images[0]
+                                                   : null),
                   url: vehicle.url, // Always keep the original URL
                 };
 
+                console.log(`✅ Enhanced with detail page data`);
                 // If we have a VIN but still missing year/make/model, try VIN decoder
                 return await enrichVehicleWithVIN(merged);
               } else {
@@ -114,6 +115,9 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
         } catch (error) {
           console.log(`Failed to fetch details for ${vehicle.url}: ${error.message}`);
         }
+      } else if (vehicle.url && hasCriticalData) {
+        // Skip detail page fetch - already have all critical data
+        console.log(`✅ ${vehicle.year} ${vehicle.make} ${vehicle.model} - all critical data present, skipping detail fetch`);
       }
 
       // If we have VIN but missing data, try VIN decoder as final fallback

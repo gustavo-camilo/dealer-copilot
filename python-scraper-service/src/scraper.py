@@ -308,10 +308,10 @@ class VehicleScraper:
 
             # Image URL
             image_url = None
-            if product.get('images') and len(product['images']) > 0:
+            if product.get('images') and len(product['images') > 0:
                 image_url = product['images'][0].get('src')
 
-            # Detail URL (Edge Function expects 'url' field)
+            # Detail URL (Edge Function expects 'url' field, not 'detail_url')
             url = f"{base_url}/products/{product.get('handle', '')}" if product.get('handle') else None
 
             # Listing date
@@ -329,7 +329,7 @@ class VehicleScraper:
                 "mileage": mileage,
                 "vin": vin,
                 "image_url": image_url,
-                "url": url,  # Edge Function expects 'url' not 'detail_url'
+                "url": url,  # Edge Function expects 'url' for detail page enhancement
                 "listing_date": listing_date,
                 "stock_number": str(product.get('id', '')),
                 "title": title
