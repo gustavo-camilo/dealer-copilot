@@ -274,6 +274,7 @@ serve(async (req) => {
   }
 
   const startTime = Date.now();
+  const MAX_EXECUTION_TIME = 100000; // 100 seconds (leave buffer before 120s timeout)
 
   try {
     // Initialize Supabase client with service role
@@ -320,6 +321,12 @@ serve(async (req) => {
     const results: ScrapingResult[] = [];
 
     for (const tenant of tenants) {
+      // Check if we're approaching timeout - leave time to return response
+      if (Date.now() - startTime > MAX_EXECUTION_TIME) {
+        console.log(`⏰ Approaching timeout, stopping after ${results.length} tenants`);
+        break;
+      }
+
       const tenantStartTime = Date.now();
 
       try {
@@ -514,18 +521,23 @@ serve(async (req) => {
     }
 
     const totalDuration = Date.now() - startTime;
+    const timedOut = totalDuration > MAX_EXECUTION_TIME;
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Scraped ${results.length} tenant(s) in ${totalDuration}ms`,
+        message: timedOut
+          ? `Scraped ${results.length}/${tenants.length} tenant(s) in ${totalDuration}ms (timeout reached)`
+          : `Scraped ${results.length} tenant(s) in ${totalDuration}ms`,
         results,
         summary: {
           total_tenants: results.length,
+          requested_tenants: tenants.length,
           successful: results.filter((r) => r.status === 'success').length,
           failed: results.filter((r) => r.status === 'failed').length,
           total_vehicles: results.reduce((sum, r) => sum + r.vehicles_found, 0),
           duration_ms: totalDuration,
+          timed_out: timedOut,
         },
       }),
       {

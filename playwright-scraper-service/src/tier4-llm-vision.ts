@@ -22,14 +22,20 @@ export class LLMVisionExtractor {
     console.log(`🤖 Tier 4: Using Claude Vision...`);
 
     try {
-      // Take full-page screenshot
+      // Take viewport screenshot only (not full page) to stay under 5MB limit
+      // Full page screenshots can exceed Claude's 5MB limit on long pages
       const screenshot = await page.screenshot({
-        fullPage: true,
-        type: 'png',
+        fullPage: false, // Changed from true to false
+        type: 'jpeg', // Changed from png to jpeg for smaller size
+        quality: 80, // Compress to ~80% quality
       });
 
       // Convert to base64
       const base64Image = screenshot.toString('base64');
+
+      // Check size (for debugging)
+      const sizeInMB = (base64Image.length * 0.75) / (1024 * 1024); // base64 is ~33% larger
+      console.log(`📸 Screenshot size: ${sizeInMB.toFixed(2)} MB`);
 
       // Call Claude Vision API
       const response = await this.anthropic.messages.create({
