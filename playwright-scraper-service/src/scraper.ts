@@ -63,6 +63,8 @@ export class RobustScraper {
    */
   async scrape(request: ScrapeRequest): Promise<ScrapeResponse> {
     const startTime = Date.now();
+    let context;
+    let page;
 
     try {
       await this.initialize();
@@ -79,14 +81,14 @@ export class RobustScraper {
         cachedPattern = await this.patternCache.get(domain);
       }
 
-      const context = await this.browser!.newContext({
+      context = await this.browser!.newContext({
         userAgent:
           'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
         viewport: { width: 1920, height: 1080 },
         locale: 'en-US',
       });
 
-      const page = await context.newPage();
+      page = await context.newPage();
 
       // Set up API interceptor before navigation
       const apiInterceptor = new APIInterceptor();
@@ -285,8 +287,6 @@ export class RobustScraper {
         }
       }
 
-      await context.close();
-
       // If still no result, return failure
       if (!result) {
         return {
@@ -316,6 +316,15 @@ export class RobustScraper {
         pagesScraped: 0,
         duration: Date.now() - startTime,
       };
+    } finally {
+      // Always close context to prevent resource leaks
+      try {
+        if (context) {
+          await context.close();
+        }
+      } catch (e) {
+        // Ignore cleanup errors
+      }
     }
   }
 
