@@ -114,26 +114,35 @@ export class RobustScraper {
       if (isShopify) {
         console.log('🛍️ Detected Shopify store, fetching products API...');
         try {
-          // Try to fetch products from collection or all products
+          // Fetch products API directly without navigation to preserve page state
           const currentUrl = new URL(request.url);
           const apiUrls = [
-            `${currentUrl.origin}${currentUrl.pathname}.json`,
             `${currentUrl.origin}/products.json`,
             `${currentUrl.origin}/collections/all/products.json`,
           ];
 
           for (const apiUrl of apiUrls) {
             try {
-              await page.goto(apiUrl, { waitUntil: 'networkidle', timeout: 10000 });
-              console.log(`✅ Fetched Shopify API: ${apiUrl}`);
-              break;
-            } catch (e) {
+              const response = await page.evaluate(async (url) => {
+                const res = await fetch(url);
+                return await res.json();
+              }, apiUrl);
+
+              if (response && response.products) {
+                console.log(`✅ Fetched Shopify API: ${apiUrl} (${response.products.length} products)`);
+                // Manually trigger the API interceptor with this data
+                apiInterceptor['apiResponses'].push({
+                  url: apiUrl,
+                  data: response,
+                  method: 'GET'
+                });
+                break;
+              }
+            } catch (e: any) {
               // Try next URL
+              console.log(`⚠️ Failed to fetch ${apiUrl}: ${e?.message || 'Unknown error'}`);
             }
           }
-
-          // Go back to original page
-          await page.goto(request.url, { waitUntil: 'networkidle', timeout: 10000 });
         } catch (error) {
           console.log('⚠️ Failed to fetch Shopify API, continuing...');
         }
