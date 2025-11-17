@@ -44,12 +44,13 @@ COPY src/ ./src/
 
 # Set environment variables
 ENV PYTHONUNBUFFERED=1 \
-    PORT=3000
+    PORT=3000 \
+    PYTHONPATH=/app
 
 # Expose port
 EXPOSE 3000
 
-# Run with gunicorn for production
+# Run with gunicorn for production (using absolute import path)
 # Optimized for Professional plan (1GB RAM, 2 workers for concurrent scrapes)
 # For Basic plan (512MB): reduce --workers to 1
-CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "2", "--timeout", "120", "src.app:app"]
+CMD ["gunicorn", "--bind", "0.0.0.0:3000", "--workers", "2", "--timeout", "120", "--chdir", "/app", "src.app:app"]
