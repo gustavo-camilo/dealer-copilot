@@ -44,17 +44,6 @@ class VehicleScraper:
         options.add_argument('--ignore-certificate-errors')
         options.add_argument('--window-size=1920,1080')
 
-        # Memory optimization for Basic plan (512MB RAM)
-        options.add_argument('--disable-gpu')
-        options.add_argument('--disable-software-rasterizer')
-        options.add_argument('--disable-extensions')
-        options.add_argument('--disable-plugins')
-        options.add_argument('--single-process')  # Risky but saves memory
-        options.add_argument('--no-zygote')  # Reduces memory footprint
-
-        # Set memory limits
-        options.add_argument('--js-flags=--max-old-space-size=256')  # Limit JS heap
-
         # Use undetected-chromedriver (better bot bypass than Playwright)
         self.driver = uc.Chrome(options=options, version_main=None)
 
