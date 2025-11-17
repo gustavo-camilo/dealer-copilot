@@ -88,15 +88,15 @@ Copy this URL!
 
 ```bash
 # Health check
-curl https://python-scraper-xxxxx.ondigitalocean.app/health
+curl https://python-scraper-6tzlk.ondigitalocean.app/health
 
 # Test Shopify site
-curl -X POST https://python-scraper-xxxxx.ondigitalocean.app/scrape \
+curl -X POST https://python-scraper-6tzlk.ondigitalocean.app/scrape \
   -H "Content-Type: application/json" \
   -d '{"url":"https://rpm-motors.us"}' | jq .
 
 # Test problem sites
-curl -X POST https://python-scraper-xxxxx.ondigitalocean.app/scrape \
+curl -X POST https://python-scraper-6tzlk.ondigitalocean.app/scrape \
   -H "Content-Type: application/json" \
   -d '{"url":"https://nexautoga.com"}' | jq .
 ```
@@ -109,7 +109,7 @@ If you want your Edge Function to use the Python scraper instead:
 cd supabase
 
 # Set the new scraper URL
-supabase secrets set PYTHON_SCRAPER_URL=https://python-scraper-xxxxx.ondigitalocean.app
+supabase secrets set PYTHON_SCRAPER_URL=https://python-scraper-6tzlk.ondigitalocean.app
 
 # Update the code
 # In functions/scrape-dealer-inventory/index.ts

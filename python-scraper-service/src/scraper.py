@@ -297,7 +297,7 @@ class VehicleScraper:
 
             # Image URL
             image_url = None
-            if product.get('images') and len(product['images') > 0:
+            if product.get('images') and len(product['images']) > 0:
                 image_url = product['images'][0].get('src')
 
             # Detail URL (Edge Function expects 'url' field, not 'detail_url')

@@ -12,7 +12,7 @@ import { enrichVehicleWithVIN } from './vinDecoder.ts';
 
 // Scraper service URLs (deployed on DigitalOcean)
 // Python scraper has better bot detection bypass, try it first
-const PYTHON_SCRAPER_URL = Deno.env.get('PYTHON_SCRAPER_URL') || '';
+const PYTHON_SCRAPER_URL = Deno.env.get('PYTHON_SCRAPER_URL') || 'https://python-scraper-6tzlk.ondigitalocean.app';
 const PLAYWRIGHT_SERVICE_URL = Deno.env.get('PLAYWRIGHT_SERVICE_URL') || 'https://squid-app-vew3y.ondigitalocean.app';
 
 // CORS headers
