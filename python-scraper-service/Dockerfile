@@ -1,7 +1,7 @@
 FROM python:3.11-slim
 
-# Install Chrome dependencies
-RUN apt-get update && apt-get install -y \
+# Install Chrome dependencies and Chrome in one layer (faster + smaller)
+RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     gnupg \
     ca-certificates \
@@ -24,29 +24,27 @@ RUN apt-get update && apt-get install -y \
     libxkbcommon0 \
     libxrandr2 \
     xdg-utils \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Chrome (modern apt key method for Debian 13+)
-RUN wget -q -O /tmp/google-chrome-key.pub https://dl-ssl.google.com/linux/linux_signing_key.pub \
+    && wget -q -O /tmp/google-chrome-key.pub https://dl-ssl.google.com/linux/linux_signing_key.pub \
     && gpg --dearmor -o /usr/share/keyrings/google-chrome.gpg /tmp/google-chrome-key.pub \
     && echo "deb [arch=amd64 signed-by=/usr/share/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google.list \
     && apt-get update \
-    && apt-get install -y google-chrome-stable \
+    && apt-get install -y --no-install-recommends google-chrome-stable \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/google-chrome-key.pub
 
 # Set working directory
 WORKDIR /app
 
-# Copy requirements and install Python packages
+# Copy and install Python dependencies first (cached layer if requirements.txt unchanged)
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
+# Copy application code (separate layer for faster rebuilds)
 COPY src/ ./src/
 
 # Set environment variables
-ENV PYTHONUNBUFFERED=1
-ENV PORT=3000
+ENV PYTHONUNBUFFERED=1 \
+    PORT=3000
 
 # Expose port
 EXPOSE 3000
