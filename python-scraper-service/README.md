@@ -181,7 +181,7 @@ Update your Supabase Edge Function to use the Python scraper:
 
 const SCRAPER_SERVICE_URL =
   Deno.env.get('PYTHON_SCRAPER_URL') ||
-  'https://python-scraper-6tzlk.ondigitalocean.app';
+  'https://python-scraper-b7g4h.ondigitalocean.app';
 
 const response = await fetch(`${SCRAPER_SERVICE_URL}/scrape`, {
   method: 'POST',
@@ -192,7 +192,7 @@ const response = await fetch(`${SCRAPER_SERVICE_URL}/scrape`, {
 
 Then set the environment variable in Supabase:
 ```bash
-supabase secrets set PYTHON_SCRAPER_URL=https://python-scraper-6tzlk.ondigitalocean.app
+supabase secrets set PYTHON_SCRAPER_URL=https://python-scraper-b7g4h.ondigitalocean.app
 ```
 
 ## Testing Against Problem Sites
@@ -200,7 +200,7 @@ supabase secrets set PYTHON_SCRAPER_URL=https://python-scraper-6tzlk.ondigitaloc
 ### Test nexautoga.com
 
 ```bash
-curl -X POST https://python-scraper-6tzlk.ondigitalocean.app/scrape \
+curl -X POST https://python-scraper-b7g4h.ondigitalocean.app/scrape \
   -H "Content-Type: application/json" \
   -d '{"url":"https://nexautoga.com"}' | jq .
 ```
@@ -210,7 +210,7 @@ Expected: Should bypass bot detection and extract vehicles
 ### Test rpmmotorsfl.com
 
 ```bash
-curl -X POST https://python-scraper-6tzlk.ondigitalocean.app/scrape \
+curl -X POST https://python-scraper-b7g4h.ondigitalocean.app/scrape \
   -H "Content-Type: application/json" \
   -d '{"url":"https://rpmmotorsfl.com"}' | jq .
 ```
