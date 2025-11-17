@@ -20,13 +20,14 @@ import base64
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 import requests
-from anthropic import Anthropic
+from anthropic import Anthropic, Client as AnthropicClient
 import os
 
 class VehicleScraper:
     def __init__(self):
         self.driver = None
-        self.anthropic = Anthropic(api_key=os.getenv('ANTHROPIC_API_KEY'))
+        self.anthropic = None
+        self.anthropic_api_key = os.getenv('ANTHROPIC_API_KEY')
 
     def initialize_driver(self):
         """Initialize undetected Chrome driver"""
@@ -531,6 +532,11 @@ class VehicleScraper:
         print("\n🔹 TIER 4: Using Claude Vision (last resort)...")
 
         try:
+            client = self._get_anthropic_client()
+            if client is None:
+                print("⚠️  Anthropic client unavailable, skipping vision tier")
+                return None
+
             # Take screenshot
             screenshot_b64 = self.driver.get_screenshot_as_base64()
 
@@ -567,7 +573,7 @@ Requirements:
 - If you can't find vehicles, return {"vehicles": []}
 """
 
-            response = self.anthropic.messages.create(
+            response = client.messages.create(
                 model="claude-sonnet-4-5-20250929",
                 max_tokens=4096,
                 messages=[{
@@ -616,6 +622,30 @@ Requirements:
         except Exception as e:
             print(f"❌ Tier 4 failed: {str(e)}")
             return None
+
+    def _get_anthropic_client(self):
+        """Lazily initialize Anthropic client with compatibility fallback"""
+        if self.anthropic:
+            return self.anthropic
+
+        if not self.anthropic_api_key:
+            return None
+
+        try:
+            self.anthropic = Anthropic(api_key=self.anthropic_api_key)
+        except TypeError as e:
+            # Older anthropic SDKs might not accept certain kwargs (e.g., proxies); retry with legacy client
+            print(f"⚠️  Anthropic init TypeError, retrying with legacy client: {e}")
+            try:
+                self.anthropic = AnthropicClient(api_key=self.anthropic_api_key)
+            except Exception as legacy_error:
+                print(f"❌ Failed to initialize Anthropic legacy client: {legacy_error}")
+                self.anthropic = None
+        except Exception as e:
+            print(f"❌ Failed to initialize Anthropic client: {e}")
+            self.anthropic = None
+
+        return self.anthropic
 
     def _debug_failed_extraction(self):
         """Debug why extraction failed"""
