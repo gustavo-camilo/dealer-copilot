@@ -50,7 +50,7 @@ class VehicleScraper:
 
         print("✅ Driver initialized with anti-detection")
 
-    def scrape(self, url: str) -> Dict[str, Any]:
+    def scrape(self, url: str, timeout_ms: Optional[int] = None) -> Dict[str, Any]:
         """Main scrape orchestrator"""
         start_time = time.time()
 
@@ -61,7 +61,10 @@ class VehicleScraper:
 
             # Navigate to page
             print("📄 Loading page...")
-            self.driver.set_page_load_timeout(30)
+            page_timeout_sec = 30
+            if timeout_ms and timeout_ms > 0:
+                page_timeout_sec = max(5, min(int(timeout_ms / 1000), 180))
+            self.driver.set_page_load_timeout(page_timeout_sec)
 
             try:
                 self.driver.get(url)

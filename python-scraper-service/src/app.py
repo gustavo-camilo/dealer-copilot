@@ -47,10 +47,18 @@ def scrape():
             }), 400
 
         url = data['url']
+        timeout_ms = None
+
+        # Optional timeout override (milliseconds)
+        if isinstance(data.get('timeout'), (int, float)):
+            try:
+                timeout_ms = max(5000, min(int(data['timeout']), 180000))  # clamp 5s-180s
+            except Exception:
+                timeout_ms = None
 
         # Get scraper and scrape
         s = get_scraper()
-        result = s.scrape(url)
+        result = s.scrape(url, timeout_ms=timeout_ms)
 
         return jsonify(result)
 
