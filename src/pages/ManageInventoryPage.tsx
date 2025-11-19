@@ -320,10 +320,12 @@ export default function ManageInventoryPage() {
                 Your inventory is being processed
               </h2>
               <p className="text-blue-800 mb-4">
-                Our team is currently scraping your website. This usually takes 2-4 hours.
+                This usually takes a few minutes, but it can take up to 2-4 hours.
+                </br>
+                We appreciate your patience.
               </p>
               <p className="text-sm text-blue-700 mb-6">
-                You'll receive an email when your inventory data is ready to view.
+                You'll receive an email when your inventory assessment is ready to view.
               </p>
               <div className="bg-white rounded-lg p-6 max-w-md">
                 <h3 className="font-semibold text-gray-900 mb-3">While you wait, you can:</h3>
@@ -338,7 +340,7 @@ export default function ManageInventoryPage() {
                   </li>
                   <li className="flex items-center">
                     <span className="text-green-600 mr-2">✓</span>
-                    Explore the <Link to="/dashboard" className="text-blue-600 hover:underline">dashboard</Link>
+                    Explore the <Link to="/dashboard" className="text-blue-600 hover:underline"> dashboard</Link>
                   </li>
                 </ul>
               </div>
