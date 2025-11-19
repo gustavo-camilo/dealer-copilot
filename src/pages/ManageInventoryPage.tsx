@@ -321,7 +321,6 @@ export default function ManageInventoryPage() {
               </h2>
               <p className="text-blue-800 mb-4">
                 This usually takes a few minutes, but it can take up to 2-4 hours.
-                </br>
                 We appreciate your patience.
               </p>
               <p className="text-sm text-blue-700 mb-6">
