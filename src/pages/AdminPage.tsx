@@ -1,12 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Link, Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LayoutDashboard, Upload, Database, FileText, Clock, Menu, X } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import WaitingListCard from '../components/WaitingListCard';
-import NavigationMenu from '../components/NavigationMenu';
 
 interface UploadHistory {
   id: string;
@@ -52,11 +51,9 @@ interface PendingReview {
 }
 
 export default function AdminPage() {
-  const { user, tenant, signOut } = useAuth();
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [activeTab, setActiveTab] = useState<'tenants' | 'waiting-list' | 'upload' | 'history' | 'reviews'>('tenants');
-  const [menuOpen, setMenuOpen] = useState(false);
 
   // Check if user has access (super_admin or va_uploader)
   const isVAUploader = user?.role === 'va_uploader';
@@ -337,34 +334,15 @@ export default function AdminPage() {
                 {isVAUploader ? 'Dealer Co-Pilot - Upload Portal' : 'Dealer Co-Pilot Admin'}
               </span>
             </div>
-            <div className="flex items-center space-x-4 relative">
-              {!isVAUploader && <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>}
-              <Link
-                to="/dashboard"
-                className="hidden md:flex items-center text-gray-600 hover:text-gray-900"
-              >
+            <div className="flex items-center space-x-4">
+              <Link to="/dashboard" className="flex items-center text-gray-600 hover:text-gray-900">
                 <LayoutDashboard className="h-4 w-4 mr-2" />
                 Dashboard
               </Link>
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition"
-                  aria-label="Menu"
-                >
-                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </button>
-
-                {menuOpen && (
-                  <NavigationMenu
-                    currentPath={location.pathname}
-                    onClose={() => setMenuOpen(false)}
-                    onSignOut={handleSignOut}
-                    user={user}
-                    tenantName={tenant?.name}
-                  />
-                )}
-              </div>
+              <button onClick={handleSignOut} className="flex items-center text-red-600 hover:text-red-700">
+                <LogOut className="h-4 w-4 mr-2" />
+                Sign Out
+              </button>
             </div>
           </div>
         </div>

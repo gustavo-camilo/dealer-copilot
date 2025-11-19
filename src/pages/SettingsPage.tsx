@@ -250,7 +250,7 @@ export default function SettingsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2 bg-blue-900 text-white hover:bg-blue-800 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-2 bg-orange-600 text-white hover:bg-orange-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {saving ? 'Saving...' : 'Save Profile'}
             </button>
@@ -343,7 +343,7 @@ export default function SettingsPage() {
               <button
                 type="submit"
                 disabled={saving}
-                className="px-6 py-2 bg-blue-900 text-white hover:bg-blue-800 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-6 py-2 bg-orange-600 text-white hover:bg-orange-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {saving ? 'Saving...' : 'Save Cost Settings'}
               </button>
@@ -390,7 +390,7 @@ export default function SettingsPage() {
 
           <Link
             to="/upgrade"
-            className="mt-6 block w-full text-center px-6 py-3 bg-blue-900 text-white hover:bg-blue-800 rounded-lg font-semibold transition"
+            className="mt-6 block w-full text-center px-6 py-3 bg-orange-600 text-white hover:bg-orange-700 rounded-lg font-semibold transition"
           >
             Upgrade Plan
           </Link>
