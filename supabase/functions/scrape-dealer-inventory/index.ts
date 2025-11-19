@@ -335,8 +335,8 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get request body (optional: can specify specific tenant)
-    const { tenant_id } = await req.json().catch(() => ({}));
+    // Get request body (optional: can specify specific tenant and review mode)
+    const { tenant_id, review_mode = false } = await req.json().catch(() => ({}));
 
     // Get all active/trial tenants with website URLs (exclude only suspended/cancelled)
     let query = supabase
@@ -386,11 +386,12 @@ serve(async (req) => {
         console.log(`Scraping ${tenant.name} (${tenant.website_url})...`);
 
         // Create snapshot record
+        // If review_mode is true, set status to 'pending_review' instead of 'pending'
         const { data: snapshot, error: snapshotError } = await supabase
           .from('inventory_snapshots')
           .insert({
             tenant_id: tenant.id,
-            status: 'pending',
+            status: review_mode ? 'pending_review' : 'pending',
           })
           .select()
           .single();
@@ -529,24 +530,64 @@ serve(async (req) => {
         const sitemapCache = await getSitemapCache(supabase, tenant.id, tenant.website_url);
         console.log(`Loaded sitemap cache with ${Object.keys(sitemapCache).length} URLs`);
 
-        // Process vehicles and update database
-        const { newVehicles, updatedVehicles, soldVehicles } = await processVehicles(
-          supabase,
-          tenant.id,
-          enhancedVehicles,
-          sitemapCache
-        );
+        let newVehicles = 0;
+        let updatedVehicles = 0;
+        let soldVehicles = 0;
 
-        // Update snapshot with results
-        await supabase
-          .from('inventory_snapshots')
-          .update({
-            vehicles_found: enhancedVehicles.length,
-            status: 'success',
-            scraping_duration_ms: Date.now() - tenantStartTime,
-            raw_data: enhancedVehicles,
-          })
-          .eq('id', snapshot.id);
+        // If review_mode is enabled, DON'T update vehicle_history
+        // Just save the data to snapshot for admin review
+        if (review_mode) {
+          console.log('Review mode enabled - saving results for admin approval');
+
+          // Store vehicle data in raw_data for later approval
+          await supabase
+            .from('inventory_snapshots')
+            .update({
+              vehicles_found: enhancedVehicles.length,
+              status: 'pending_review',
+              scraping_duration_ms: Date.now() - tenantStartTime,
+              raw_data: { vehicles: enhancedVehicles }, // Store vehicles for approval
+            })
+            .eq('id', snapshot.id);
+
+          // Return preview of what would change (without actually making changes)
+          const { data: existingVehicles } = await supabase
+            .from('vehicle_history')
+            .select('vin')
+            .eq('tenant_id', tenant.id)
+            .eq('status', 'active');
+
+          const existingVINs = new Set((existingVehicles || []).map(v => v.vin));
+          const scrapedVINs = new Set(enhancedVehicles.map(v => v.vin).filter(Boolean));
+
+          newVehicles = enhancedVehicles.filter(v => !existingVINs.has(v.vin)).length;
+          updatedVehicles = enhancedVehicles.filter(v => existingVINs.has(v.vin)).length;
+          soldVehicles = (existingVehicles || []).filter(v => !scrapedVINs.has(v.vin)).length;
+
+          console.log(`Preview: ${newVehicles} new, ${updatedVehicles} updated, ${soldVehicles} sold`);
+        } else {
+          // Normal mode - process vehicles and update database immediately
+          const result = await processVehicles(
+            supabase,
+            tenant.id,
+            enhancedVehicles,
+            sitemapCache
+          );
+          newVehicles = result.newVehicles;
+          updatedVehicles = result.updatedVehicles;
+          soldVehicles = result.soldVehicles;
+
+          // Update snapshot with results
+          await supabase
+            .from('inventory_snapshots')
+            .update({
+              vehicles_found: enhancedVehicles.length,
+              status: 'success',
+              scraping_duration_ms: Date.now() - tenantStartTime,
+              raw_data: { vehicles: enhancedVehicles },
+            })
+            .eq('id', snapshot.id);
+        }
 
         // Log success
         await supabase.from('scraping_logs').insert({

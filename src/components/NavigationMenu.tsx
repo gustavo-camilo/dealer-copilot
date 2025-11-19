@@ -10,6 +10,8 @@ import {
   Settings,
   LogOut,
   X,
+  Upload,
+  Database,
 } from 'lucide-react';
 
 interface NavigationMenuProps {
@@ -135,18 +137,56 @@ export default function NavigationMenu({
             );
           })}
 
-          {/* Admin Panel - Only for super_admin */}
-          {user?.role === 'super_admin' && (
+          {/* Settings - For all authenticated users */}
+          <Link
+            to="/settings"
+            className={`flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 ${
+              currentPath === '/settings' ? 'bg-gray-50' : ''
+            }`}
+            onClick={onClose}
+          >
+            <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+            Settings
+          </Link>
+
+          {/* Upload Scraping Data - For va_uploader and super_admin */}
+          {(user?.role === 'va_uploader' || user?.role === 'super_admin') && (
             <Link
-              to="/admin"
+              to="/admin/upload"
               className={`flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 ${
-                currentPath === '/admin' ? 'bg-gray-50' : ''
+                currentPath === '/admin/upload' ? 'bg-gray-50' : ''
               }`}
               onClick={onClose}
             >
-              <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-              Admin Panel
+              <Upload className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+              Upload Scraping Data
             </Link>
+          )}
+
+          {/* Scraping Management & Admin Panel - Only for super_admin */}
+          {user?.role === 'super_admin' && (
+            <>
+              <Link
+                to="/admin/scraping"
+                className={`flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 ${
+                  currentPath === '/admin/scraping' ? 'bg-gray-50' : ''
+                }`}
+                onClick={onClose}
+              >
+                <Database className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                Scraping Management
+              </Link>
+              <Link
+                to="/admin"
+                className={`flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 ${
+                  currentPath === '/admin' ? 'bg-gray-50' : ''
+                }`}
+                onClick={onClose}
+              >
+                <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
+                Admin Panel
+              </Link>
+            </>
           )}
         </div>
 

@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'tenant_admin' | 'tenant_user';
+export type UserRole = 'super_admin' | 'tenant_admin' | 'tenant_user' | 'va_uploader';
 
 export type TenantStatus = 'active' | 'suspended' | 'trial' | 'cancelled';
 
@@ -21,6 +21,8 @@ export interface TenantCostSettings {
   target_days_to_sale: number;
 }
 
+export type InventoryStatus = 'pending' | 'processing' | 'ready' | 'failed';
+
 export interface Tenant {
   id: string;
   name: string;
@@ -33,6 +35,8 @@ export interface Tenant {
   max_users: number;
   max_vehicles: number;
   cost_settings: TenantCostSettings | null;
+  inventory_status: InventoryStatus;
+  inventory_ready_at: string | null;
   created_at: string;
   updated_at: string;
 }

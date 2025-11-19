@@ -112,6 +112,13 @@ export default function VINScanPage() {
           estimated_profit: recommendation.estimatedProfit,
           max_bid_suggestion: recommendation.maxBidSuggestion,
           saved_to_bid_list: false,
+          // Initialize custom costs as null - will be set if user edits
+          custom_auction_fee_percent: null,
+          custom_recon_cost: null,
+          custom_transport_cost: null,
+          custom_max_bid: null,
+          custom_market_price: null,
+          costs_edited: false,
         })
         .select()
         .single();
@@ -286,6 +293,26 @@ export default function VINScanPage() {
             defaultAuctionFee={costSettings.auction_fee_percent}
             defaultRecon={costSettings.reconditioning_cost}
             defaultTransport={costSettings.transport_cost}
+            onCostsChange={async (costs) => {
+              // Save custom costs to database if scan_id exists and costs were edited
+              if (result.scan_id && costs.costsEdited) {
+                try {
+                  await supabase
+                    .from('vin_scans')
+                    .update({
+                      custom_auction_fee_percent: costs.auctionFee,
+                      custom_recon_cost: costs.recon,
+                      custom_transport_cost: costs.transport,
+                      custom_max_bid: costs.maxBid,
+                      custom_market_price: costs.marketPrice,
+                      costs_edited: true,
+                    })
+                    .eq('id', result.scan_id);
+                } catch (error) {
+                  console.error('Error saving custom costs:', error);
+                }
+              }
+            }}
           />
 
           {/* Market Context */}

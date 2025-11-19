@@ -67,65 +67,49 @@ export default function OnboardingPage() {
         normalizedUrl = `https://${normalizedUrl}`;
       }
 
-      // Update tenant website URL
+      // Update tenant website URL and set inventory status to 'pending'
       await supabase
         .from('tenants')
-        .update({ website_url: normalizedUrl })
+        .update({
+          website_url: normalizedUrl,
+          inventory_status: 'pending'
+        })
         .eq('id', user.tenant_id);
 
-      // Simulate progress while calling the edge function
-      const progressInterval = setInterval(() => {
-        setAnalysisProgress((prev) => Math.min(prev + 5, 90));
-      }, 500);
+      setAnalysisProgress(50);
 
-      // Call the scraping Edge Function
-      const { data, error } = await supabase.functions.invoke('scrape-dealer-inventory', {
-        body: { tenant_id: user.tenant_id },
-      });
+      // Add to waiting list (trigger will handle Slack notification)
+      const { error: waitingListError } = await supabase
+        .from('scraping_waiting_list')
+        .insert({
+          tenant_id: user.tenant_id,
+          website_url: normalizedUrl,
+          status: 'pending',
+          priority: 1,
+        });
 
-      clearInterval(progressInterval);
-
-      console.log('Scraping response:', data);
-
-      if (error) {
-        throw new Error(error.message || 'Failed to scrape website');
-      }
-
-      if (!data) {
-        throw new Error('No response from scraping service');
-      }
-
-      if (!data.success) {
-        throw new Error(data.error || 'Scraping failed');
-      }
-
-      // Check if results array exists and has items
-      if (!data.results || !Array.isArray(data.results) || data.results.length === 0) {
-        console.error('No results in response:', data);
-        throw new Error('No scraping results returned. The scraper may not have found any inventory pages.');
+      if (waitingListError && !waitingListError.message.includes('duplicate')) {
+        throw waitingListError;
       }
 
       setAnalysisProgress(100);
 
-      // Get the result for this tenant
-      const result = data.results[0];
+      // Set to complete with waiting message
+      setStep('complete');
+      setScrapingResult({
+        tenant_id: user.tenant_id,
+        tenant_name: tenant?.name || '',
+        website_url: normalizedUrl,
+        vehicles_found: 0,
+        new_vehicles: 0,
+        updated_vehicles: 0,
+        sold_vehicles: 0,
+        status: 'success',
+        duration_ms: 0,
+      });
 
-      if (!result) {
-        throw new Error('Invalid result data returned from scraper');
-      }
-
-      setScrapingResult(result);
-
-      if (result.status === 'failed') {
-        setStep('error');
-        setErrorMessage(result.error || 'Failed to scrape website');
-      } else {
-        setStep('complete');
-        // Reload scan info to update last scan date
-        await loadScanInfo();
-      }
     } catch (error: any) {
-      console.error('Error scraping website:', error);
+      console.error('Error adding to waiting list:', error);
       setStep('error');
       setErrorMessage(error.message || 'An unexpected error occurred');
     }
@@ -301,49 +285,48 @@ export default function OnboardingPage() {
         <div className="flex items-center justify-center px-4 py-8">
           <div className="max-w-2xl w-full bg-white rounded-lg shadow-sm p-8">
           <div className="text-center mb-6">
-            <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="h-10 w-10 text-green-600" />
+            <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Clock className="h-10 w-10 text-blue-600" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">Scan Complete!</h2>
-            <p className="text-gray-600 mt-2">We've successfully scanned your inventory</p>
+            <h2 className="text-3xl font-bold text-gray-900">Your Inventory is Being Processed!</h2>
+            <p className="text-gray-600 mt-2">We've added your dealership to our scraping queue</p>
           </div>
 
-          {scrapingResult && (
-            <div className="bg-gray-50 rounded-lg p-6 mb-6">
-              <h3 className="font-bold text-gray-900 mb-4">Scan Results</h3>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm text-gray-600">Vehicles Found</p>
-                  <p className="text-2xl font-bold text-gray-900">
-                    {scrapingResult.vehicles_found}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">New Vehicles</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {scrapingResult.new_vehicles}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Updated</p>
-                  <p className="text-2xl font-bold text-blue-600">
-                    {scrapingResult.updated_vehicles}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm text-gray-600">Sold</p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {scrapingResult.sold_vehicles}
-                  </p>
-                </div>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6">
+            <h3 className="font-bold text-blue-900 mb-3">What happens next?</h3>
+            <div className="space-y-3 text-sm text-blue-800">
+              <div className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
+                <p>Our team has been notified and will manually scrape your website within the next few hours</p>
               </div>
-              <div className="mt-4 pt-4 border-t border-gray-200">
-                <p className="text-xs text-gray-500">
-                  Scan completed in {(scrapingResult.duration_ms / 1000).toFixed(2)} seconds
-                </p>
+              <div className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
+                <p>You'll receive an email notification when your inventory data is ready</p>
+              </div>
+              <div className="flex items-start">
+                <CheckCircle className="h-5 w-5 text-blue-600 mr-2 flex-shrink-0 mt-0.5" />
+                <p>This typically takes 2-4 hours during business hours</p>
               </div>
             </div>
-          )}
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-6 mb-6">
+            <h3 className="font-bold text-gray-900 mb-3">While you wait, you can:</h3>
+            <ul className="space-y-2 text-sm text-gray-700">
+              <li className="flex items-center">
+                <span className="text-green-600 mr-2">✓</span>
+                Scan VINs to get instant purchase recommendations
+              </li>
+              <li className="flex items-center">
+                <span className="text-green-600 mr-2">✓</span>
+                Set up your default cost settings in Settings
+              </li>
+              <li className="flex items-center">
+                <span className="text-green-600 mr-2">✓</span>
+                Explore the dashboard and familiarize yourself with the features
+              </li>
+            </ul>
+          </div>
 
           <div className="space-y-3">
             <button

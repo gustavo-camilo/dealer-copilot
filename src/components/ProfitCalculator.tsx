@@ -12,14 +12,16 @@ export interface ProfitCalculatorProps {
     recon: number;
     transport: number;
     maxBid: number;
+    marketPrice: number;
     totalCost: number;
     estimatedProfit: number;
+    costsEdited: boolean;
   }) => void;
 }
 
 export default function ProfitCalculator({
   maxBidSuggestion,
-  marketPrice,
+  marketPrice: defaultMarketPrice,
   defaultAuctionFee,
   defaultRecon,
   defaultTransport,
@@ -29,13 +31,31 @@ export default function ProfitCalculator({
   const [auctionFeePercent, setAuctionFeePercent] = useState(defaultAuctionFee);
   const [reconCost, setReconCost] = useState(defaultRecon);
   const [transportCost, setTransportCost] = useState(defaultTransport);
+  const [marketPrice, setMarketPrice] = useState(defaultMarketPrice);
   const [isEditing, setIsEditing] = useState(false);
+
+  // Track if any costs were edited
+  const costsEdited =
+    maxBid !== maxBidSuggestion ||
+    auctionFeePercent !== defaultAuctionFee ||
+    reconCost !== defaultRecon ||
+    transportCost !== defaultTransport ||
+    marketPrice !== defaultMarketPrice;
 
   // Calculate derived values
   const auctionFee = Math.round(maxBid * (auctionFeePercent / 100));
   const totalCost = maxBid + auctionFee + reconCost + transportCost;
   const estimatedProfit = marketPrice - totalCost;
   const profitMargin = totalCost > 0 ? ((estimatedProfit / totalCost) * 100) : 0;
+
+  // Reset to defaults
+  const resetToDefaults = () => {
+    setMaxBid(maxBidSuggestion);
+    setAuctionFeePercent(defaultAuctionFee);
+    setReconCost(defaultRecon);
+    setTransportCost(defaultTransport);
+    setMarketPrice(defaultMarketPrice);
+  };
 
   // Notify parent of cost changes
   useEffect(() => {
@@ -45,23 +65,42 @@ export default function ProfitCalculator({
         recon: reconCost,
         transport: transportCost,
         maxBid,
+        marketPrice,
         totalCost,
         estimatedProfit,
+        costsEdited,
       });
     }
-  }, [maxBid, auctionFeePercent, reconCost, transportCost, totalCost, estimatedProfit, onCostsChange]);
+  }, [maxBid, auctionFeePercent, reconCost, transportCost, marketPrice, totalCost, estimatedProfit, costsEdited, onCostsChange]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex justify-between items-center mb-4">
-        <h3 className="font-bold text-gray-900">💰 Profit Calculator</h3>
-        <button
-          onClick={() => setIsEditing(!isEditing)}
-          className="text-sm text-blue-900 hover:text-blue-700 flex items-center gap-1"
-        >
-          <Edit2 className="h-4 w-4" />
-          {isEditing ? 'Done' : 'Edit Costs'}
-        </button>
+        <div className="flex items-center gap-2">
+          <h3 className="font-bold text-gray-900">💰 Profit Calculator</h3>
+          {costsEdited && (
+            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+              Edited
+            </span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {costsEdited && (
+            <button
+              onClick={resetToDefaults}
+              className="text-xs text-gray-600 hover:text-gray-900 underline"
+            >
+              Use Defaults
+            </button>
+          )}
+          <button
+            onClick={() => setIsEditing(!isEditing)}
+            className="text-sm text-blue-900 hover:text-blue-700 flex items-center gap-1"
+          >
+            <Edit2 className="h-4 w-4" />
+            {isEditing ? 'Done' : 'Edit Costs'}
+          </button>
+        </div>
       </div>
 
       <div className="space-y-3">
@@ -137,9 +176,18 @@ export default function ProfitCalculator({
         </div>
 
         {/* Market Retail */}
-        <div className="flex justify-between text-sm">
+        <div className="flex justify-between items-center text-sm">
           <span className="text-gray-600">Market Retail Price</span>
-          <span className="font-medium">${marketPrice.toLocaleString()}</span>
+          {isEditing ? (
+            <input
+              type="number"
+              value={marketPrice}
+              onChange={(e) => setMarketPrice(Number(e.target.value))}
+              className="w-32 px-3 py-1 border border-gray-300 rounded text-right font-medium"
+            />
+          ) : (
+            <span className="font-medium">${marketPrice.toLocaleString()}</span>
+          )}
         </div>
 
         {/* Expected Gross Profit */}

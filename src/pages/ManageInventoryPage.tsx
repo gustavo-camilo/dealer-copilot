@@ -17,6 +17,7 @@ import {
   Trash2,
   LayoutGrid,
   List,
+  RefreshCw,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 import toast, { Toaster } from 'react-hot-toast';
@@ -122,6 +123,12 @@ export default function ManageInventoryPage() {
 
     try {
       setLoading(true);
+
+      // Check if inventory is still being processed
+      if (tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing') {
+        setLoading(false);
+        return; // Don't try to load vehicles
+      }
 
       const { data, error } = await supabase
         .from('vehicle_history')
@@ -302,6 +309,49 @@ export default function ManageInventoryPage() {
           </p>
         </div>
 
+        {/* Processing Status Message */}
+        {(tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing') && (
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-8 mb-8 text-center">
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <RefreshCw className="h-8 w-8 text-blue-600 animate-spin" />
+              </div>
+              <h2 className="text-2xl font-bold text-blue-900 mb-2">
+                Your inventory is being processed
+              </h2>
+              <p className="text-blue-800 mb-4">
+                Our team is currently scraping your website. This usually takes 2-4 hours.
+              </p>
+              <p className="text-sm text-blue-700 mb-6">
+                You'll receive an email when your inventory data is ready to view.
+              </p>
+              <div className="bg-white rounded-lg p-6 max-w-md">
+                <h3 className="font-semibold text-gray-900 mb-3">While you wait, you can:</h3>
+                <ul className="text-left space-y-2 text-sm text-gray-700">
+                  <li className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
+                    <Link to="/scan" className="text-blue-600 hover:underline">Scan VINs</Link> for purchase recommendations
+                  </li>
+                  <li className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
+                    <Link to="/settings" className="text-blue-600 hover:underline">Set up your default cost settings</Link>
+                  </li>
+                  <li className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
+                    Explore the <Link to="/dashboard" className="text-blue-600 hover:underline">dashboard</Link>
+                  </li>
+                </ul>
+              </div>
+              <p className="text-xs text-blue-600 mt-6">
+                Last updated: {new Date().toLocaleString()}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {/* Only show stats and vehicles if inventory is ready */}
+        {tenant?.inventory_status === 'ready' && (
+          <>
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -593,6 +643,8 @@ export default function ManageInventoryPage() {
               );
             })}
           </div>
+        )}
+        </>
         )}
       </div>
     </div>
