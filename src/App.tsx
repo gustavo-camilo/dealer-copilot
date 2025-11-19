@@ -14,8 +14,6 @@ import UpgradePage from './pages/UpgradePage';
 import RecommendationsPage from './pages/RecommendationsPage';
 import AdminPage from './pages/AdminPage';
 import SettingsPage from './pages/SettingsPage';
-import ManualScrapingUploadPage from './pages/ManualScrapingUploadPage';
-import ScrapingManagementPage from './pages/ScrapingManagementPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -167,22 +165,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <SettingsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/upload"
-            element={
-              <ProtectedRoute>
-                <ManualScrapingUploadPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin/scraping"
-            element={
-              <ProtectedRoute>
-                <ScrapingManagementPage />
               </ProtectedRoute>
             }
           />
