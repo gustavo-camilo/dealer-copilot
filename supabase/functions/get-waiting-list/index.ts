@@ -73,47 +73,91 @@ serve(async (req) => {
     const status = url.searchParams.get('status') || 'pending';
     const includeCompleted = url.searchParams.get('include_completed') === 'true';
 
-    // Build query
-    let query = supabaseClient
-      .from('scraping_waiting_list')
-      .select(`
-        id,
-        tenant_id,
-        website_url,
-        requested_at,
-        status,
-        assigned_to,
-        priority,
-        notes,
-        completed_at,
-        notified_at,
-        tenants!inner (
-          name,
-          contact_email,
-          contact_phone,
-          location
-        )
-      `);
+    // First, get all tenants without inventory (inventory_status != 'ready')
+    const { data: tenantsWithoutInventory, error: tenantsError } = await supabaseClient
+      .from('tenants')
+      .select('id, name, website_url, contact_email, contact_phone, location, created_at')
+      .neq('inventory_status', 'ready')
+      .order('created_at', { ascending: true });
 
-    // Filter by status
+    if (tenantsError) {
+      throw new Error(`Failed to fetch tenants: ${tenantsError.message}`);
+    }
+
+    // Get existing waiting list entries
+    const { data: existingEntries, error: existingError } = await supabaseClient
+      .from('scraping_waiting_list')
+      .select('tenant_id, id, status, assigned_to, priority, notes, requested_at, completed_at, notified_at');
+
+    if (existingError) {
+      throw new Error(`Failed to fetch existing entries: ${existingError.message}`);
+    }
+
+    // Create a map of existing entries by tenant_id
+    const existingMap = new Map(existingEntries.map(e => [e.tenant_id, e]));
+
+    // For each tenant without inventory, ensure they have a waiting list entry
+    const waitingListPromises = tenantsWithoutInventory.map(async (tenant) => {
+      let entry = existingMap.get(tenant.id);
+
+      // If no entry exists, create one
+      if (!entry) {
+        const { data: newEntry, error: insertError } = await supabaseClient
+          .from('scraping_waiting_list')
+          .insert({
+            tenant_id: tenant.id,
+            website_url: tenant.website_url || '',
+            status: 'pending',
+            priority: 2, // Default normal priority
+            requested_at: new Date().toISOString(),
+          })
+          .select()
+          .single();
+
+        if (!insertError && newEntry) {
+          entry = newEntry;
+        }
+      }
+
+      return {
+        id: entry?.id || '',
+        tenant_id: tenant.id,
+        website_url: tenant.website_url || '',
+        requested_at: entry?.requested_at || tenant.created_at,
+        status: entry?.status || 'pending',
+        assigned_to: entry?.assigned_to || null,
+        priority: entry?.priority || 2,
+        notes: entry?.notes || null,
+        completed_at: entry?.completed_at || null,
+        notified_at: entry?.notified_at || null,
+        tenant: {
+          name: tenant.name,
+          contact_email: tenant.contact_email,
+          contact_phone: tenant.contact_phone,
+          location: tenant.location,
+        },
+      };
+    });
+
+    let waitingList = await Promise.all(waitingListPromises);
+
+    // Filter by status if requested
     if (status && status !== 'all') {
-      query = query.eq('status', status);
+      waitingList = waitingList.filter(e => e.status === status);
     }
 
     // Optionally exclude completed entries
     if (!includeCompleted) {
-      query = query.neq('status', 'completed');
+      waitingList = waitingList.filter(e => e.status !== 'completed');
     }
 
-    // Order by priority (DESC) then requested_at (ASC)
-    query = query.order('priority', { ascending: false });
-    query = query.order('requested_at', { ascending: true });
-
-    const { data: waitingList, error: queryError } = await query;
-
-    if (queryError) {
-      throw new Error(`Failed to fetch waiting list: ${queryError.message}`);
-    }
+    // Sort by priority (DESC) then requested_at (ASC)
+    waitingList.sort((a, b) => {
+      if (b.priority !== a.priority) {
+        return b.priority - a.priority;
+      }
+      return new Date(a.requested_at).getTime() - new Date(b.requested_at).getTime();
+    });
 
     // Fetch assigned user details for entries that have assignments
     const entriesWithAssignees = waitingList.filter(entry => entry.assigned_to);
@@ -135,24 +179,9 @@ serve(async (req) => {
       }
     }
 
-    // Format response
+    // Format response with assigned user details
     const formattedList: WaitingListEntry[] = waitingList.map(entry => ({
-      id: entry.id,
-      tenant_id: entry.tenant_id,
-      website_url: entry.website_url,
-      requested_at: entry.requested_at,
-      status: entry.status,
-      assigned_to: entry.assigned_to,
-      priority: entry.priority,
-      notes: entry.notes,
-      completed_at: entry.completed_at,
-      notified_at: entry.notified_at,
-      tenant: {
-        name: entry.tenants.name,
-        contact_email: entry.tenants.contact_email,
-        contact_phone: entry.tenants.contact_phone,
-        location: entry.tenants.location,
-      },
+      ...entry,
       assigned_user: entry.assigned_to ? assigneeMap[entry.assigned_to] || null : null,
     }));
 

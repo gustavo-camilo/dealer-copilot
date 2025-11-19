@@ -48,32 +48,26 @@ export default function NavigationMenu({
     },
     {
       path: '/inventory',
-      label: 'Manage Inventory',
+      label: 'Inventory',
       icon: Car,
       showOnMobile: true,
     },
     {
       path: '/competitors',
-      label: 'Competitor Intel',
+      label: 'Competitors',
       icon: TrendingUp,
       showOnMobile: true,
     },
     {
       path: '/recommendations',
-      label: 'View Recommendations',
+      label: 'Recommendations',
       icon: Target,
       showOnMobile: true,
     },
     {
       path: '/vin-scans',
-      label: 'VIN Scan History',
+      label: 'VIN Scans',
       icon: Package,
-      showOnMobile: true,
-    },
-    {
-      path: '/onboarding',
-      label: 'Scan Website',
-      icon: Globe,
       showOnMobile: true,
     },
   ];
