@@ -210,7 +210,7 @@ export default function SettingsPage() {
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
                 placeholder="https://yourdealership.com"
-                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">Changing this will add you to the scraping waiting list</p>
             </div>
@@ -222,7 +222,7 @@ export default function SettingsPage() {
                 value={dealerLocation}
                 onChange={(e) => setDealerLocation(e.target.value)}
                 placeholder="City, State"
-                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
               />
             </div>
 
@@ -243,7 +243,7 @@ export default function SettingsPage() {
                 value={contactPhone}
                 onChange={(e) => setContactPhone(e.target.value)}
                 placeholder="(555) 123-4567"
-                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
               />
             </div>
 
@@ -274,7 +274,7 @@ export default function SettingsPage() {
                   min="0"
                   value={costSettings.auction_fee_percent}
                   onChange={(e) => setCostSettings({ ...costSettings, auction_fee_percent: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 />
               </div>
 
@@ -286,7 +286,7 @@ export default function SettingsPage() {
                   min="0"
                   value={costSettings.reconditioning_cost}
                   onChange={(e) => setCostSettings({ ...costSettings, reconditioning_cost: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 />
               </div>
 
@@ -298,7 +298,7 @@ export default function SettingsPage() {
                   min="0"
                   value={costSettings.transport_cost}
                   onChange={(e) => setCostSettings({ ...costSettings, transport_cost: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 />
               </div>
 
@@ -310,7 +310,7 @@ export default function SettingsPage() {
                   min="0"
                   value={costSettings.floor_plan_rate}
                   onChange={(e) => setCostSettings({ ...costSettings, floor_plan_rate: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 />
               </div>
 
@@ -322,7 +322,7 @@ export default function SettingsPage() {
                   min="0"
                   value={costSettings.target_margin_percent}
                   onChange={(e) => setCostSettings({ ...costSettings, target_margin_percent: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 />
               </div>
 
@@ -334,7 +334,7 @@ export default function SettingsPage() {
                   min="1"
                   value={costSettings.target_days_to_sale}
                   onChange={(e) => setCostSettings({ ...costSettings, target_days_to_sale: parseInt(e.target.value) || 1 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-900 focus:border-transparent"
+                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                 />
               </div>
             </div>
