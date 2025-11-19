@@ -34,9 +34,13 @@ export default function SettingsPage() {
   // Form state
   const [dealershipName, setDealershipName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
-  const [dealerLocation, setDealerLocation] = useState('');
+  const [zipCode, setZipCode] = useState('');
+  const [city, setCity] = useState('');
+  const [state, setState] = useState('');
   const [contactEmail, setContactEmail] = useState('');
   const [contactPhone, setContactPhone] = useState('');
+  const [zipCodeLoading, setZipCodeLoading] = useState(false);
+  const [zipCodeError, setZipCodeError] = useState('');
 
   const [costSettings, setCostSettings] = useState<CostSettings>(DEFAULT_COST_SETTINGS);
 
@@ -54,9 +58,23 @@ export default function SettingsPage() {
       // Load tenant data
       setDealershipName(tenant.name || '');
       setWebsiteUrl(tenant.website_url || '');
-      setDealerLocation(tenant.location || '');
       setContactEmail(tenant.contact_email || '');
       setContactPhone(tenant.contact_phone || '');
+
+      // Parse location if it exists (format: "City, State (ZipCode)" or "City, State")
+      if (tenant.location) {
+        const zipMatch = tenant.location.match(/\((\d{5})\)$/);
+        if (zipMatch) {
+          setZipCode(zipMatch[1]);
+          const cityState = tenant.location.replace(/\s*\(\d{5}\)$/, '').split(', ');
+          setCity(cityState[0] || '');
+          setState(cityState[1] || '');
+        } else {
+          const parts = tenant.location.split(', ');
+          setCity(parts[0] || '');
+          setState(parts[1] || '');
+        }
+      }
 
       // Load cost settings
       if (tenant.cost_settings) {
@@ -67,6 +85,58 @@ export default function SettingsPage() {
       }
     }
   }, [tenant]);
+
+  const handleZipCodeLookup = async (zip: string) => {
+    if (zip.length !== 5 || !/^\d{5}$/.test(zip)) {
+      setZipCodeError('Please enter a valid 5-digit ZIP code');
+      return;
+    }
+
+    setZipCodeLoading(true);
+    setZipCodeError('');
+
+    try {
+      // Use Zippopotam.us API (free, no API key required)
+      const response = await fetch(`https://api.zippopotam.us/us/${zip}`);
+
+      if (!response.ok) {
+        throw new Error('ZIP code not found');
+      }
+
+      const data = await response.json();
+
+      if (data.places && data.places.length > 0) {
+        const place = data.places[0];
+        setCity(place['place name']);
+        setState(place['state abbreviation']);
+        setZipCodeError('');
+      } else {
+        throw new Error('ZIP code not found');
+      }
+    } catch (error) {
+      console.error('ZIP code lookup error:', error);
+      setZipCodeError('Invalid ZIP code or unable to lookup location');
+      setCity('');
+      setState('');
+    } finally {
+      setZipCodeLoading(false);
+    }
+  };
+
+  const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const zip = e.target.value.replace(/\D/g, '').slice(0, 5);
+    setZipCode(zip);
+    setZipCodeError('');
+
+    // Auto-lookup when 5 digits are entered
+    if (zip.length === 5) {
+      handleZipCodeLookup(zip);
+    } else {
+      // Clear city/state if zip is incomplete
+      setCity('');
+      setState('');
+    }
+  };
 
   const handleSaveCostSettings = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -99,11 +169,18 @@ export default function SettingsPage() {
     setMessage('');
 
     try {
+      // Format location as "City, State (ZipCode)"
+      const location = zipCode && city && state
+        ? `${city}, ${state} (${zipCode})`
+        : city && state
+        ? `${city}, ${state}`
+        : '';
+
       const { error } = await supabase
         .from('tenants')
         .update({
           website_url: websiteUrl,
-          location: dealerLocation,
+          location,
           contact_phone: contactPhone,
         })
         .eq('id', tenant?.id);
@@ -216,14 +293,48 @@ export default function SettingsPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Location</label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">ZIP Code</label>
               <input
                 type="text"
-                value={dealerLocation}
-                onChange={(e) => setDealerLocation(e.target.value)}
-                placeholder="City, State"
+                value={zipCode}
+                onChange={handleZipCodeChange}
+                placeholder="12345"
+                maxLength={5}
                 className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
               />
+              {zipCodeLoading && (
+                <p className="text-xs text-blue-600 mt-1">Looking up location...</p>
+              )}
+              {zipCodeError && (
+                <p className="text-xs text-red-600 mt-1">{zipCodeError}</p>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="City"
+                  className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400"
+                  readOnly={zipCodeLoading}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
+                <input
+                  type="text"
+                  value={state}
+                  onChange={(e) => setState(e.target.value)}
+                  placeholder="State"
+                  maxLength={2}
+                  className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 uppercase"
+                  readOnly={zipCodeLoading}
+                />
+              </div>
             </div>
 
             <div>
