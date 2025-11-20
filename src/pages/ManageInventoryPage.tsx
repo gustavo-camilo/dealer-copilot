@@ -331,7 +331,7 @@ export default function ManageInventoryPage() {
                 <ul className="text-left space-y-2 text-sm text-gray-700">
                   <li className="flex items-center">
                     <span className="text-green-600 mr-2">✓</span>
-                    <Link to="/scan" className="text-blue-600 hover:underline">Scan VINs</Link> for purchase recommendations
+                    <span><Link to="/scan" className="text-blue-600 hover:underline">Scan VINs</Link> for purchase recommendations</span>
                   </li>
                   <li className="flex items-center">
                     <span className="text-green-600 mr-2">✓</span>
@@ -339,13 +339,15 @@ export default function ManageInventoryPage() {
                   </li>
                   <li className="flex items-center">
                     <span className="text-green-600 mr-2">✓</span>
-                    Explore the <Link to="/dashboard" className="text-blue-600 hover:underline"> dashboard</Link>
+                    <span>Explore the <Link to="/dashboard" className="text-blue-600 hover:underline">dashboard</Link></span>
                   </li>
                 </ul>
               </div>
-              <p className="text-xs text-blue-600 mt-6">
-                Last updated: {new Date().toLocaleString()}
-              </p>
+              {tenant?.inventory_ready_at && (
+                <p className="text-xs text-blue-600 mt-6">
+                  Last updated: {new Date(tenant.inventory_ready_at).toLocaleString()}
+                </p>
+              )}
             </div>
           </div>
         )}
