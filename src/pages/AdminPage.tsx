@@ -565,7 +565,7 @@ export default function AdminPage() {
                   <select
                     value={selectedTenantForUpload}
                     onChange={(e) => setSelectedTenantForUpload(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                   >
                     <option value="">Choose a dealership...</option>
                     {tenants.map((tenant) => (
@@ -583,7 +583,7 @@ export default function AdminPage() {
                 <button
                   onClick={handleUpload}
                   disabled={!csvFile || !selectedTenantForUpload || uploading}
-                  className="w-full px-6 py-3 bg-blue-900 text-white rounded-lg font-semibold hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {uploading ? 'Uploading...' : 'Upload and Process CSV'}
                 </button>
@@ -647,7 +647,7 @@ export default function AdminPage() {
                     <select
                       value={selectedTenantForScrape}
                       onChange={(e) => setSelectedTenantForScrape(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900"
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
                     >
                       <option value="">Choose a dealership...</option>
                       {tenants.map((tenant) => (
@@ -659,7 +659,7 @@ export default function AdminPage() {
                     <button
                       onClick={handleTestScrape}
                       disabled={!selectedTenantForScrape || scraping}
-                      className="px-6 py-2 bg-blue-900 text-white rounded-lg font-semibold hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {scraping ? 'Scraping...' : 'Test Scrape with Review'}
                     </button>

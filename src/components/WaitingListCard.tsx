@@ -37,15 +37,15 @@ export default function WaitingListCard({
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50';
+        return 'bg-yellow-100 text-yellow-800';
       case 'assigned':
-        return 'bg-blue-500/20 text-blue-300 border-blue-500/50';
+        return 'bg-blue-100 text-blue-800';
       case 'in_progress':
-        return 'bg-purple-500/20 text-purple-300 border-purple-500/50';
+        return 'bg-purple-100 text-purple-800';
       case 'completed':
-        return 'bg-green-500/20 text-green-300 border-green-500/50';
+        return 'bg-green-100 text-green-800';
       default:
-        return 'bg-gray-500/20 text-gray-300 border-gray-500/50';
+        return 'bg-gray-100 text-gray-800';
     }
   };
 
@@ -72,60 +72,60 @@ export default function WaitingListCard({
   };
 
   return (
-    <div className="bg-white/10 backdrop-blur-md rounded-xl p-6 border border-white/10 hover:border-white/20 transition">
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
       {/* Header */}
       <div className="flex items-start justify-between mb-4">
         <div className="flex-1">
           <div className="flex items-center gap-3 mb-2">
-            <h3 className="text-xl font-semibold text-white">{entry.tenant.name}</h3>
+            <h3 className="text-xl font-semibold text-gray-900">{entry.tenant.name}</h3>
             <span className="text-2xl">{getPriorityEmoji(entry.priority)}</span>
           </div>
           <a
             href={entry.website_url}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-sm text-blue-400 hover:text-blue-300 hover:underline"
+            className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
           >
             {entry.website_url}
           </a>
         </div>
 
-        <span className={`px-3 py-1 rounded-full text-xs font-medium border ${getStatusColor(entry.status)}`}>
-          {entry.status.replace('_', ' ').toUpperCase()}
+        <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${getStatusColor(entry.status)}`}>
+          {entry.status.replace('_', ' ')}
         </span>
       </div>
 
       {/* Details Grid */}
       <div className="grid grid-cols-2 gap-4 mb-4">
         <div>
-          <p className="text-xs text-gray-400 mb-1">Contact Email</p>
-          <p className="text-sm text-white">{entry.tenant.contact_email}</p>
+          <p className="text-xs text-gray-500 mb-1">Contact Email</p>
+          <p className="text-sm text-gray-900">{entry.tenant.contact_email}</p>
         </div>
 
         <div>
-          <p className="text-xs text-gray-400 mb-1">Location</p>
-          <p className="text-sm text-white">{entry.tenant.location || 'Not specified'}</p>
+          <p className="text-xs text-gray-500 mb-1">Location</p>
+          <p className="text-sm text-gray-900">{entry.tenant.location || 'Not specified'}</p>
         </div>
 
         <div>
-          <p className="text-xs text-gray-400 mb-1">Phone</p>
-          <p className="text-sm text-white">{entry.tenant.contact_phone || 'Not specified'}</p>
+          <p className="text-xs text-gray-500 mb-1">Phone</p>
+          <p className="text-sm text-gray-900">{entry.tenant.contact_phone || 'Not specified'}</p>
         </div>
 
         <div>
-          <p className="text-xs text-gray-400 mb-1">Requested</p>
-          <p className="text-sm text-white">{formatDate(entry.requested_at)}</p>
+          <p className="text-xs text-gray-500 mb-1">Requested</p>
+          <p className="text-sm text-gray-900">{formatDate(entry.requested_at)}</p>
         </div>
       </div>
 
       {/* Priority Selector */}
       {onUpdatePriority && (
         <div className="mb-4">
-          <label className="text-xs text-gray-400 mb-2 block">Priority Level</label>
+          <label className="text-xs text-gray-500 mb-2 block">Priority Level</label>
           <select
             value={entry.priority}
             onChange={(e) => onUpdatePriority(entry.id, parseInt(e.target.value))}
-            className="w-full px-3 py-2 bg-white/5 border border-white/20 rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
           >
             <option value={1}>🟢 Low (1)</option>
             <option value={2}>🟢 Normal (2)</option>
@@ -138,18 +138,18 @@ export default function WaitingListCard({
 
       {/* Assigned User */}
       {entry.assigned_user && (
-        <div className="mb-4 p-3 bg-white/5 rounded-lg">
-          <p className="text-xs text-gray-400 mb-1">Assigned To</p>
-          <p className="text-sm text-white font-medium">{entry.assigned_user.full_name}</p>
-          <p className="text-xs text-gray-400">{entry.assigned_user.email}</p>
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <p className="text-xs text-gray-500 mb-1">Assigned To</p>
+          <p className="text-sm text-gray-900 font-medium">{entry.assigned_user.full_name}</p>
+          <p className="text-xs text-gray-500">{entry.assigned_user.email}</p>
         </div>
       )}
 
       {/* Notes */}
       {entry.notes && (
-        <div className="mb-4 p-3 bg-white/5 rounded-lg">
-          <p className="text-xs text-gray-400 mb-1">Notes</p>
-          <p className="text-sm text-white">{entry.notes}</p>
+        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
+          <p className="text-xs text-gray-500 mb-1">Notes</p>
+          <p className="text-sm text-gray-900">{entry.notes}</p>
         </div>
       )}
 
@@ -158,7 +158,7 @@ export default function WaitingListCard({
         {onUpload && (
           <button
             onClick={() => onUpload(entry.tenant_id)}
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition text-sm"
+            className="flex-1 px-4 py-2 bg-orange-600 hover:bg-orange-700 rounded-lg font-medium transition text-sm text-white"
           >
             Upload CSV
           </button>
@@ -167,7 +167,7 @@ export default function WaitingListCard({
         {onUpdateStatus && entry.status === 'pending' && (
           <button
             onClick={() => onUpdateStatus(entry.id, 'in_progress')}
-            className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition text-sm"
+            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition text-sm text-white"
           >
             Mark In Progress
           </button>
@@ -176,7 +176,7 @@ export default function WaitingListCard({
         {onUpdateStatus && entry.status === 'in_progress' && (
           <button
             onClick={() => onUpdateStatus(entry.id, 'completed')}
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition text-sm"
+            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition text-sm text-white"
           >
             Mark Complete
           </button>
