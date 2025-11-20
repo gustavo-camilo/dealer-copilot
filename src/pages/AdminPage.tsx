@@ -3,9 +3,12 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Globe } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import WaitingListCard from '../components/WaitingListCard';
+import CompetitorWaitingListCard from '../components/CompetitorWaitingListCard';
+import EditTenantModal from '../components/EditTenantModal';
+import toast from 'react-hot-toast';
 
 interface UploadHistory {
   id: string;
@@ -16,6 +19,7 @@ interface UploadHistory {
   vehicles_new: number;
   vehicles_updated: number;
   vehicles_sold: number;
+  scraping_source: string;
   tenants: { name: string };
   users: { full_name: string };
 }
@@ -50,10 +54,32 @@ interface PendingReview {
   tenants: { name: string };
 }
 
+interface CompetitorWaitingListEntry {
+  id: string;
+  tenant_id: string;
+  competitor_url: string;
+  competitor_name: string | null;
+  requested_at: string;
+  status: string;
+  assigned_to: string | null;
+  priority: number;
+  notes: string | null;
+  tenant: {
+    name: string;
+    contact_email: string;
+    contact_phone: string | null;
+    location: string | null;
+  };
+  assigned_user?: {
+    full_name: string;
+    email: string;
+  } | null;
+}
+
 export default function AdminPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tenants' | 'waiting-list' | 'upload' | 'history' | 'reviews'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'waiting-list' | 'competitor-queue' | 'upload' | 'history' | 'reviews'>('tenants');
 
   // Check if user has access (super_admin or va_uploader)
   const isVAUploader = user?.role === 'va_uploader';
@@ -80,6 +106,12 @@ export default function AdminPage() {
   const [selectedTenantForScrape, setSelectedTenantForScrape] = useState('');
   const [scraping, setScraping] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedTenantForEdit, setSelectedTenantForEdit] = useState<Tenant | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
+  const [competitorWaitingList, setCompetitorWaitingList] = useState<CompetitorWaitingListEntry[]>([]);
+  const [competitorStatusFilter, setCompetitorStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [uploadType, setUploadType] = useState<'dealer_inventory' | 'competitor_data'>('dealer_inventory');
+  const [selectedCompetitorEntry, setSelectedCompetitorEntry] = useState('');
 
   const handleSignOut = async () => {
     try {
@@ -99,6 +131,7 @@ export default function AdminPage() {
 
   useEffect(() => {
     if (activeTab === 'waiting-list') loadWaitingList();
+    else if (activeTab === 'competitor-queue') loadCompetitorWaitingList();
     else if (activeTab === 'history') loadUploadHistory();
     else if (activeTab === 'reviews') loadPendingReviews();
   }, [activeTab]);
@@ -108,6 +141,12 @@ export default function AdminPage() {
       loadWaitingList();
     }
   }, [waitingListStatusFilter]);
+
+  useEffect(() => {
+    if (activeTab === 'competitor-queue') {
+      loadCompetitorWaitingList();
+    }
+  }, [competitorStatusFilter]);
 
   const loadAdminData = async () => {
     try {
@@ -147,18 +186,38 @@ export default function AdminPage() {
     }
   };
 
+  const loadCompetitorWaitingList = async () => {
+    try {
+      const params = new URLSearchParams({
+        status: competitorStatusFilter,
+        include_completed: 'true',
+      });
+
+      const { data, error } = await supabase.functions.invoke('get-competitor-waiting-list', {
+        body: params,
+      });
+
+      if (error) throw error;
+      setCompetitorWaitingList(data.waiting_list || []);
+    } catch (error) {
+      console.error('Error loading competitor waiting list:', error);
+    }
+  };
+
   const loadUploadHistory = async () => {
     try {
       const { data, error } = await supabase
         .from('manual_scraping_uploads')
-        .select('id, filename, upload_date, status, vehicles_processed, vehicles_new, vehicles_updated, vehicles_sold, tenants!inner (name), users!inner (full_name)')
+        .select('id, filename, upload_date, status, vehicles_processed, vehicles_new, vehicles_updated, vehicles_sold, scraping_source, tenants!inner (name), users!inner (full_name)')
+        .eq('status', 'completed') // Only show successful scrapes
         .order('upload_date', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
       const mapped = (data || []).map((item: any) => ({
         ...item,
+        scraping_source: item.scraping_source || 'dealer_inventory',
         tenants: Array.isArray(item.tenants) && item.tenants.length > 0 ? item.tenants[0] : { name: 'Unknown' },
         users: Array.isArray(item.users) && item.users.length > 0 ? item.users[0] : { full_name: 'Unknown' }
       }));
@@ -203,8 +262,18 @@ export default function AdminPage() {
   };
 
   const handleUpload = async () => {
-    if (!csvFile || !csvContent || !selectedTenantForUpload) {
-      setUploadError('Please select a tenant and upload a CSV file');
+    if (!csvFile || !csvContent) {
+      setUploadError('Please upload a CSV file');
+      return;
+    }
+
+    if (uploadType === 'dealer_inventory' && !selectedTenantForUpload) {
+      setUploadError('Please select a dealership');
+      return;
+    }
+
+    if (uploadType === 'competitor_data' && !selectedCompetitorEntry) {
+      setUploadError('Please select a competitor from the waiting list');
       return;
     }
 
@@ -213,16 +282,46 @@ export default function AdminPage() {
     setUploadMessage('');
 
     try {
-      const { data, error: uploadError } = await supabase.functions.invoke('upload-manual-scraping', {
-        body: { csv_content: csvContent, filename: csvFile.name, tenant_id: selectedTenantForUpload },
-      });
+      if (uploadType === 'dealer_inventory') {
+        // Upload dealer inventory CSV
+        const { data, error: uploadError } = await supabase.functions.invoke('upload-manual-scraping', {
+          body: { csv_content: csvContent, filename: csvFile.name, tenant_id: selectedTenantForUpload },
+        });
 
-      if (uploadError) throw uploadError;
-      if (!data.success) throw new Error(data.error || 'Upload failed');
+        if (uploadError) throw uploadError;
+        if (!data.success) throw new Error(data.error || 'Upload failed');
 
-      setUploadMessage(`Successfully uploaded! ${data.vehicles_new} new, ${data.vehicles_updated} updated, ${data.vehicles_sold} sold`);
+        setUploadMessage(`Successfully uploaded! ${data.vehicles_new} new, ${data.vehicles_updated} updated, ${data.vehicles_sold} sold`);
+      } else {
+        // Upload competitor data CSV
+        const selectedEntry = competitorWaitingList.find(e => e.id === selectedCompetitorEntry);
+        if (!selectedEntry) {
+          throw new Error('Selected competitor entry not found');
+        }
+
+        const { data, error: uploadError } = await supabase.functions.invoke('process-competitor-csv', {
+          body: {
+            csv_content: csvContent,
+            filename: csvFile.name,
+            tenant_id: selectedEntry.tenant_id,
+            competitor_url: selectedEntry.competitor_url,
+            competitor_name: selectedEntry.competitor_name,
+            waiting_list_entry_id: selectedEntry.id,
+          },
+        });
+
+        if (uploadError) throw uploadError;
+        if (!data.success) throw new Error(data.error || 'Upload failed');
+
+        setUploadMessage(`Successfully uploaded competitor data! ${data.vehicles_processed} vehicles processed`);
+
+        // Reload competitor waiting list
+        loadCompetitorWaitingList();
+      }
+
       handleClearFile();
       setSelectedTenantForUpload('');
+      setSelectedCompetitorEntry('');
       setTimeout(() => setUploadMessage(''), 5000);
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -320,6 +419,64 @@ export default function AdminPage() {
       loadWaitingList();
     } catch (error: any) {
       console.error('Error updating priority:', error);
+    }
+  };
+
+  const handleUpdateCompetitorStatus = async (entryId: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from('competitor_scraping_waiting_list')
+        .update({ status })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      loadCompetitorWaitingList();
+    } catch (error: any) {
+      console.error('Error updating competitor status:', error);
+      toast.error(`Failed to update: ${error.message}`);
+    }
+  };
+
+  const handleUpdateCompetitorPriority = async (entryId: string, priority: number) => {
+    try {
+      const { error } = await supabase
+        .from('competitor_scraping_waiting_list')
+        .update({ priority })
+        .eq('id', entryId);
+
+      if (error) throw error;
+
+      loadCompetitorWaitingList();
+    } catch (error: any) {
+      console.error('Error updating competitor priority:', error);
+    }
+  };
+
+  const handleEditTenant = (tenant: Tenant) => {
+    setSelectedTenantForEdit(tenant);
+    setEditModalOpen(true);
+  };
+
+  const handleUpdateTenant = async (updatedTenant: Partial<Tenant>) => {
+    if (!selectedTenantForEdit) return;
+
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update(updatedTenant)
+        .eq('id', selectedTenantForEdit.id);
+
+      if (error) throw error;
+
+      toast.success('Dealership updated successfully!');
+      loadAdminData();
+      setEditModalOpen(false);
+      setSelectedTenantForEdit(null);
+    } catch (error: any) {
+      console.error('Error updating tenant:', error);
+      toast.error(`Failed to update: ${error.message}`);
+      throw error;
     }
   };
 
@@ -430,6 +587,20 @@ export default function AdminPage() {
                 Waiting List
               </button>
 
+              {(isSuperAdmin || isVAUploader) && (
+                <button
+                  onClick={() => setActiveTab('competitor-queue')}
+                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
+                    activeTab === 'competitor-queue'
+                      ? 'border-purple-600 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  <Globe className="inline-block h-4 w-4 mr-2" />
+                  Competitor Queue
+                </button>
+              )}
+
               <button
                 onClick={() => setActiveTab('upload')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
@@ -482,6 +653,7 @@ export default function AdminPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inventory</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -523,6 +695,16 @@ export default function AdminPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(tenant.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <button
+                            onClick={() => handleEditTenant(tenant)}
+                            className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                            title="Edit dealership"
+                          >
+                            <Edit size={16} />
+                            Edit
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -597,6 +779,70 @@ export default function AdminPage() {
               </div>
             )}
 
+            {activeTab === 'competitor-queue' && (
+              <div className="space-y-4">
+                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
+                  <p className="text-sm text-purple-800">
+                    Competitor websites waiting for CSV upload. Click "Upload CSV" on any entry to upload competitor data.
+                  </p>
+                </div>
+
+                {/* Filter Controls */}
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-gray-700">Status:</label>
+                    <select
+                      value={competitorStatusFilter}
+                      onChange={(e) => setCompetitorStatusFilter(e.target.value as any)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+                      Pending: {competitorWaitingList.filter(e => e.status === 'pending').length}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                      In Progress: {competitorWaitingList.filter(e => e.status === 'in_progress').length}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                      Completed: {competitorWaitingList.filter(e => e.status === 'completed').length}
+                    </span>
+                  </div>
+                </div>
+
+                {competitorWaitingList.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">
+                    {competitorStatusFilter === 'all'
+                      ? 'No competitors in queue'
+                      : `No ${competitorStatusFilter.replace('_', ' ')} entries`}
+                  </p>
+                ) : (
+                  competitorWaitingList.map((entry) => (
+                    <CompetitorWaitingListCard
+                      key={entry.id}
+                      entry={entry}
+                      onUpdateStatus={isSuperAdmin ? handleUpdateCompetitorStatus : undefined}
+                      onUpdatePriority={isSuperAdmin ? handleUpdateCompetitorPriority : undefined}
+                      onUpload={(entryId, tenantId) => {
+                        setSelectedTenantForUpload(tenantId);
+                        setActiveTab('upload');
+                      }}
+                    />
+                  ))
+                )}
+              </div>
+            )}
+
             {activeTab === 'upload' && (
               <div className="max-w-3xl mx-auto">
                 {uploadMessage && (
@@ -611,22 +857,99 @@ export default function AdminPage() {
                   </div>
                 )}
 
+                {/* Upload Type Selector */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Dealership
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Upload Type
                   </label>
-                  <select
-                    value={selectedTenantForUpload}
-                    onChange={(e) => setSelectedTenantForUpload(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                  >
-                    <option value="">Choose a dealership...</option>
-                    {tenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenant.name} - {tenant.website_url}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => {
+                        setUploadType('dealer_inventory');
+                        setSelectedCompetitorEntry('');
+                      }}
+                      className={`p-4 border-2 rounded-lg transition ${
+                        uploadType === 'dealer_inventory'
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Building2 className={`h-5 w-5 ${uploadType === 'dealer_inventory' ? 'text-blue-600' : 'text-gray-600'}`} />
+                        <span className={`font-medium ${uploadType === 'dealer_inventory' ? 'text-blue-900' : 'text-gray-700'}`}>
+                          Dealer Inventory
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Upload dealership vehicles</p>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUploadType('competitor_data');
+                        setSelectedTenantForUpload('');
+                      }}
+                      className={`p-4 border-2 rounded-lg transition ${
+                        uploadType === 'competitor_data'
+                          ? 'border-purple-600 bg-purple-50'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Globe className={`h-5 w-5 ${uploadType === 'competitor_data' ? 'text-purple-600' : 'text-gray-600'}`} />
+                        <span className={`font-medium ${uploadType === 'competitor_data' ? 'text-purple-900' : 'text-gray-700'}`}>
+                          Competitor Data
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Upload competitor vehicles</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dealership/Competitor Selector */}
+                <div className="mb-6">
+                  {uploadType === 'dealer_inventory' ? (
+                    <>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Dealership
+                      </label>
+                      <select
+                        value={selectedTenantForUpload}
+                        onChange={(e) => setSelectedTenantForUpload(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                      >
+                        <option value="">Choose a dealership...</option>
+                        {tenants.map((tenant) => (
+                          <option key={tenant.id} value={tenant.id}>
+                            {tenant.name} - {tenant.website_url}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Competitor from Waiting List
+                      </label>
+                      <select
+                        value={selectedCompetitorEntry}
+                        onChange={(e) => setSelectedCompetitorEntry(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                      >
+                        <option value="">Choose a competitor...</option>
+                        {competitorWaitingList
+                          .filter(e => e.status === 'in_progress' || e.status === 'pending')
+                          .map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                              {entry.tenant.name} → {entry.competitor_name || entry.competitor_url}
+                            </option>
+                          ))}
+                      </select>
+                      {competitorWaitingList.filter(e => e.status === 'in_progress' || e.status === 'pending').length === 0 && (
+                        <p className="mt-2 text-sm text-gray-500">
+                          No competitors in waiting list. Add competitors from the Competitor Queue tab.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div className="mb-6">
@@ -635,8 +958,17 @@ export default function AdminPage() {
 
                 <button
                   onClick={handleUpload}
-                  disabled={!csvFile || !selectedTenantForUpload || uploading}
-                  className="w-full px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={
+                    !csvFile ||
+                    uploading ||
+                    (uploadType === 'dealer_inventory' && !selectedTenantForUpload) ||
+                    (uploadType === 'competitor_data' && !selectedCompetitorEntry)
+                  }
+                  className={`w-full px-6 py-3 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                    uploadType === 'dealer_inventory'
+                      ? 'bg-blue-600 hover:bg-blue-700'
+                      : 'bg-purple-600 hover:bg-purple-700'
+                  }`}
                 >
                   {uploading ? 'Uploading...' : 'Upload and Process CSV'}
                 </button>
@@ -653,6 +985,7 @@ export default function AdminPage() {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processed</th>
@@ -667,6 +1000,15 @@ export default function AdminPage() {
                         <tr key={upload.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.tenants.name}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              upload.scraping_source === 'competitor_data'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {upload.scraping_source === 'competitor_data' ? 'Competitor Data' : 'Dealer Inventory'}
+                            </span>
+                          </td>
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.users.full_name}</td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {new Date(upload.upload_date).toLocaleString()}
@@ -760,6 +1102,19 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Tenant Modal */}
+      {selectedTenantForEdit && (
+        <EditTenantModal
+          tenant={selectedTenantForEdit}
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setSelectedTenantForEdit(null);
+          }}
+          onSave={handleUpdateTenant}
+        />
+      )}
     </div>
   );
 }

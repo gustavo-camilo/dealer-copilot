@@ -60,6 +60,7 @@ export default function CompetitorAnalysisPage() {
   const [newCompetitorName, setNewCompetitorName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<string>('starter');
+  const [addingToQueue, setAddingToQueue] = useState(false);
 
   useEffect(() => {
     loadCompetitors();
@@ -121,6 +122,48 @@ export default function CompetitorAnalysisPage() {
       }));
     } catch (error) {
       console.error('Error loading history:', error);
+    }
+  };
+
+  const handleAddToWaitingList = async () => {
+    if (!newCompetitorUrl.trim()) {
+      setError('Please enter a competitor URL');
+      return;
+    }
+
+    if (!tenant?.id) {
+      setError('No tenant ID found');
+      return;
+    }
+
+    try {
+      setAddingToQueue(true);
+      setError(null);
+
+      // Add to competitor waiting list
+      const { error: insertError } = await supabase
+        .from('competitor_scraping_waiting_list')
+        .insert({
+          tenant_id: tenant.id,
+          competitor_url: newCompetitorUrl.trim(),
+          competitor_name: newCompetitorName.trim() || null,
+          status: 'pending',
+          priority: 2,
+        });
+
+      if (insertError) throw insertError;
+
+      toast.success('Competitor added to waiting list! Our team will process it soon.');
+
+      // Clear form
+      setNewCompetitorUrl('');
+      setNewCompetitorName('');
+    } catch (error) {
+      console.error('Error adding to waiting list:', error);
+      setError(error instanceof Error ? error.message : 'Failed to add competitor to waiting list');
+      toast.error('Failed to add competitor to waiting list');
+    } finally {
+      setAddingToQueue(false);
     }
   };
 
@@ -350,45 +393,71 @@ export default function CompetitorAnalysisPage() {
 
         {/* Scan Form */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Scan New Competitor</h2>
-          <div className="flex flex-col sm:flex-row gap-4">
-            <div className="flex-1">
-              <input
-                type="url"
-                placeholder="Competitor website URL (e.g., https://competitor.com)"
-                value={newCompetitorUrl}
-                onChange={(e) => setNewCompetitorUrl(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={scanning}
-              />
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Competitor</h2>
+          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+            <p className="text-sm text-blue-800">
+              Add competitors to the waiting list for our team to scrape and analyze. You'll be notified when the data is ready.
+            </p>
+          </div>
+          <div className="flex flex-col gap-4">
+            <div className="flex flex-col sm:flex-row gap-4">
+              <div className="flex-1">
+                <input
+                  type="url"
+                  placeholder="Competitor website URL (e.g., https://competitor.com)"
+                  value={newCompetitorUrl}
+                  onChange={(e) => setNewCompetitorUrl(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  disabled={scanning || addingToQueue}
+                />
+              </div>
+              <div className="sm:w-64">
+                <input
+                  type="text"
+                  placeholder="Competitor name (optional)"
+                  value={newCompetitorName}
+                  onChange={(e) => setNewCompetitorName(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  disabled={scanning || addingToQueue}
+                />
+              </div>
             </div>
-            <div className="sm:w-64">
-              <input
-                type="text"
-                placeholder="Competitor name (optional)"
-                value={newCompetitorName}
-                onChange={(e) => setNewCompetitorName(e.target.value)}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                disabled={scanning}
-              />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <button
+                onClick={handleAddToWaitingList}
+                disabled={addingToQueue || scanning || !newCompetitorUrl.trim()}
+                className="flex-1 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {addingToQueue ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Adding to Queue...
+                  </>
+                ) : (
+                  <>
+                    <TrendingUp className="w-5 h-5" />
+                    Add to Waiting List
+                  </>
+                )}
+              </button>
+              <button
+                onClick={() => handleScanCompetitor()}
+                disabled={scanning || addingToQueue || !newCompetitorUrl.trim()}
+                className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {scanning ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Scanning...
+                  </>
+                ) : (
+                  <>
+                    <Search className="w-5 h-5" />
+                    Quick Scan (Dev)
+                  </>
+                )}
+              </button>
             </div>
-            <button
-              onClick={() => handleScanCompetitor()}
-              disabled={scanning || !newCompetitorUrl.trim()}
-              className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {scanning ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Scanning...
-                </>
-              ) : (
-                <>
-                  <Search className="w-5 h-5" />
-                  Quick Scan
-                </>
-              )}
-            </button>
           </div>
         </div>
 

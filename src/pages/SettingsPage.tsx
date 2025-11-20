@@ -61,11 +61,19 @@ export default function SettingsPage() {
       setContactEmail(tenant.contact_email || '');
       setContactPhone(tenant.contact_phone || '');
 
+      // Check if we have a separate zip_code field first (new schema)
+      if (tenant.zip_code) {
+        setZipCode(tenant.zip_code);
+      }
+
       // Parse location if it exists (format: "City, State (ZipCode)" or "City, State")
       if (tenant.location) {
         const zipMatch = tenant.location.match(/\((\d{5})\)$/);
         if (zipMatch) {
-          setZipCode(zipMatch[1]);
+          // Only set ZIP from location if we don't have it in the separate field
+          if (!tenant.zip_code) {
+            setZipCode(zipMatch[1]);
+          }
           const cityState = tenant.location.replace(/\s*\(\d{5}\)$/, '').split(', ');
           setCity(cityState[0] || '');
           setState(cityState[1] || '');
@@ -169,7 +177,7 @@ export default function SettingsPage() {
     setMessage('');
 
     try {
-      // Format location as "City, State (ZipCode)"
+      // Format location as "City, State (ZipCode)" for backwards compatibility
       const location = zipCode && city && state
         ? `${city}, ${state} (${zipCode})`
         : city && state
@@ -181,6 +189,7 @@ export default function SettingsPage() {
         .update({
           website_url: websiteUrl,
           location,
+          zip_code: zipCode || null, // Save ZIP to separate field as well
           contact_phone: contactPhone,
         })
         .eq('id', tenant?.id);
