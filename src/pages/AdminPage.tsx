@@ -110,6 +110,8 @@ export default function AdminPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [competitorWaitingList, setCompetitorWaitingList] = useState<CompetitorWaitingListEntry[]>([]);
   const [competitorStatusFilter, setCompetitorStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [uploadType, setUploadType] = useState<'dealer_inventory' | 'competitor_data'>('dealer_inventory');
+  const [selectedCompetitorEntry, setSelectedCompetitorEntry] = useState('');
 
   const handleSignOut = async () => {
     try {
@@ -260,8 +262,18 @@ export default function AdminPage() {
   };
 
   const handleUpload = async () => {
-    if (!csvFile || !csvContent || !selectedTenantForUpload) {
-      setUploadError('Please select a tenant and upload a CSV file');
+    if (!csvFile || !csvContent) {
+      setUploadError('Please upload a CSV file');
+      return;
+    }
+
+    if (uploadType === 'dealer_inventory' && !selectedTenantForUpload) {
+      setUploadError('Please select a dealership');
+      return;
+    }
+
+    if (uploadType === 'competitor_data' && !selectedCompetitorEntry) {
+      setUploadError('Please select a competitor from the waiting list');
       return;
     }
 
@@ -270,16 +282,46 @@ export default function AdminPage() {
     setUploadMessage('');
 
     try {
-      const { data, error: uploadError } = await supabase.functions.invoke('upload-manual-scraping', {
-        body: { csv_content: csvContent, filename: csvFile.name, tenant_id: selectedTenantForUpload },
-      });
+      if (uploadType === 'dealer_inventory') {
+        // Upload dealer inventory CSV
+        const { data, error: uploadError } = await supabase.functions.invoke('upload-manual-scraping', {
+          body: { csv_content: csvContent, filename: csvFile.name, tenant_id: selectedTenantForUpload },
+        });
 
-      if (uploadError) throw uploadError;
-      if (!data.success) throw new Error(data.error || 'Upload failed');
+        if (uploadError) throw uploadError;
+        if (!data.success) throw new Error(data.error || 'Upload failed');
 
-      setUploadMessage(`Successfully uploaded! ${data.vehicles_new} new, ${data.vehicles_updated} updated, ${data.vehicles_sold} sold`);
+        setUploadMessage(`Successfully uploaded! ${data.vehicles_new} new, ${data.vehicles_updated} updated, ${data.vehicles_sold} sold`);
+      } else {
+        // Upload competitor data CSV
+        const selectedEntry = competitorWaitingList.find(e => e.id === selectedCompetitorEntry);
+        if (!selectedEntry) {
+          throw new Error('Selected competitor entry not found');
+        }
+
+        const { data, error: uploadError } = await supabase.functions.invoke('process-competitor-csv', {
+          body: {
+            csv_content: csvContent,
+            filename: csvFile.name,
+            tenant_id: selectedEntry.tenant_id,
+            competitor_url: selectedEntry.competitor_url,
+            competitor_name: selectedEntry.competitor_name,
+            waiting_list_entry_id: selectedEntry.id,
+          },
+        });
+
+        if (uploadError) throw uploadError;
+        if (!data.success) throw new Error(data.error || 'Upload failed');
+
+        setUploadMessage(`Successfully uploaded competitor data! ${data.vehicles_processed} vehicles processed`);
+
+        // Reload competitor waiting list
+        loadCompetitorWaitingList();
+      }
+
       handleClearFile();
       setSelectedTenantForUpload('');
+      setSelectedCompetitorEntry('');
       setTimeout(() => setUploadMessage(''), 5000);
     } catch (err: any) {
       console.error('Upload error:', err);
@@ -815,22 +857,99 @@ export default function AdminPage() {
                   </div>
                 )}
 
+                {/* Upload Type Selector */}
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Select Dealership
+                  <label className="block text-sm font-medium text-gray-700 mb-3">
+                    Upload Type
                   </label>
-                  <select
-                    value={selectedTenantForUpload}
-                    onChange={(e) => setSelectedTenantForUpload(e.target.value)}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                  >
-                    <option value="">Choose a dealership...</option>
-                    {tenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenant.name} - {tenant.website_url}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => {
+                        setUploadType('dealer_inventory');
+                        setSelectedCompetitorEntry('');
+                      }}
+                      className={`p-4 border-2 rounded-lg transition ${
+                        uploadType === 'dealer_inventory'
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Building2 className={`h-5 w-5 ${uploadType === 'dealer_inventory' ? 'text-blue-600' : 'text-gray-600'}`} />
+                        <span className={`font-medium ${uploadType === 'dealer_inventory' ? 'text-blue-900' : 'text-gray-700'}`}>
+                          Dealer Inventory
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Upload dealership vehicles</p>
+                    </button>
+                    <button
+                      onClick={() => {
+                        setUploadType('competitor_data');
+                        setSelectedTenantForUpload('');
+                      }}
+                      className={`p-4 border-2 rounded-lg transition ${
+                        uploadType === 'competitor_data'
+                          ? 'border-purple-600 bg-purple-50'
+                          : 'border-gray-300 hover:border-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center justify-center gap-2">
+                        <Globe className={`h-5 w-5 ${uploadType === 'competitor_data' ? 'text-purple-600' : 'text-gray-600'}`} />
+                        <span className={`font-medium ${uploadType === 'competitor_data' ? 'text-purple-900' : 'text-gray-700'}`}>
+                          Competitor Data
+                        </span>
+                      </div>
+                      <p className="text-xs text-gray-500 mt-1">Upload competitor vehicles</p>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Dealership/Competitor Selector */}
+                <div className="mb-6">
+                  {uploadType === 'dealer_inventory' ? (
+                    <>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Dealership
+                      </label>
+                      <select
+                        value={selectedTenantForUpload}
+                        onChange={(e) => setSelectedTenantForUpload(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                      >
+                        <option value="">Choose a dealership...</option>
+                        {tenants.map((tenant) => (
+                          <option key={tenant.id} value={tenant.id}>
+                            {tenant.name} - {tenant.website_url}
+                          </option>
+                        ))}
+                      </select>
+                    </>
+                  ) : (
+                    <>
+                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                        Select Competitor from Waiting List
+                      </label>
+                      <select
+                        value={selectedCompetitorEntry}
+                        onChange={(e) => setSelectedCompetitorEntry(e.target.value)}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
+                      >
+                        <option value="">Choose a competitor...</option>
+                        {competitorWaitingList
+                          .filter(e => e.status === 'in_progress' || e.status === 'pending')
+                          .map((entry) => (
+                            <option key={entry.id} value={entry.id}>
+                              {entry.tenant.name} → {entry.competitor_name || entry.competitor_url}
+                            </option>
+                          ))}
+                      </select>
+                      {competitorWaitingList.filter(e => e.status === 'in_progress' || e.status === 'pending').length === 0 && (
+                        <p className="mt-2 text-sm text-gray-500">
+                          No competitors in waiting list. Add competitors from the Competitor Queue tab.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </div>
 
                 <div className="mb-6">
@@ -839,8 +958,17 @@ export default function AdminPage() {
 
                 <button
                   onClick={handleUpload}
-                  disabled={!csvFile || !selectedTenantForUpload || uploading}
-                  className="w-full px-6 py-3 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  disabled={
+                    !csvFile ||
+                    uploading ||
+                    (uploadType === 'dealer_inventory' && !selectedTenantForUpload) ||
+                    (uploadType === 'competitor_data' && !selectedCompetitorEntry)
+                  }
+                  className={`w-full px-6 py-3 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
+                    uploadType === 'dealer_inventory'
+                      ? 'bg-blue-600 hover:bg-blue-700'
+                      : 'bg-purple-600 hover:bg-purple-700'
+                  }`}
                 >
                   {uploading ? 'Uploading...' : 'Upload and Process CSV'}
                 </button>
