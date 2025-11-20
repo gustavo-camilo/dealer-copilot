@@ -28,6 +28,7 @@ export interface Tenant {
   name: string;
   website_url: string | null;
   location: string | null;
+  zip_code: string | null;
   contact_email: string;
   contact_phone: string | null;
   status: TenantStatus;
@@ -217,4 +218,44 @@ export interface SweetSpotAnalysis {
   avg_gross_profit: number;
   total_gross_profit: number;
   is_top_performer: boolean;
+}
+
+export type ScrapingSource = 'dealer_inventory' | 'competitor_data';
+
+export type UploadStatus = 'processing' | 'completed' | 'failed' | 'pending_review';
+
+export interface ManualScrapingUpload {
+  id: string;
+  tenant_id: string;
+  uploaded_by: string;
+  filename: string;
+  upload_date: string;
+  status: UploadStatus;
+  vehicles_processed: number;
+  vehicles_new: number;
+  vehicles_updated: number;
+  vehicles_sold: number;
+  error_log: Record<string, any> | null;
+  raw_csv_data: string | null;
+  scraping_source: ScrapingSource;
+  created_at: string;
+  updated_at: string;
+}
+
+export type CompetitorWaitingListStatus = 'pending' | 'in_progress' | 'completed';
+
+export interface CompetitorWaitingListEntry {
+  id: string;
+  tenant_id: string;
+  competitor_url: string;
+  competitor_name: string | null;
+  requested_at: string;
+  status: CompetitorWaitingListStatus;
+  assigned_to: string | null;
+  priority: number;
+  notes: string | null;
+  completed_at: string | null;
+  notified_at: string | null;
+  created_at: string;
+  updated_at: string;
 }

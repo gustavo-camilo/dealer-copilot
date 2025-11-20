@@ -3,9 +3,11 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import WaitingListCard from '../components/WaitingListCard';
+import EditTenantModal from '../components/EditTenantModal';
+import toast from 'react-hot-toast';
 
 interface UploadHistory {
   id: string;
@@ -16,6 +18,7 @@ interface UploadHistory {
   vehicles_new: number;
   vehicles_updated: number;
   vehicles_sold: number;
+  scraping_source: string;
   tenants: { name: string };
   users: { full_name: string };
 }
@@ -80,6 +83,8 @@ export default function AdminPage() {
   const [selectedTenantForScrape, setSelectedTenantForScrape] = useState('');
   const [scraping, setScraping] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [selectedTenantForEdit, setSelectedTenantForEdit] = useState<Tenant | null>(null);
+  const [editModalOpen, setEditModalOpen] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -151,14 +156,16 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from('manual_scraping_uploads')
-        .select('id, filename, upload_date, status, vehicles_processed, vehicles_new, vehicles_updated, vehicles_sold, tenants!inner (name), users!inner (full_name)')
+        .select('id, filename, upload_date, status, vehicles_processed, vehicles_new, vehicles_updated, vehicles_sold, scraping_source, tenants!inner (name), users!inner (full_name)')
+        .eq('status', 'completed') // Only show successful scrapes
         .order('upload_date', { ascending: false })
-        .limit(50);
+        .limit(100);
 
       if (error) throw error;
 
       const mapped = (data || []).map((item: any) => ({
         ...item,
+        scraping_source: item.scraping_source || 'dealer_inventory',
         tenants: Array.isArray(item.tenants) && item.tenants.length > 0 ? item.tenants[0] : { name: 'Unknown' },
         users: Array.isArray(item.users) && item.users.length > 0 ? item.users[0] : { full_name: 'Unknown' }
       }));
@@ -323,6 +330,33 @@ export default function AdminPage() {
     }
   };
 
+  const handleEditTenant = (tenant: Tenant) => {
+    setSelectedTenantForEdit(tenant);
+    setEditModalOpen(true);
+  };
+
+  const handleUpdateTenant = async (updatedTenant: Partial<Tenant>) => {
+    if (!selectedTenantForEdit) return;
+
+    try {
+      const { error } = await supabase
+        .from('tenants')
+        .update(updatedTenant)
+        .eq('id', selectedTenantForEdit.id);
+
+      if (error) throw error;
+
+      toast.success('Dealership updated successfully!');
+      loadAdminData();
+      setEditModalOpen(false);
+      setSelectedTenantForEdit(null);
+    } catch (error: any) {
+      console.error('Error updating tenant:', error);
+      toast.error(`Failed to update: ${error.message}`);
+      throw error;
+    }
+  };
+
   if (!hasAccess) {
     return <Navigate to="/dashboard" />;
   }
@@ -482,6 +516,7 @@ export default function AdminPage() {
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inventory</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
                   <tbody className="bg-white divide-y divide-gray-200">
@@ -523,6 +558,16 @@ export default function AdminPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                           {new Date(tenant.created_at).toLocaleDateString()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <button
+                            onClick={() => handleEditTenant(tenant)}
+                            className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                            title="Edit dealership"
+                          >
+                            <Edit size={16} />
+                            Edit
+                          </button>
                         </td>
                       </tr>
                     ))}
@@ -653,6 +698,7 @@ export default function AdminPage() {
                       <tr>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processed</th>
@@ -667,6 +713,15 @@ export default function AdminPage() {
                         <tr key={upload.id} className="hover:bg-gray-50">
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.tenants.name}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              upload.scraping_source === 'competitor_data'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {upload.scraping_source === 'competitor_data' ? 'Competitor Data' : 'Dealer Inventory'}
+                            </span>
+                          </td>
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.users.full_name}</td>
                           <td className="px-6 py-4 text-sm text-gray-500">
                             {new Date(upload.upload_date).toLocaleString()}
@@ -760,6 +815,19 @@ export default function AdminPage() {
           </div>
         </div>
       </div>
+
+      {/* Edit Tenant Modal */}
+      {selectedTenantForEdit && (
+        <EditTenantModal
+          tenant={selectedTenantForEdit}
+          isOpen={editModalOpen}
+          onClose={() => {
+            setEditModalOpen(false);
+            setSelectedTenantForEdit(null);
+          }}
+          onSave={handleUpdateTenant}
+        />
+      )}
     </div>
   );
 }
