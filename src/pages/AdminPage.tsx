@@ -74,6 +74,7 @@ export default function AdminPage() {
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState('');
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
+  const [waitingListStatusFilter, setWaitingListStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
   const [selectedTenantForScrape, setSelectedTenantForScrape] = useState('');
@@ -102,6 +103,12 @@ export default function AdminPage() {
     else if (activeTab === 'reviews') loadPendingReviews();
   }, [activeTab]);
 
+  useEffect(() => {
+    if (activeTab === 'waiting-list') {
+      loadWaitingList();
+    }
+  }, [waitingListStatusFilter]);
+
   const loadAdminData = async () => {
     try {
       const { data: tenantsData } = await supabase.from('tenants').select('*').order('created_at', { ascending: false });
@@ -124,7 +131,15 @@ export default function AdminPage() {
 
   const loadWaitingList = async () => {
     try {
-      const { data, error } = await supabase.functions.invoke('get-waiting-list');
+      const params = new URLSearchParams({
+        status: waitingListStatusFilter,
+        include_completed: 'true', // Always include completed so we can filter client-side
+      });
+
+      const { data, error } = await supabase.functions.invoke('get-waiting-list', {
+        body: params,
+      });
+
       if (error) throw error;
       setWaitingList(data.waiting_list || []);
     } catch (error) {
@@ -525,8 +540,46 @@ export default function AdminPage() {
                     </p>
                   </div>
                 )}
+
+                {/* Filter Controls */}
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-gray-700">Status:</label>
+                    <select
+                      value={waitingListStatusFilter}
+                      onChange={(e) => setWaitingListStatusFilter(e.target.value as any)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent text-sm"
+                    >
+                      <option value="all">All Statuses</option>
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                  </div>
+
+                  {/* Stats */}
+                  <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+                      Pending: {waitingList.filter(e => e.status === 'pending').length}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-purple-500"></span>
+                      In Progress: {waitingList.filter(e => e.status === 'in_progress').length}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                      Completed: {waitingList.filter(e => e.status === 'completed').length}
+                    </span>
+                  </div>
+                </div>
+
                 {waitingList.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No tenants in waiting list</p>
+                  <p className="text-gray-500 text-center py-8">
+                    {waitingListStatusFilter === 'all'
+                      ? 'No tenants in waiting list'
+                      : `No ${waitingListStatusFilter.replace('_', ' ')} entries`}
+                  </p>
                 ) : (
                   waitingList.map((entry) => (
                     <WaitingListCard
