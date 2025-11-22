@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Globe, Download } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Globe, Download, MessageSquare } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import WaitingListCard from '../components/WaitingListCard';
 import CompetitorWaitingListCard from '../components/CompetitorWaitingListCard';
@@ -76,10 +76,28 @@ interface CompetitorWaitingListEntry {
   } | null;
 }
 
+interface SupportTicket {
+  id: string;
+  type: 'missing_market_data' | 'bug' | 'feature_request' | 'other';
+  subject: string;
+  details: any;
+  status: 'open' | 'in_progress' | 'resolved' | 'closed';
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  created_at: string;
+  tenant: {
+    name: string;
+    contact_email: string;
+  };
+  user: {
+    full_name: string;
+    email: string;
+  };
+}
+
 export default function AdminPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tenants' | 'waiting-list' | 'competitor-queue' | 'upload' | 'history' | 'reviews'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'waiting-list' | 'competitor-queue' | 'upload' | 'history' | 'reviews' | 'support'>('tenants');
 
   // Check if user has access (super_admin or va_uploader)
   const isVAUploader = user?.role === 'va_uploader';
@@ -93,9 +111,7 @@ export default function AdminPage() {
     activeTenants: 0,
     totalUsers: 0,
   });
-  const [selectedTenantForUpload, setSelectedTenantForUpload] = useState('');
   const [csvFile, setCsvFile] = useState<File | null>(null);
-  const [csvContent, setCsvContent] = useState('');
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState('');
@@ -110,8 +126,6 @@ export default function AdminPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [competitorWaitingList, setCompetitorWaitingList] = useState<CompetitorWaitingListEntry[]>([]);
   const [competitorStatusFilter, setCompetitorStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
-  const [uploadType, setUploadType] = useState<'dealer_inventory' | 'competitor_data'>('dealer_inventory');
-  const [selectedCompetitorEntry, setSelectedCompetitorEntry] = useState('');
 
   const handleSignOut = async () => {
     try {
@@ -134,7 +148,12 @@ export default function AdminPage() {
     else if (activeTab === 'competitor-queue') loadCompetitorWaitingList();
     else if (activeTab === 'history') loadUploadHistory();
     else if (activeTab === 'reviews') loadPendingReviews();
+    else if (activeTab === 'support') loadSupportTickets();
   }, [activeTab]);
+
+  useEffect(() => {
+    if (activeTab === 'support') loadSupportTickets();
+  }, [supportStatusFilter]);
 
   useEffect(() => {
     if (activeTab === 'waiting-list') {
@@ -249,84 +268,60 @@ export default function AdminPage() {
 
   const handleFileSelect = (file: File, content: string) => {
     setCsvFile(file);
-    setCsvContent(content);
     setUploadError('');
     setUploadMessage('');
   };
 
   const handleClearFile = () => {
     setCsvFile(null);
-    setCsvContent('');
     setUploadError('');
     setUploadMessage('');
   };
 
   const handleUpload = async () => {
-    if (!csvFile || !csvContent) {
-      setUploadError('Please upload a CSV file');
-      return;
-    }
-
-    if (uploadType === 'dealer_inventory' && !selectedTenantForUpload) {
-      setUploadError('Please select a dealership');
-      return;
-    }
-
-    if (uploadType === 'competitor_data' && !selectedCompetitorEntry) {
-      setUploadError('Please select a competitor from the waiting list');
-      return;
-    }
+    if (!csvFile || !user) return;
 
     setUploading(true);
     setUploadError('');
     setUploadMessage('');
 
     try {
-      if (uploadType === 'dealer_inventory') {
-        // Upload dealer inventory CSV
-        const { data, error: uploadError } = await supabase.functions.invoke('upload-manual-scraping', {
-          body: { csv_content: csvContent, filename: csvFile.name, tenant_id: selectedTenantForUpload },
-        });
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        const text = e.target?.result as string;
 
-        if (uploadError) throw uploadError;
-        if (!data.success) throw new Error(data.error || 'Upload failed');
+        try {
+          const { data, error } = await supabase.functions.invoke('upload-universal-csv', {
+            body: {
+              csv_content: text,
+              filename: csvFile.name,
+              tenant_id: user.tenant_id // Pass user's tenant_id for logging purposes
+            }
+          });
 
-        setUploadMessage(`Successfully uploaded! ${data.vehicles_new} new, ${data.vehicles_updated} updated, ${data.vehicles_sold} sold`);
-      } else {
-        // Upload competitor data CSV
-        const selectedEntry = competitorWaitingList.find(e => e.id === selectedCompetitorEntry);
-        if (!selectedEntry) {
-          throw new Error('Selected competitor entry not found');
+          if (error) throw error;
+
+          if (data.success) {
+            setUploadMessage(`Successfully processed ${data.vehicles_processed} vehicles!`);
+            if (data.vehicles_new > 0) setUploadMessage(prev => `${prev} (${data.vehicles_new} new)`);
+            handleClearFile();
+            // Refresh data
+            loadAdminData();
+            loadCompetitorWaitingList();
+          } else {
+            throw new Error(data.error || 'Upload failed');
+          }
+        } catch (err: any) {
+          console.error('Upload error:', err);
+          setUploadError(err.message || 'Failed to upload CSV');
+        } finally {
+          setUploading(false);
         }
-
-        const { data, error: uploadError } = await supabase.functions.invoke('process-competitor-csv', {
-          body: {
-            csv_content: csvContent,
-            filename: csvFile.name,
-            tenant_id: selectedEntry.tenant_id,
-            competitor_url: selectedEntry.competitor_url,
-            competitor_name: selectedEntry.competitor_name,
-            waiting_list_entry_id: selectedEntry.id,
-          },
-        });
-
-        if (uploadError) throw uploadError;
-        if (!data.success) throw new Error(data.error || 'Upload failed');
-
-        setUploadMessage(`Successfully uploaded competitor data! ${data.vehicles_processed} vehicles processed`);
-
-        // Reload competitor waiting list
-        loadCompetitorWaitingList();
-      }
-
-      handleClearFile();
-      setSelectedTenantForUpload('');
-      setSelectedCompetitorEntry('');
-      setTimeout(() => setUploadMessage(''), 5000);
+      };
+      reader.readAsText(csvFile);
     } catch (err: any) {
-      console.error('Upload error:', err);
-      setUploadError(err.message || 'Failed to upload CSV');
-    } finally {
+      console.error('File reading error:', err);
+      setUploadError('Failed to read file');
       setUploading(false);
     }
   };
@@ -632,6 +627,19 @@ export default function AdminPage() {
                   Pending Reviews
                 </button>
               )}
+
+              {isSuperAdmin && (
+                <button
+                  onClick={() => setActiveTab('support')}
+                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'support'
+                    ? 'border-blue-900 text-blue-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
+                >
+                  <MessageSquare className="inline-block h-4 w-4 mr-2" />
+                  Support Tickets
+                </button>
+              )}
             </nav>
           </div>
 
@@ -762,7 +770,6 @@ export default function AdminPage() {
                       onUpdateStatus={isSuperAdmin ? handleUpdateWaitingListStatus : undefined}
                       onUpdatePriority={isSuperAdmin ? handleUpdatePriority : undefined}
                       onUpload={() => {
-                        setSelectedTenantForUpload(entry.tenant_id);
                         setActiveTab('upload');
                       }}
                     />
@@ -825,9 +832,8 @@ export default function AdminPage() {
                       entry={entry}
                       onUpdateStatus={isSuperAdmin ? handleUpdateCompetitorStatus : undefined}
                       onUpdatePriority={isSuperAdmin ? handleUpdateCompetitorPriority : undefined}
-                      onUpload={(entryId, tenantId) => {
-                        setSelectedTenantForUpload(tenantId);
-                        setActiveTab('upload');
+                      onUpload={() => {
+                        // Handle upload logic
                       }}
                     />
                   ))
@@ -835,284 +841,242 @@ export default function AdminPage() {
               </div>
             )}
 
-            {activeTab === 'upload' && (
-              <div className="max-w-3xl mx-auto">
-                {uploadMessage && (
-                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
-                    {uploadMessage}
-                  </div>
-                )}
-
-                {uploadError && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-                    {uploadError}
-                  </div>
-                )}
-
-                {/* Upload Type Selector */}
-                <div className="mb-6">
-                  <label className="block text-sm font-medium text-gray-700 mb-3">
-                    Upload Type
-                  </label>
-                  <div className="grid grid-cols-2 gap-4">
-                    <button
-                      onClick={() => {
-                        setUploadType('dealer_inventory');
-                        setSelectedCompetitorEntry('');
-                      }}
-                      className={`p-4 border-2 rounded-lg transition ${uploadType === 'dealer_inventory'
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <Building2 className={`h-5 w-5 ${uploadType === 'dealer_inventory' ? 'text-blue-600' : 'text-gray-600'}`} />
-                        <span className={`font-medium ${uploadType === 'dealer_inventory' ? 'text-blue-900' : 'text-gray-700'}`}>
-                          Dealer Inventory
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">Upload dealership vehicles</p>
-                    </button>
-                    <button
-                      onClick={() => {
-                        setUploadType('competitor_data');
-                        setSelectedTenantForUpload('');
-                      }}
-                      className={`p-4 border-2 rounded-lg transition ${uploadType === 'competitor_data'
-                        ? 'border-purple-600 bg-purple-50'
-                        : 'border-gray-300 hover:border-gray-400'
-                        }`}
-                    >
-                      <div className="flex items-center justify-center gap-2">
-                        <Globe className={`h-5 w-5 ${uploadType === 'competitor_data' ? 'text-purple-600' : 'text-gray-600'}`} />
-                        <span className={`font-medium ${uploadType === 'competitor_data' ? 'text-purple-900' : 'text-gray-700'}`}>
-                          Competitor Data
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-500 mt-1">Upload competitor vehicles</p>
-                    </button>
-                  </div>
-                </div>
-
-                {/* Dealership/Competitor Selector */}
-                <div className="mb-6">
-                  {uploadType === 'dealer_inventory' ? (
-                    <>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Dealership
-                      </label>
-                      <select
-                        value={selectedTenantForUpload}
-                        onChange={(e) => setSelectedTenantForUpload(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                      >
-                        <option value="">Choose a dealership...</option>
-                        {tenants.map((tenant) => (
-                          <option key={tenant.id} value={tenant.id}>
-                            {tenant.name} - {tenant.website_url}
-                          </option>
-                        ))}
-                      </select>
-                    </>
-                  ) : (
-                    <>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Select Competitor from Waiting List
-                      </label>
-                      <select
-                        value={selectedCompetitorEntry}
-                        onChange={(e) => setSelectedCompetitorEntry(e.target.value)}
-                        className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-                      >
-                        <option value="">Choose a competitor...</option>
-                        {competitorWaitingList
-                          .filter(e => e.status === 'in_progress' || e.status === 'pending')
-                          .map((entry) => (
-                            <option key={entry.id} value={entry.id}>
-                              {entry.tenant.name} → {entry.competitor_name || entry.competitor_url}
-                            </option>
-                          ))}
-                      </select>
-                      {competitorWaitingList.filter(e => e.status === 'in_progress' || e.status === 'pending').length === 0 && (
-                        <p className="mt-2 text-sm text-gray-500">
-                          No competitors in waiting list. Add competitors from the Competitor Queue tab.
-                        </p>
-                      )}
-                    </>
-                  )}
-                </div>
-
-                <div className="mb-6 flex justify-end">
-                  <a
-                    href="/templates/inventory_upload_template.csv"
-                    download="inventory_upload_template.csv"
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                  >
-                    <Download className="h-4 w-4" />
-                    Download CSV Template
-                  </a>
-                </div>
-
-                <div className="mb-6">
-                  <CSVUploader onFileSelect={handleFileSelect} onClear={handleClearFile} />
-                </div>
-
-                <button
-                  onClick={handleUpload}
-                  disabled={
-                    !csvFile ||
-                    uploading ||
-                    (uploadType === 'dealer_inventory' && !selectedTenantForUpload) ||
-                    (uploadType === 'competitor_data' && !selectedCompetitorEntry)
-                  }
-                  className={`w-full px-6 py-3 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${uploadType === 'dealer_inventory'
-                    ? 'bg-blue-600 hover:bg-blue-700'
-                    : 'bg-purple-600 hover:bg-purple-700'
-                    }`}
-                >
-                  {uploading ? 'Uploading...' : 'Upload and Process CSV'}
-                </button>
-              </div>
-            )}
-
-            {activeTab === 'history' && (
-              <div className="overflow-x-auto">
-                {uploadHistory.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No upload history</p>
-                ) : (
-                  <table className="w-full">
-                    <thead className="bg-gray-50">
-                      <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processed</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sold</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
-                      {uploadHistory.map((upload) => (
-                        <tr key={upload.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.tenants.name}</td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
-                          <td className="px-6 py-4 text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'competitor_data'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                              }`}>
-                              {upload.scraping_source === 'competitor_data' ? 'Competitor Data' : 'Dealer Inventory'}
-                            </span>
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.users.full_name}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
-                            {new Date(upload.upload_date).toLocaleString()}
-                          </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.vehicles_processed}</td>
-                          <td className="px-6 py-4 text-sm text-green-600">{upload.vehicles_new}</td>
-                          <td className="px-6 py-4 text-sm text-blue-600">{upload.vehicles_updated}</td>
-                          <td className="px-6 py-4 text-sm text-red-600">{upload.vehicles_sold}</td>
-                          <td className="px-6 py-4">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              upload.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                                'bg-red-100 text-red-800'
-                              }`}>
-                              {upload.status}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {activeTab === 'reviews' && isSuperAdmin && (
-              <div>
-                <div className="mb-6 pb-6 border-b">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Automated Scraper</h3>
-                  <div className="flex gap-4">
+            {activeTab === 'support' && (
+              <div className="space-y-4">
+                <div className="flex items-center justify-between gap-4 mb-6">
+                  <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-gray-700">Status:</label>
                     <select
-                      value={selectedTenantForScrape}
-                      onChange={(e) => setSelectedTenantForScrape(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                      value={supportStatusFilter}
+                      onChange={(e) => setSupportStatusFilter(e.target.value as any)}
+                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
                     >
-                      <option value="">Choose a dealership...</option>
-                      {tenants.map((tenant) => (
-                        <option key={tenant.id} value={tenant.id}>
-                          {tenant.name} - {tenant.website_url}
-                        </option>
-                      ))}
+                      <option value="all">All Tickets</option>
+                      <option value="open">Open</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="resolved">Resolved</option>
                     </select>
-                    <button
-                      onClick={handleTestScrape}
-                      disabled={!selectedTenantForScrape || scraping}
-                      className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      {scraping ? 'Scraping...' : 'Test Scrape with Review'}
-                    </button>
+                  </div>
+
+                  <div className="text-sm text-gray-600">
+                    Total: {supportTickets.length} tickets
                   </div>
                 </div>
 
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Reviews</h3>
-                {pendingReviews.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No pending reviews</p>
+                {supportTickets.length === 0 ? (
+                  <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
+                    <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
+                    <p className="text-gray-500">No support tickets found</p>
+                  </div>
                 ) : (
                   <div className="space-y-4">
-                    {pendingReviews.map((review) => (
-                      <div key={review.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h4 className="font-medium text-gray-900">{review.tenants.name}</h4>
-                            <p className="text-sm text-gray-500">
-                              {new Date(review.snapshot_date).toLocaleString()}
-                            </p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {review.vehicles_found} vehicles found
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleApproveReview(review.id)}
-                              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleRejectReview(review.id)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition"
-                            >
-                              Reject
-                            </button>
-                          </div>
-                        </div>
-                      </div>
+                    {supportTickets.map((ticket) => (
+                      <SupportTicketCard
+                        key={ticket.id}
+                        ticket={ticket}
+                        onUpdateStatus={handleUpdateTicketStatus}
+                      />
                     ))}
                   </div>
                 )}
               </div>
             )}
+            onUpdatePriority={isSuperAdmin ? handleUpdateCompetitorPriority : undefined}
+            onUpload={() => {
+              setActiveTab('upload');
+            }}
+                    />
+            ))
+                )}
           </div>
+            )}
+
+          {activeTab === 'upload' && (
+            <div className="max-w-3xl mx-auto">
+              {uploadMessage && (
+                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+                  {uploadMessage}
+                </div>
+              )}
+
+              {uploadError && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+                  {uploadError}
+                </div>
+              )}
+
+              <div className="mb-6 flex justify-end">
+                <a
+                  href="/templates/inventory_upload_template.csv"
+                  download="inventory_upload_template.csv"
+                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                >
+                  <Download className="h-4 w-4" />
+                  Download CSV Template
+                </a>
+              </div>
+
+              <div className="mb-6">
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                  <h3 className="text-sm font-medium text-blue-900 mb-2">Smart Upload</h3>
+                  <p className="text-sm text-blue-800">
+                    Upload any inventory CSV (Dealer or Competitor). The system will automatically detect the website URL
+                    and route the data to the correct inventory or competitor database.
+                  </p>
+                </div>
+                <CSVUploader onFileSelect={handleFileSelect} onClear={handleClearFile} />
+              </div>
+
+              <button
+                onClick={handleUpload}
+                disabled={!csvFile || uploading}
+                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {uploading ? 'Processing...' : 'Upload CSV'}
+              </button>
+            </div>
+          )}
+
+          {activeTab === 'history' && (
+            <div className="overflow-x-auto">
+              {uploadHistory.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No upload history</p>
+              ) : (
+                <table className="w-full">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processed</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sold</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {uploadHistory.map((upload) => (
+                      <tr key={upload.id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 text-sm text-gray-900">{upload.tenants.name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
+                        <td className="px-6 py-4 text-sm">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'competitor_data'
+                            ? 'bg-purple-100 text-purple-800'
+                            : 'bg-blue-100 text-blue-800'
+                            }`}>
+                            {upload.scraping_source === 'competitor_data' ? 'Competitor Data' : 'Dealer Inventory'}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{upload.users.full_name}</td>
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {new Date(upload.upload_date).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-sm text-gray-900">{upload.vehicles_processed}</td>
+                        <td className="px-6 py-4 text-sm text-green-600">{upload.vehicles_new}</td>
+                        <td className="px-6 py-4 text-sm text-blue-600">{upload.vehicles_updated}</td>
+                        <td className="px-6 py-4 text-sm text-red-600">{upload.vehicles_sold}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            upload.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                              'bg-red-100 text-red-800'
+                            }`}>
+                            {upload.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'reviews' && isSuperAdmin && (
+            <div>
+              <div className="mb-6 pb-6 border-b">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Automated Scraper</h3>
+                <div className="flex gap-4">
+                  <select
+                    value={selectedTenantForScrape}
+                    onChange={(e) => setSelectedTenantForScrape(e.target.value)}
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                  >
+                    <option value="">Choose a dealership...</option>
+                    {tenants.map((tenant) => (
+                      <option key={tenant.id} value={tenant.id}>
+                        {tenant.name} - {tenant.website_url}
+                      </option>
+                    ))}
+                  </select>
+                  <button
+                    onClick={handleTestScrape}
+                    disabled={!selectedTenantForScrape || scraping}
+                    className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {scraping ? 'Scraping...' : 'Test Scrape with Review'}
+                  </button>
+                </div>
+              </div>
+
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Reviews</h3>
+              {pendingReviews.length === 0 ? (
+                <p className="text-gray-500 text-center py-8">No pending reviews</p>
+              ) : (
+                <div className="space-y-4">
+                  {pendingReviews.map((review) => (
+                    <div key={review.id} className="border border-gray-200 rounded-lg p-4">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h4 className="font-medium text-gray-900">{review.tenants.name}</h4>
+                          <p className="text-sm text-gray-500">
+                            {new Date(review.snapshot_date).toLocaleString()}
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {review.vehicles_found} vehicles found
+                          </p>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleApproveReview(review.id)}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition"
+                          >
+                            Approve
+                          </button>
+                          <button
+                            onClick={() => handleRejectReview(review.id)}
+                            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition"
+                          >
+                            Reject
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
-
-      {/* Edit Tenant Modal */}
-      {selectedTenantForEdit && (
-        <EditTenantModal
-          tenant={selectedTenantForEdit}
-          isOpen={editModalOpen}
-          onClose={() => {
-            setEditModalOpen(false);
-            setSelectedTenantForEdit(null);
-          }}
-          onSave={handleUpdateTenant}
-        />
-      )}
     </div>
+
+      {/* Edit Tenant Modal */ }
+  {
+    selectedTenantForEdit && (
+      <EditTenantModal
+        tenant={selectedTenantForEdit}
+        isOpen={editModalOpen}
+        onClose={() => {
+          setEditModalOpen(false);
+          setSelectedTenantForEdit(null);
+        }}
+        onSave={handleUpdateTenant}
+      />
+    )
+  }
+    </div >
   );
 }
