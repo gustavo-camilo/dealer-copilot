@@ -881,202 +881,190 @@ export default function AdminPage() {
                 )}
               </div>
             )}
-            onUpdatePriority={isSuperAdmin ? handleUpdateCompetitorPriority : undefined}
-            onUpload={() => {
-              setActiveTab('upload');
-            }}
-                    />
-            ))
+
+
+            {activeTab === 'upload' && (
+              <div className="max-w-3xl mx-auto">
+                {uploadMessage && (
+                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
+                    {uploadMessage}
+                  </div>
                 )}
-          </div>
+
+                {uploadError && (
+                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
+                    {uploadError}
+                  </div>
+                )}
+
+                <div className="mb-6 flex justify-end">
+                  <a
+                    href="/templates/inventory_upload_template.csv"
+                    download="inventory_upload_template.csv"
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download CSV Template
+                  </a>
+                </div>
+
+                <div className="mb-6">
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h3 className="text-sm font-medium text-blue-900 mb-2">Smart Upload</h3>
+                    <p className="text-sm text-blue-800">
+                      Upload any inventory CSV (Dealer or Competitor). The system will automatically detect the website URL
+                      and route the data to the correct inventory or competitor database.
+                    </p>
+                  </div>
+                  <CSVUploader onFileSelect={handleFileSelect} onClear={handleClearFile} />
+                </div>
+
+                <button
+                  onClick={handleUpload}
+                  disabled={!csvFile || uploading}
+                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {uploading ? 'Processing...' : 'Upload CSV'}
+                </button>
+              </div>
             )}
 
-          {activeTab === 'upload' && (
-            <div className="max-w-3xl mx-auto">
-              {uploadMessage && (
-                <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
-                  {uploadMessage}
-                </div>
-              )}
-
-              {uploadError && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-                  {uploadError}
-                </div>
-              )}
-
-              <div className="mb-6 flex justify-end">
-                <a
-                  href="/templates/inventory_upload_template.csv"
-                  download="inventory_upload_template.csv"
-                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
-                >
-                  <Download className="h-4 w-4" />
-                  Download CSV Template
-                </a>
-              </div>
-
-              <div className="mb-6">
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                  <h3 className="text-sm font-medium text-blue-900 mb-2">Smart Upload</h3>
-                  <p className="text-sm text-blue-800">
-                    Upload any inventory CSV (Dealer or Competitor). The system will automatically detect the website URL
-                    and route the data to the correct inventory or competitor database.
-                  </p>
-                </div>
-                <CSVUploader onFileSelect={handleFileSelect} onClear={handleClearFile} />
-              </div>
-
-              <button
-                onClick={handleUpload}
-                disabled={!csvFile || uploading}
-                className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {uploading ? 'Processing...' : 'Upload CSV'}
-              </button>
-            </div>
-          )}
-
-          {activeTab === 'history' && (
-            <div className="overflow-x-auto">
-              {uploadHistory.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No upload history</p>
-              ) : (
-                <table className="w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processed</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sold</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {uploadHistory.map((upload) => (
-                      <tr key={upload.id} className="hover:bg-gray-50">
-                        <td className="px-6 py-4 text-sm text-gray-900">{upload.tenants.name}</td>
-                        <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
-                        <td className="px-6 py-4 text-sm">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'competitor_data'
-                            ? 'bg-purple-100 text-purple-800'
-                            : 'bg-blue-100 text-blue-800'
-                            }`}>
-                            {upload.scraping_source === 'competitor_data' ? 'Competitor Data' : 'Dealer Inventory'}
-                          </span>
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">{upload.users.full_name}</td>
-                        <td className="px-6 py-4 text-sm text-gray-500">
-                          {new Date(upload.upload_date).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-sm text-gray-900">{upload.vehicles_processed}</td>
-                        <td className="px-6 py-4 text-sm text-green-600">{upload.vehicles_new}</td>
-                        <td className="px-6 py-4 text-sm text-blue-600">{upload.vehicles_updated}</td>
-                        <td className="px-6 py-4 text-sm text-red-600">{upload.vehicles_sold}</td>
-                        <td className="px-6 py-4">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 text-green-800' :
-                            upload.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
-                            {upload.status}
-                          </span>
-                        </td>
+            {activeTab === 'history' && (
+              <div className="overflow-x-auto">
+                {uploadHistory.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No upload history</p>
+                ) : (
+                  <table className="w-full">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processed</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sold</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          )}
-
-          {activeTab === 'reviews' && isSuperAdmin && (
-            <div>
-              <div className="mb-6 pb-6 border-b">
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Automated Scraper</h3>
-                <div className="flex gap-4">
-                  <select
-                    value={selectedTenantForScrape}
-                    onChange={(e) => setSelectedTenantForScrape(e.target.value)}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                  >
-                    <option value="">Choose a dealership...</option>
-                    {tenants.map((tenant) => (
-                      <option key={tenant.id} value={tenant.id}>
-                        {tenant.name} - {tenant.website_url}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={handleTestScrape}
-                    disabled={!selectedTenantForScrape || scraping}
-                    className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {scraping ? 'Scraping...' : 'Test Scrape with Review'}
-                  </button>
-                </div>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {uploadHistory.map((upload) => (
+                        <tr key={upload.id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 text-sm text-gray-900">{upload.tenants.name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
+                          <td className="px-6 py-4 text-sm">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'competitor_data'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                              }`}>
+                              {upload.scraping_source === 'competitor_data' ? 'Competitor Data' : 'Dealer Inventory'}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{upload.users.full_name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            {new Date(upload.upload_date).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{upload.vehicles_processed}</td>
+                          <td className="px-6 py-4 text-sm text-green-600">{upload.vehicles_new}</td>
+                          <td className="px-6 py-4 text-sm text-blue-600">{upload.vehicles_updated}</td>
+                          <td className="px-6 py-4 text-sm text-red-600">{upload.vehicles_sold}</td>
+                          <td className="px-6 py-4">
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 text-green-800' :
+                              upload.status === 'processing' ? 'bg-blue-100 text-blue-800' :
+                                'bg-red-100 text-red-800'
+                              }`}>
+                              {upload.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
+            )}
 
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Reviews</h3>
-              {pendingReviews.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No pending reviews</p>
-              ) : (
-                <div className="space-y-4">
-                  {pendingReviews.map((review) => (
-                    <div key={review.id} className="border border-gray-200 rounded-lg p-4">
-                      <div className="flex justify-between items-start mb-4">
-                        <div>
-                          <h4 className="font-medium text-gray-900">{review.tenants.name}</h4>
-                          <p className="text-sm text-gray-500">
-                            {new Date(review.snapshot_date).toLocaleString()}
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {review.vehicles_found} vehicles found
-                          </p>
-                        </div>
-                        <div className="flex gap-2">
-                          <button
-                            onClick={() => handleApproveReview(review.id)}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition"
-                          >
-                            Approve
-                          </button>
-                          <button
-                            onClick={() => handleRejectReview(review.id)}
-                            className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition"
-                          >
-                            Reject
-                          </button>
+            {activeTab === 'reviews' && isSuperAdmin && (
+              <div>
+                <div className="mb-6 pb-6 border-b">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Automated Scraper</h3>
+                  <div className="flex gap-4">
+                    <select
+                      value={selectedTenantForScrape}
+                      onChange={(e) => setSelectedTenantForScrape(e.target.value)}
+                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                    >
+                      <option value="">Choose a dealership...</option>
+                      {tenants.map((tenant) => (
+                        <option key={tenant.id} value={tenant.id}>
+                          {tenant.name} - {tenant.website_url}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={handleTestScrape}
+                      disabled={!selectedTenantForScrape || scraping}
+                      className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {scraping ? 'Scraping...' : 'Test Scrape with Review'}
+                    </button>
+                  </div>
+                </div>
+
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Reviews</h3>
+                {pendingReviews.length === 0 ? (
+                  <p className="text-gray-500 text-center py-8">No pending reviews</p>
+                ) : (
+                  <div className="space-y-4">
+                    {pendingReviews.map((review) => (
+                      <div key={review.id} className="border border-gray-200 rounded-lg p-4">
+                        <div className="flex justify-between items-start mb-4">
+                          <div>
+                            <h4 className="font-medium text-gray-900">{review.tenants.name}</h4>
+                            <p className="text-sm text-gray-500">
+                              {new Date(review.snapshot_date).toLocaleString()}
+                            </p>
+                            <p className="text-sm text-gray-600 mt-1">
+                              {review.vehicles_found} vehicles found
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              onClick={() => handleApproveReview(review.id)}
+                              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition"
+                            >
+                              Approve
+                            </button>
+                            <button
+                              onClick={() => handleRejectReview(review.id)}
+                              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition"
+                            >
+                              Reject
+                            </button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
-    </div>
-
-      {/* Edit Tenant Modal */ }
-  {
-    selectedTenantForEdit && (
-      <EditTenantModal
-        tenant={selectedTenantForEdit}
-        isOpen={editModalOpen}
-        onClose={() => {
-          setEditModalOpen(false);
-          setSelectedTenantForEdit(null);
-        }}
-        onSave={handleUpdateTenant}
-      />
-    )
-  }
-    </div >
-  );
+        {/* Edit Tenant Modal */}
+        {selectedTenantForEdit && (
+          <EditTenantModal
+            tenant={selectedTenantForEdit}
+            isOpen={editModalOpen}
+            onClose={() => {
+              setEditModalOpen(false);
+              setSelectedTenantForEdit(null);
+            }}
+            onSave={handleUpdateTenant}
+          />
+        )}
+      </div >
+      );
 }
