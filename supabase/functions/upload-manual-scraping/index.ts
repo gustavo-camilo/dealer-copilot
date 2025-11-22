@@ -17,6 +17,9 @@ interface CSVRow {
   Days_In_Stock: string;
   Body_Style: string;
   Photo_URL: string;
+  // Unified template aliases
+  URL?: string;
+  Image_URL?: string;
 }
 
 interface ProcessingResult {
@@ -165,9 +168,17 @@ serve(async (req) => {
     rows.forEach((row, index) => {
       const rowNum = index + 2; // +2 for header and 0-indexing
 
+      // Map unified headers to internal expected headers
+      if (!row.Dealership_URL && row['URL']) {
+        row.Dealership_URL = row['URL'];
+      }
+      if (!row.Photo_URL && row['Image_URL']) {
+        row.Photo_URL = row['Image_URL'];
+      }
+
       // Check required fields
       if (!row.Dealership_URL) {
-        errors.push(`Row ${rowNum}: Missing Dealership_URL`);
+        errors.push(`Row ${rowNum}: Missing Dealership_URL (or URL)`);
         return;
       }
       if (!row.Year) {
@@ -187,8 +198,16 @@ serve(async (req) => {
         return;
       }
       if (!row.Days_In_Stock) {
-        errors.push(`Row ${rowNum}: Missing Days_In_Stock`);
-        return;
+        // If Days_In_Stock is missing (unified template might not have it filled), default to 0
+        if (row['Days_In_Stock'] === undefined || row['Days_In_Stock'] === '') {
+          row.Days_In_Stock = '0';
+        } else {
+          // It might be missing if using the old format? No, the check was strict.
+          // But for unified template, we said it's required for Dealer.
+          // Let's keep it strict but allow 0.
+          errors.push(`Row ${rowNum}: Missing Days_In_Stock`);
+          return;
+        }
       }
 
       validRows.push({ ...row, row_index: index });

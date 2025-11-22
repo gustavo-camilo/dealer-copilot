@@ -2,13 +2,13 @@ import { useState } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Target, ArrowLeft, CheckCircle, AlertCircle, Loader2, Menu, X } from 'lucide-react';
+import { Target, CheckCircle, AlertCircle, Loader2, Menu, X } from 'lucide-react';
 import { decodeVIN, enrichDecodedData } from '../services/vinDecoder';
 import { getMarketPricing, calculateMaxBid } from '../services/marketPricing';
 import { generateRecommendation } from '../services/recommendationEngine';
 import ProfitCalculator from '../components/ProfitCalculator';
 import NavigationMenu from '../components/NavigationMenu';
-import { DecodedVehicleData, SalesRecord, TenantCostSettings } from '../types/database';
+import { SalesRecord, TenantCostSettings } from '../types/database';
 
 // Default cost settings if tenant hasn't configured them
 const DEFAULT_COST_SETTINGS: TenantCostSettings = {
@@ -28,7 +28,7 @@ export default function VINScanPage() {
   const [mileage, setMileage] = useState('');
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<React.ReactNode | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
   const costSettings = tenant?.cost_settings || DEFAULT_COST_SETTINGS;
@@ -42,11 +42,40 @@ export default function VINScanPage() {
     }
   };
 
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportSuccess, setReportSuccess] = useState(false);
+
+  const handleReportMissingData = async () => {
+    if (!result?.decoded_data) return;
+
+    setReportLoading(true);
+    try {
+      const { SupportService } = await import('../services/support');
+      await SupportService.createTicket({
+        type: 'missing_market_data',
+        subject: `Missing Pricing: ${result.decoded_data.year} ${result.decoded_data.make} ${result.decoded_data.model}`,
+        details: {
+          vin: vin,
+          decoded_data: result.decoded_data,
+          mileage: mileage
+        },
+        priority: 'medium'
+      });
+      setReportSuccess(true);
+    } catch (err) {
+      console.error('Failed to report issue:', err);
+      setError('Failed to submit report. Please try again.');
+    } finally {
+      setReportLoading(false);
+    }
+  };
+
   const handleScan = async () => {
     if (!vin || !user?.tenant_id) return;
 
     setLoading(true);
     setError(null);
+    setReportSuccess(false);
 
     try {
       // Step 1: Decode VIN
@@ -64,7 +93,38 @@ export default function VINScanPage() {
       });
 
       // Step 2: Get market pricing
-      const marketData = await getMarketPricing(enrichedData);
+      // Enforce tenant zip code
+      if (!tenant?.zip_code) {
+        setError(
+          <span>
+            Missing ZIP Code. Please configure your location in{' '}
+            <Link to="/settings" className="underline font-bold hover:text-red-900">
+              Settings
+            </Link>{' '}
+            to get accurate market data.
+          </span> as any
+        );
+        setLoading(false);
+        return;
+      }
+
+      const marketData = await getMarketPricing(enrichedData, tenant.zip_code);
+
+      // If no market data, stop here and show report UI
+      if (!marketData) {
+        setResult({
+          decoded_data: enrichedData,
+          market_data: null,
+          recommendation: 'caution', // Default to caution if no data
+          confidence_score: 0,
+          match_reasoning: [],
+          estimated_profit: 0,
+          max_bid_suggestion: 0,
+          estimated_days_to_sale: 0,
+        });
+        setLoading(false);
+        return;
+      }
 
       // Step 3: Get dealer's sales history for this vehicle type
       const { data: salesHistory, error: salesError } = await supabase
@@ -207,13 +267,12 @@ export default function VINScanPage() {
                 <p className="text-sm text-gray-500 mt-1">VIN: {vin}</p>
               </div>
               <div
-                className={`px-4 py-2 rounded-lg font-semibold ${
-                  result.recommendation === 'buy'
-                    ? 'bg-green-100 text-green-800'
-                    : result.recommendation === 'caution'
+                className={`px-4 py-2 rounded-lg font-semibold ${result.recommendation === 'buy'
+                  ? 'bg-green-100 text-green-800'
+                  : result.recommendation === 'caution'
                     ? 'bg-yellow-100 text-yellow-800'
                     : 'bg-red-100 text-red-800'
-                }`}
+                  }`}
               >
                 {result.recommendation === 'buy' && '🟢 STRONG BUY'}
                 {result.recommendation === 'caution' && '🟡 PROCEED WITH CAUTION'}
@@ -256,80 +315,110 @@ export default function VINScanPage() {
           </div>
 
           {/* Match Reasoning */}
-          <div
-            className={`rounded-lg p-6 mb-6 ${
-              result.recommendation === 'buy'
+          {result.market_data && (
+            <div
+              className={`rounded-lg p-6 mb-6 ${result.recommendation === 'buy'
                 ? 'bg-green-50 border border-green-200'
                 : result.recommendation === 'caution'
-                ? 'bg-yellow-50 border border-yellow-200'
-                : 'bg-red-50 border border-red-200'
-            }`}
-          >
-            <h3 className="font-bold text-gray-900 mb-3">
-              {result.recommendation === 'buy' && '✅ Why This is a Strong Match'}
-              {result.recommendation === 'caution' && '⚠️ Proceed Carefully - Here\'s Why'}
-              {result.recommendation === 'pass' && '❌ Why You Should Pass'}
-            </h3>
-            <div className="space-y-2">
-              {result.match_reasoning.map((reason: any, index: number) => (
-                <div key={index} className="flex items-start">
-                  {reason.type === 'positive' ? (
-                    <CheckCircle className="h-5 w-5 text-green-600 mr-2 flex-shrink-0 mt-0.5" />
-                  ) : reason.type === 'negative' ? (
-                    <AlertCircle className="h-5 w-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
-                  ) : (
-                    <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
-                  )}
-                  <span className="text-gray-700">{reason.message}</span>
-                </div>
-              ))}
+                  ? 'bg-yellow-50 border border-yellow-200'
+                  : 'bg-red-50 border border-red-200'
+                }`}
+            >
+              <h3 className="font-bold text-gray-900 mb-3">
+                {result.recommendation === 'buy' && '✅ Why This is a Strong Match'}
+                {result.recommendation === 'caution' && '⚠️ Proceed Carefully - Here\'s Why'}
+                {result.recommendation === 'pass' && '❌ Why You Should Pass'}
+              </h3>
+              <div className="space-y-2">
+                {result.match_reasoning.map((reason: any, index: number) => (
+                  <div key={index} className="flex items-start">
+                    {reason.type === 'positive' ? (
+                      <CheckCircle className="h-5 w-5 text-green-600 mr-2 flex-shrink-0 mt-0.5" />
+                    ) : reason.type === 'negative' ? (
+                      <AlertCircle className="h-5 w-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                    )}
+                    <span className="text-gray-700">{reason.message}</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Profit Calculator */}
-          <ProfitCalculator
-            maxBidSuggestion={result.max_bid_suggestion}
-            marketPrice={result.market_data.averagePrice}
-            defaultAuctionFee={costSettings.auction_fee_percent}
-            defaultRecon={costSettings.reconditioning_cost}
-            defaultTransport={costSettings.transport_cost}
-            onCostsChange={async (costs) => {
-              // Save custom costs to database if scan_id exists and costs were edited
-              if (result.scan_id && costs.costsEdited) {
-                try {
-                  await supabase
-                    .from('vin_scans')
-                    .update({
-                      custom_auction_fee_percent: costs.auctionFee,
-                      custom_recon_cost: costs.recon,
-                      custom_transport_cost: costs.transport,
-                      custom_max_bid: costs.maxBid,
-                      custom_market_price: costs.marketPrice,
-                      costs_edited: true,
-                    })
-                    .eq('id', result.scan_id);
-                } catch (error) {
-                  console.error('Error saving custom costs:', error);
+          {result.market_data && (
+            <ProfitCalculator
+              maxBidSuggestion={result.max_bid_suggestion}
+              marketPrice={result.market_data.averagePrice}
+              defaultAuctionFee={costSettings.auction_fee_percent}
+              defaultRecon={costSettings.reconditioning_cost}
+              defaultTransport={costSettings.transport_cost}
+              onCostsChange={async (costs) => {
+                // Save custom costs to database if scan_id exists and costs were edited
+                if (result.scan_id && costs.costsEdited) {
+                  try {
+                    await supabase
+                      .from('vin_scans')
+                      .update({
+                        custom_auction_fee_percent: costs.auctionFee,
+                        custom_recon_cost: costs.recon,
+                        custom_transport_cost: costs.transport,
+                        custom_max_bid: costs.maxBid,
+                        custom_market_price: costs.marketPrice,
+                        costs_edited: true,
+                      })
+                      .eq('id', result.scan_id);
+                  } catch (error) {
+                    console.error('Error saving custom costs:', error);
+                  }
                 }
-              }
-            }}
-          />
+              }}
+            />
+          )}
 
           {/* Market Context */}
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
-            <h4 className="font-semibold text-blue-900 mb-2">📊 Market Context</h4>
-            <div className="text-sm text-blue-800 space-y-1">
-              <p>
-                • Average Market Price: ${result.market_data.averagePrice.toLocaleString()} (
-                {result.market_data.dataSource === 'estimated' ? 'estimated' : 'from real listings'})
-              </p>
-              <p>
-                • Price Range: ${result.market_data.minPrice.toLocaleString()} - $
-                {result.market_data.maxPrice.toLocaleString()}
-              </p>
-              <p>• Data Confidence: {result.market_data.confidence}%</p>
+          {result.market_data ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+              <h4 className="font-semibold text-blue-900 mb-2">📊 Market Context</h4>
+              <div className="text-sm text-blue-800 space-y-1">
+                <p>
+                  • Average Market Price: ${result.market_data.averagePrice.toLocaleString()} (
+                  {result.market_data.dataSource === 'estimated' ? 'estimated' : 'from real listings'})
+                </p>
+                <p>
+                  • Price Range: ${result.market_data.minPrice.toLocaleString()} - $
+                  {result.market_data.maxPrice.toLocaleString()}
+                </p>
+                <p>• Data Confidence: {result.market_data.confidence}%</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mt-6 text-center">
+              <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-3" />
+              <h3 className="text-lg font-bold text-yellow-900 mb-2">Market Data Unavailable</h3>
+              <p className="text-yellow-800 mb-6">
+                We couldn't find sufficient market data for this specific vehicle configuration in your area.
+                This can happen with rare trims or very new inventory.
+              </p>
+
+              {reportSuccess ? (
+                <div className="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-center">
+                  <CheckCircle className="h-5 w-5 mr-2" />
+                  Report submitted successfully! Our team will investigate.
+                </div>
+              ) : (
+                <button
+                  onClick={handleReportMissingData}
+                  disabled={reportLoading}
+                  className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto"
+                >
+                  {reportLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
+                  Report Missing Data to Support
+                </button>
+              )}
+            </div>
+          )}
 
           {/* Action Buttons */}
           <div className="flex gap-4 mt-6">

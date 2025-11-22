@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Globe } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Globe, Download } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import WaitingListCard from '../components/WaitingListCard';
 import CompetitorWaitingListCard from '../components/CompetitorWaitingListCard';
@@ -564,11 +564,10 @@ export default function AdminPage() {
               {isSuperAdmin && (
                 <button
                   onClick={() => setActiveTab('tenants')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
-                    activeTab === 'tenants'
-                      ? 'border-blue-900 text-blue-900'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'tenants'
+                    ? 'border-blue-900 text-blue-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <Building2 className="inline-block h-4 w-4 mr-2" />
                   All Tenants
@@ -577,11 +576,10 @@ export default function AdminPage() {
 
               <button
                 onClick={() => setActiveTab('waiting-list')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
-                  activeTab === 'waiting-list'
-                    ? 'border-blue-900 text-blue-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'waiting-list'
+                  ? 'border-blue-900 text-blue-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <Clock className="inline-block h-4 w-4 mr-2" />
                 Waiting List
@@ -590,11 +588,10 @@ export default function AdminPage() {
               {(isSuperAdmin || isVAUploader) && (
                 <button
                   onClick={() => setActiveTab('competitor-queue')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
-                    activeTab === 'competitor-queue'
-                      ? 'border-purple-600 text-purple-600'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'competitor-queue'
+                    ? 'border-purple-600 text-purple-600'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <Globe className="inline-block h-4 w-4 mr-2" />
                   Competitor Queue
@@ -603,11 +600,10 @@ export default function AdminPage() {
 
               <button
                 onClick={() => setActiveTab('upload')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
-                  activeTab === 'upload'
-                    ? 'border-blue-900 text-blue-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'upload'
+                  ? 'border-blue-900 text-blue-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <Upload className="inline-block h-4 w-4 mr-2" />
                 Upload CSV
@@ -615,11 +611,10 @@ export default function AdminPage() {
 
               <button
                 onClick={() => setActiveTab('history')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
-                  activeTab === 'history'
-                    ? 'border-blue-900 text-blue-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                }`}
+                className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'history'
+                  ? 'border-blue-900 text-blue-900'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
               >
                 <FileText className="inline-block h-4 w-4 mr-2" />
                 Upload History
@@ -628,11 +623,10 @@ export default function AdminPage() {
               {isSuperAdmin && (
                 <button
                   onClick={() => setActiveTab('reviews')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${
-                    activeTab === 'reviews'
-                      ? 'border-blue-900 text-blue-900'
-                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                  }`}
+                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'reviews'
+                    ? 'border-blue-900 text-blue-900'
+                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    }`}
                 >
                   <Database className="inline-block h-4 w-4 mr-2" />
                   Pending Reviews
@@ -675,21 +669,19 @@ export default function AdminPage() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full uppercase ${
-                            tenant.status === 'active' ? 'bg-green-100 text-green-800' :
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full uppercase ${tenant.status === 'active' ? 'bg-green-100 text-green-800' :
                             tenant.status === 'trial' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
+                              'bg-red-100 text-red-800'
+                            }`}>
                             {tenant.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full uppercase ${
-                            tenant.inventory_status === 'ready' ? 'bg-green-100 text-green-800' :
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full uppercase ${tenant.inventory_status === 'ready' ? 'bg-green-100 text-green-800' :
                             tenant.inventory_status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                            tenant.inventory_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-red-100 text-red-800'
-                          }`}>
+                              tenant.inventory_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-red-100 text-red-800'
+                            }`}>
                             {tenant.inventory_status}
                           </span>
                         </td>
@@ -868,11 +860,10 @@ export default function AdminPage() {
                         setUploadType('dealer_inventory');
                         setSelectedCompetitorEntry('');
                       }}
-                      className={`p-4 border-2 rounded-lg transition ${
-                        uploadType === 'dealer_inventory'
-                          ? 'border-blue-600 bg-blue-50'
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                      className={`p-4 border-2 rounded-lg transition ${uploadType === 'dealer_inventory'
+                        ? 'border-blue-600 bg-blue-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                        }`}
                     >
                       <div className="flex items-center justify-center gap-2">
                         <Building2 className={`h-5 w-5 ${uploadType === 'dealer_inventory' ? 'text-blue-600' : 'text-gray-600'}`} />
@@ -887,11 +878,10 @@ export default function AdminPage() {
                         setUploadType('competitor_data');
                         setSelectedTenantForUpload('');
                       }}
-                      className={`p-4 border-2 rounded-lg transition ${
-                        uploadType === 'competitor_data'
-                          ? 'border-purple-600 bg-purple-50'
-                          : 'border-gray-300 hover:border-gray-400'
-                      }`}
+                      className={`p-4 border-2 rounded-lg transition ${uploadType === 'competitor_data'
+                        ? 'border-purple-600 bg-purple-50'
+                        : 'border-gray-300 hover:border-gray-400'
+                        }`}
                     >
                       <div className="flex items-center justify-center gap-2">
                         <Globe className={`h-5 w-5 ${uploadType === 'competitor_data' ? 'text-purple-600' : 'text-gray-600'}`} />
@@ -952,6 +942,17 @@ export default function AdminPage() {
                   )}
                 </div>
 
+                <div className="mb-6 flex justify-end">
+                  <a
+                    href="/templates/inventory_upload_template.csv"
+                    download="inventory_upload_template.csv"
+                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                  >
+                    <Download className="h-4 w-4" />
+                    Download CSV Template
+                  </a>
+                </div>
+
                 <div className="mb-6">
                   <CSVUploader onFileSelect={handleFileSelect} onClear={handleClearFile} />
                 </div>
@@ -964,11 +965,10 @@ export default function AdminPage() {
                     (uploadType === 'dealer_inventory' && !selectedTenantForUpload) ||
                     (uploadType === 'competitor_data' && !selectedCompetitorEntry)
                   }
-                  className={`w-full px-6 py-3 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${
-                    uploadType === 'dealer_inventory'
-                      ? 'bg-blue-600 hover:bg-blue-700'
-                      : 'bg-purple-600 hover:bg-purple-700'
-                  }`}
+                  className={`w-full px-6 py-3 text-white rounded-lg font-semibold transition disabled:opacity-50 disabled:cursor-not-allowed ${uploadType === 'dealer_inventory'
+                    ? 'bg-blue-600 hover:bg-blue-700'
+                    : 'bg-purple-600 hover:bg-purple-700'
+                    }`}
                 >
                   {uploading ? 'Uploading...' : 'Upload and Process CSV'}
                 </button>
@@ -1001,11 +1001,10 @@ export default function AdminPage() {
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.tenants.name}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
                           <td className="px-6 py-4 text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              upload.scraping_source === 'competitor_data'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-blue-100 text-blue-800'
-                            }`}>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'competitor_data'
+                              ? 'bg-purple-100 text-purple-800'
+                              : 'bg-blue-100 text-blue-800'
+                              }`}>
                               {upload.scraping_source === 'competitor_data' ? 'Competitor Data' : 'Dealer Inventory'}
                             </span>
                           </td>
@@ -1018,11 +1017,10 @@ export default function AdminPage() {
                           <td className="px-6 py-4 text-sm text-blue-600">{upload.vehicles_updated}</td>
                           <td className="px-6 py-4 text-sm text-red-600">{upload.vehicles_sold}</td>
                           <td className="px-6 py-4">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              upload.status === 'completed' ? 'bg-green-100 text-green-800' :
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 text-green-800' :
                               upload.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                              'bg-red-100 text-red-800'
-                            }`}>
+                                'bg-red-100 text-red-800'
+                              }`}>
                               {upload.status}
                             </span>
                           </td>
