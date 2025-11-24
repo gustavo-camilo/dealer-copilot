@@ -1,0 +1,1 @@
+ALTER TABLE vin_scans ADD COLUMN IF NOT EXISTS market_data JSONB;

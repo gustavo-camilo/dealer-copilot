@@ -143,6 +143,7 @@ export interface VINScan {
   recommendation: RecommendationType;
   confidence_score: number;
   match_reasoning: MatchReason[];
+  market_data: any | null; // Using any for now as the market data structure is complex
   estimated_profit: number | null;
   max_bid_suggestion: number | null;
   scan_location: string | null;

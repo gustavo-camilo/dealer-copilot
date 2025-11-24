@@ -2,8 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, TrendingUp, TrendingDown, Minus, AlertCircle, Target, Menu, X, ChevronRight } from 'lucide-react';
+import { Search, AlertCircle, Target, Menu, X, ChevronRight } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
+import VINScanResult from '../components/VINScanResult';
 
 interface VINScan {
   id: string;
@@ -16,6 +17,8 @@ interface VINScan {
   };
   recommendation: 'buy' | 'caution' | 'pass';
   confidence_score: number;
+  market_data: any;
+  match_reasoning: any[];
   estimated_profit: number | null;
   max_bid_suggestion: number | null;
   created_at: string;
@@ -149,15 +152,7 @@ export default function VINScansPage() {
     }).format(value);
   };
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
-  };
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -323,9 +318,9 @@ export default function VINScansPage() {
         {/* Details Modal */}
         {selectedScan && (
           <div className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-            <div className="bg-white w-full md:max-w-3xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto">
+            <div className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto">
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between">
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
                 <button
                   onClick={() => setSelectedScan(null)}
@@ -335,58 +330,21 @@ export default function VINScansPage() {
                 </button>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-4 md:p-6">
-                {/* Vehicle Info */}
-                <div className="mb-6">
-                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                    {selectedScan.decoded_data.year} {selectedScan.decoded_data.make} {selectedScan.decoded_data.model}
-                    {selectedScan.decoded_data.trim && (
-                      <span className="text-gray-600 font-normal"> {selectedScan.decoded_data.trim}</span>
-                    )}
-                  </h3>
-                  <p className="text-sm text-gray-600 font-mono">{selectedScan.vin}</p>
-                  <p className="text-sm text-gray-500 mt-2">Scanned {formatDate(selectedScan.created_at)}</p>
-                </div>
-
-                {/* Recommendation Badge */}
-                <div className="mb-6">
-                  <div className={`${getRecommendationBadge(selectedScan.recommendation)} rounded-lg p-4 text-center`}>
-                    <div className="text-lg font-bold mb-1">{selectedScan.recommendation.toUpperCase()}</div>
-                    <div className="text-3xl font-bold">{selectedScan.confidence_score}% Confidence</div>
-                  </div>
-                </div>
-
-                {/* Financial Info */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-600 mb-1">Max Bid</div>
-                    <div className="text-2xl font-bold text-blue-600">
-                      {selectedScan.max_bid_suggestion ? formatCurrency(selectedScan.max_bid_suggestion) : 'N/A'}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-600 mb-1">Est. Profit</div>
-                    <div
-                      className={`text-2xl font-bold ${
-                        selectedScan.estimated_profit && selectedScan.estimated_profit > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {selectedScan.estimated_profit ? formatCurrency(selectedScan.estimated_profit) : 'N/A'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Modal Footer */}
-              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 md:p-6">
-                <button
-                  onClick={() => setSelectedScan(null)}
-                  className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
-                >
-                  Close
-                </button>
-              </div>
+              <VINScanResult
+                scanData={{
+                  id: selectedScan.id,
+                  decoded_data: selectedScan.decoded_data,
+                  market_data: selectedScan.market_data,
+                  recommendation: selectedScan.recommendation,
+                  confidence_score: selectedScan.confidence_score,
+                  match_reasoning: selectedScan.match_reasoning,
+                  estimated_profit: selectedScan.estimated_profit,
+                  max_bid_suggestion: selectedScan.max_bid_suggestion,
+                  // estimated_days_to_sale is not currently in VINScan interface, might need to add it or it will be undefined
+                }}
+                isModal={true}
+                onClose={() => setSelectedScan(null)}
+              />
             </div>
           </div>
         )}
