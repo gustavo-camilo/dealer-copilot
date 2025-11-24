@@ -19,6 +19,7 @@ interface VINScanResultProps {
     onScanAnother?: () => void;
     isModal?: boolean;
     costSettings?: any; // Pass cost settings if available, otherwise defaults will be used in ProfitCalculator (though we might want to pass them down)
+    tenantZipCode?: string | null;
 }
 
 export default function VINScanResult({
@@ -27,6 +28,7 @@ export default function VINScanResult({
     onScanAnother,
     isModal = false,
     costSettings,
+    tenantZipCode,
 }: VINScanResultProps) {
     const [reportLoading, setReportLoading] = useState(false);
     const [reportSuccess, setReportSuccess] = useState(false);
@@ -213,31 +215,43 @@ export default function VINScanResult({
                 ) : (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mt-6 text-center">
                         <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-3" />
-                        <h3 className="text-lg font-bold text-yellow-900 mb-2">Market Data Unavailable</h3>
-                        <p className="text-yellow-800 mb-6">
-                            We couldn't find sufficient market data for this specific vehicle configuration in your area.
-                            This can happen with rare trims or very new inventory.
-                        </p>
 
-                        {reportSuccess ? (
-                            <div className="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-center">
-                                <CheckCircle className="h-5 w-5 mr-2" />
-                                Report submitted successfully! Our team will investigate.
-                            </div>
+                        {!tenantZipCode ? (
+                            <>
+                                <h3 className="text-lg font-bold text-yellow-900 mb-2">Missing ZIP Code</h3>
+                                <p className="text-yellow-800 mb-6">
+                                    Please configure your location in <a href="/settings" className="underline font-bold hover:text-yellow-900">Settings</a> to get accurate market data.
+                                </p>
+                            </>
                         ) : (
-                            <button
-                                onClick={handleReportMissingData}
-                                disabled={reportLoading}
-                                className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto"
-                            >
-                                {reportLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-                                Report Missing Data to Support
-                            </button>
-                        )}
-                        {error && (
-                            <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
-                                {error}
-                            </div>
+                            <>
+                                <h3 className="text-lg font-bold text-yellow-900 mb-2">Market Data Unavailable</h3>
+                                <p className="text-yellow-800 mb-6">
+                                    We couldn't find sufficient market data for this specific vehicle configuration in your area.
+                                    This can happen with rare trims or very new inventory.
+                                </p>
+
+                                {reportSuccess ? (
+                                    <div className="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-center">
+                                        <CheckCircle className="h-5 w-5 mr-2" />
+                                        Report submitted successfully! Our team will investigate.
+                                    </div>
+                                ) : (
+                                    <button
+                                        onClick={handleReportMissingData}
+                                        disabled={reportLoading}
+                                        className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto"
+                                    >
+                                        {reportLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
+                                        Report Missing Data to Support
+                                    </button>
+                                )}
+                                {error && (
+                                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                                        {error}
+                                    </div>
+                                )}
+                            </>
                         )}
                     </div>
                 )}
@@ -252,20 +266,22 @@ export default function VINScanResult({
                             Scan Another VIN
                         </button>
                     )}
-                    {onClose ? (
-                        <button
-                            onClick={onClose}
-                            className="flex-1 bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
-                        >
-                            Close
-                        </button>
-                    ) : (
-                        <button
-                            onClick={() => window.location.href = '/dashboard'} // Or use navigate if passed, but simple link works or we can pass a "Back to Dashboard" handler
-                            className="flex-1 bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
-                        >
-                            Back to Dashboard
-                        </button>
+                    {!isModal && (
+                        onClose ? (
+                            <button
+                                onClick={onClose}
+                                className="flex-1 bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
+                            >
+                                Close
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => window.location.href = '/recommendations'} // Redirect to recommendations page
+                                className="flex-1 bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
+                            >
+                                View All Recommendations
+                            </button>
+                        )
                     )}
                 </div>
             </div>

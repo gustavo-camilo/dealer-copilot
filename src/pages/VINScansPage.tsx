@@ -343,6 +343,7 @@ export default function VINScansPage() {
                   // estimated_days_to_sale is not currently in VINScan interface, might need to add it or it will be undefined
                 }}
                 isModal={true}
+                tenantZipCode={tenant?.zip_code}
                 onClose={() => setSelectedScan(null)}
               />
             </div>

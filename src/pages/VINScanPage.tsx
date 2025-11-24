@@ -239,6 +239,7 @@ export default function VINScanPage() {
             estimated_days_to_sale: result.estimated_days_to_sale,
           }}
           costSettings={costSettings}
+          tenantZipCode={tenant?.zip_code}
           onScanAnother={() => {
             setResult(null);
             setVin('');

@@ -487,6 +487,23 @@ export default function AdminPage() {
     }
   };
 
+  const handleUpdateTicketStatus = async (ticketId: string, status: string) => {
+    try {
+      const { error } = await supabase
+        .from('support_tickets')
+        .update({ status })
+        .eq('id', ticketId);
+
+      if (error) throw error;
+
+      toast.success('Ticket status updated');
+      loadSupportTickets();
+    } catch (error: any) {
+      console.error('Error updating ticket status:', error);
+      toast.error(`Failed to update status: ${error.message}`);
+    }
+  };
+
   const handleEditTenant = (tenant: Tenant) => {
     setSelectedTenantForEdit(tenant);
     setEditModalOpen(true);
