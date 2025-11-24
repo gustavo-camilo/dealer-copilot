@@ -1,11 +1,10 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-serve(async (req) => {
+Deno.serve(async (req) => {
     // Handle CORS preflight requests
     if (req.method === 'OPTIONS') {
         return new Response('ok', { headers: corsHeaders })
@@ -18,8 +17,8 @@ serve(async (req) => {
         if (!API_KEY) {
             console.error('MARKETCHECK_API_KEY is not set')
             return new Response(
-                JSON.stringify({ error: 'Server configuration error' }),
-                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+                JSON.stringify({ error: 'Server configuration error: MARKETCHECK_API_KEY is missing' }),
+                { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 503 }
             )
         }
 
@@ -48,7 +47,7 @@ serve(async (req) => {
             const errorText = await response.text()
             console.error(`Marketcheck API error: ${response.status} - ${errorText}`)
             return new Response(
-                JSON.stringify({ error: `Marketcheck API error: ${response.status}` }),
+                JSON.stringify({ error: `Marketcheck API error: ${response.status}`, details: errorText }),
                 { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: response.status }
             )
         }
