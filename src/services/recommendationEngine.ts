@@ -293,20 +293,33 @@ function calculateProfitPotential(
  */
 export async function generateRecommendation(
   vehicleData: DecodedVehicleData,
-  marketData: MarketPricingData,
+  marketData: MarketPricingData | null,
   salesHistory: SalesRecord[],
   maxBid: number,
   targetMarginPercent: number
 ): Promise<VehicleRecommendation> {
   // Score different factors
   const conditionScore = scoreVehicleCondition(vehicleData);
-  const marketScore = scoreMarketDemand(vehicleData, marketData);
+
+  // Handle missing market data
+  let marketScore = { score: 50, reasons: [] as MatchReason[] };
+  let profitResult = { score: 50, reasons: [] as MatchReason[], estimatedProfit: 0 };
+
+  if (marketData) {
+    marketScore = scoreMarketDemand(vehicleData, marketData);
+    profitResult = calculateProfitPotential(
+      marketData.averagePrice,
+      maxBid,
+      targetMarginPercent
+    );
+  } else {
+    marketScore.reasons.push({
+      type: 'neutral',
+      message: 'Market data unavailable - recommendation based on vehicle condition and history only',
+    });
+  }
+
   const historyResult = analyzeDealerHistory(vehicleData, salesHistory);
-  const profitResult = calculateProfitPotential(
-    marketData.averagePrice,
-    maxBid,
-    targetMarginPercent
-  );
 
   // Combine all reasons
   const allReasons: MatchReason[] = [
@@ -345,7 +358,9 @@ export async function generateRecommendation(
   if (salesHistory.length === 0) {
     confidenceScore *= 0.7; // Lower confidence without dealer history
   }
-  if (marketData.dataSource === 'estimated') {
+  if (!marketData) {
+    confidenceScore *= 0.5; // Significantly lower confidence without market data
+  } else if (marketData.dataSource === 'estimated') {
     confidenceScore *= 0.9; // Slightly lower confidence with estimates
   }
 
