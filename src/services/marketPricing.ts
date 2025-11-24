@@ -49,10 +49,26 @@ export function calculateSuggestedRetail(
 /**
  * Calculate maximum bid based on market price and target margin
  */
+import { AuctionFeeThreshold } from '../types/database';
+
+/**
+ * Calculate auction fee based on price and thresholds
+ */
+export function calculateAuctionFee(price: number, thresholds: AuctionFeeThreshold[]): number {
+  if (!thresholds || thresholds.length === 0) return 0;
+
+  const threshold = thresholds.find(t => price >= t.min_price && price < t.max_price);
+  return threshold ? threshold.fee : 0;
+}
+
+/**
+ * Calculate maximum bid based on market price and target margin
+ * Iteratively solves for max bid since fee depends on the bid amount
+ */
 export function calculateMaxBid(
   marketPrice: number,
   targetMarginPercent: number,
-  auctionFeePercent: number,
+  auctionFeeThresholds: AuctionFeeThreshold[],
   reconditioningCost: number,
   transportCost: number
 ): number {
@@ -60,12 +76,23 @@ export function calculateMaxBid(
   const targetMarginMultiplier = 1 + (targetMarginPercent / 100);
   const targetAcquisitionCost = marketPrice / targetMarginMultiplier;
 
-  // Subtract fixed costs and auction fees
-  const fixedCosts = reconditioningCost + transportCost;
-  const maxBidBeforeFees = targetAcquisitionCost - fixedCosts;
+  // Initial estimate: assume 0 auction fee
+  let maxBid = targetAcquisitionCost - reconditioningCost - transportCost;
 
-  // Calculate max bid considering auction fees
-  const maxBid = maxBidBeforeFees / (1 + auctionFeePercent / 100);
+  // Iteratively refine max bid (simple fixed-point iteration)
+  // We need to find a bid B such that: B + Fee(B) + FixedCosts = TargetAcquisitionCost
+  // So B = TargetAcquisitionCost - FixedCosts - Fee(B)
 
-  return Math.round(maxBid);
+  for (let i = 0; i < 5; i++) {
+    const fee = calculateAuctionFee(maxBid, auctionFeeThresholds);
+    const newMaxBid = targetAcquisitionCost - reconditioningCost - transportCost - fee;
+
+    if (Math.abs(newMaxBid - maxBid) < 1) {
+      maxBid = newMaxBid;
+      break;
+    }
+    maxBid = newMaxBid;
+  }
+
+  return Math.max(0, Math.round(maxBid));
 }

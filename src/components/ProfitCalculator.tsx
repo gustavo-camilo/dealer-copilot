@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react';
 import { Edit2 } from 'lucide-react';
 
+import { AuctionFeeThreshold } from '../types/database';
+import { calculateAuctionFee } from '../services/marketPricing';
+
 export interface ProfitCalculatorProps {
   maxBidSuggestion: number;
   marketPrice: number;
-  defaultAuctionFee: number;
+  auctionFeeThresholds: AuctionFeeThreshold[];
   defaultRecon: number;
   defaultTransport: number;
   onCostsChange?: (costs: {
@@ -22,28 +25,31 @@ export interface ProfitCalculatorProps {
 export default function ProfitCalculator({
   maxBidSuggestion,
   marketPrice: defaultMarketPrice,
-  defaultAuctionFee,
+  auctionFeeThresholds,
   defaultRecon,
   defaultTransport,
   onCostsChange,
 }: ProfitCalculatorProps) {
   const [maxBid, setMaxBid] = useState(maxBidSuggestion);
-  const [auctionFeePercent, setAuctionFeePercent] = useState(defaultAuctionFee);
+  const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(null);
   const [reconCost, setReconCost] = useState(defaultRecon);
   const [transportCost, setTransportCost] = useState(defaultTransport);
   const [marketPrice, setMarketPrice] = useState(defaultMarketPrice);
   const [isEditing, setIsEditing] = useState(false);
 
+  // Calculate auction fee (use custom if set, otherwise calculate from thresholds based on current maxBid)
+  const calculatedAuctionFee = calculateAuctionFee(maxBid, auctionFeeThresholds);
+  const auctionFee = customAuctionFee !== null ? customAuctionFee : calculatedAuctionFee;
+
   // Track if any costs were edited
   const costsEdited =
     maxBid !== maxBidSuggestion ||
-    auctionFeePercent !== defaultAuctionFee ||
+    customAuctionFee !== null ||
     reconCost !== defaultRecon ||
     transportCost !== defaultTransport ||
     marketPrice !== defaultMarketPrice;
 
   // Calculate derived values
-  const auctionFee = Math.round(maxBid * (auctionFeePercent / 100));
   const totalCost = maxBid + auctionFee + reconCost + transportCost;
   const estimatedProfit = marketPrice - totalCost;
   const profitMargin = totalCost > 0 ? ((estimatedProfit / totalCost) * 100) : 0;
@@ -51,7 +57,7 @@ export default function ProfitCalculator({
   // Reset to defaults
   const resetToDefaults = () => {
     setMaxBid(maxBidSuggestion);
-    setAuctionFeePercent(defaultAuctionFee);
+    setCustomAuctionFee(null);
     setReconCost(defaultRecon);
     setTransportCost(defaultTransport);
     setMarketPrice(defaultMarketPrice);
@@ -61,7 +67,7 @@ export default function ProfitCalculator({
   useEffect(() => {
     if (onCostsChange) {
       onCostsChange({
-        auctionFee: auctionFeePercent,
+        auctionFee: auctionFee, // Pass the actual fee amount
         recon: reconCost,
         transport: transportCost,
         maxBid,
@@ -71,7 +77,7 @@ export default function ProfitCalculator({
         costsEdited,
       });
     }
-  }, [maxBid, auctionFeePercent, reconCost, transportCost, marketPrice, totalCost, estimatedProfit, costsEdited, onCostsChange]);
+  }, [maxBid, auctionFee, reconCost, transportCost, marketPrice, totalCost, estimatedProfit, costsEdited, onCostsChange]);
 
   return (
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
@@ -126,15 +132,14 @@ export default function ProfitCalculator({
             {isEditing && (
               <input
                 type="number"
-                value={auctionFeePercent}
-                onChange={(e) => setAuctionFeePercent(Number(e.target.value))}
-                step="0.5"
-                className="w-16 px-2 py-1 border border-gray-300 rounded text-center text-xs"
+                value={customAuctionFee !== null ? customAuctionFee : calculatedAuctionFee}
+                onChange={(e) => setCustomAuctionFee(Number(e.target.value))}
+                className="w-24 px-2 py-1 border border-gray-300 rounded text-right text-xs"
+                placeholder="Custom Fee"
               />
             )}
-            {!isEditing && <span className="text-gray-500">({auctionFeePercent}%)</span>}
           </div>
-          <span className="font-medium">${auctionFee.toLocaleString()}</span>
+          {!isEditing && <span className="font-medium">${auctionFee.toLocaleString()}</span>}
         </div>
 
         {/* Recon Cost */}
@@ -192,13 +197,12 @@ export default function ProfitCalculator({
 
         {/* Expected Gross Profit */}
         <div
-          className={`flex justify-between text-lg font-bold pt-2 border-t ${
-            estimatedProfit >= 1500
-              ? 'text-green-600'
-              : estimatedProfit >= 800
+          className={`flex justify-between text-lg font-bold pt-2 border-t ${estimatedProfit >= 1500
+            ? 'text-green-600'
+            : estimatedProfit >= 800
               ? 'text-yellow-600'
               : 'text-red-600'
-          }`}
+            }`}
         >
           <span>Expected Gross Profit</span>
           <span>${estimatedProfit.toLocaleString()}</span>

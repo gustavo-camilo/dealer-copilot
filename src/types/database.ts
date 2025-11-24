@@ -12,8 +12,14 @@ export type RecommendationType = 'buy' | 'caution' | 'pass';
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid';
 
+export interface AuctionFeeThreshold {
+  min_price: number;
+  max_price: number;
+  fee: number;
+}
+
 export interface TenantCostSettings {
-  auction_fee_percent: number;
+  auction_fee_thresholds: AuctionFeeThreshold[];
   reconditioning_cost: number;
   transport_cost: number;
   floor_plan_rate: number;

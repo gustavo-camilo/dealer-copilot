@@ -18,7 +18,7 @@ interface VINScanResultProps {
     onClose?: () => void;
     onScanAnother?: () => void;
     isModal?: boolean;
-    costSettings?: any; // Pass cost settings if available, otherwise defaults will be used in ProfitCalculator (though we might want to pass them down)
+    costSettings?: any; // Pass cost settings if available
     tenantZipCode?: string | null;
 }
 
@@ -61,7 +61,11 @@ export default function VINScanResult({
 
     // Default cost settings if not provided (though ideally they should be passed)
     const defaultCostSettings = costSettings || {
-        auction_fee_percent: 2,
+        auction_fee_thresholds: [
+            { min_price: 0, max_price: 5000, fee: 200 },
+            { min_price: 5000, max_price: 10000, fee: 350 },
+            { min_price: 10000, max_price: 999999, fee: 500 },
+        ],
         reconditioning_cost: 800,
         transport_cost: 150,
     };
@@ -169,7 +173,7 @@ export default function VINScanResult({
                 <ProfitCalculator
                     maxBidSuggestion={scanData.max_bid_suggestion || 0}
                     marketPrice={scanData.market_data?.averagePrice || 0}
-                    defaultAuctionFee={defaultCostSettings.auction_fee_percent}
+                    auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
                     defaultRecon={defaultCostSettings.reconditioning_cost}
                     defaultTransport={defaultCostSettings.transport_cost}
                     onCostsChange={async (costs) => {
@@ -179,7 +183,7 @@ export default function VINScanResult({
                                 await supabase
                                     .from('vin_scans')
                                     .update({
-                                        custom_auction_fee_percent: costs.auctionFee,
+                                        custom_auction_fee: costs.auctionFee,
                                         custom_recon_cost: costs.recon,
                                         custom_transport_cost: costs.transport,
                                         custom_max_bid: costs.maxBid,

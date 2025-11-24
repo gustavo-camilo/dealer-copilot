@@ -12,7 +12,11 @@ import { SalesRecord, TenantCostSettings } from '../types/database';
 
 // Default cost settings if tenant hasn't configured them
 const DEFAULT_COST_SETTINGS: TenantCostSettings = {
-  auction_fee_percent: 2,
+  auction_fee_thresholds: [
+    { min_price: 0, max_price: 5000, fee: 200 },
+    { min_price: 5000, max_price: 10000, fee: 350 },
+    { min_price: 10000, max_price: 999999, fee: 500 },
+  ],
   reconditioning_cost: 800,
   transport_cost: 150,
   floor_plan_rate: 0.08,
@@ -106,7 +110,7 @@ export default function VINScanPage() {
       const maxBid = marketData ? calculateMaxBid(
         marketData.averagePrice,
         costSettings.target_margin_percent,
-        costSettings.auction_fee_percent,
+        costSettings.auction_fee_thresholds || [],
         costSettings.reconditioning_cost,
         costSettings.transport_cost
       ) : 0;

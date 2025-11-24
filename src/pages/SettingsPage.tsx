@@ -2,20 +2,17 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Target, Menu, X } from 'lucide-react';
+import { Target, Menu, X, Trash2, Plus } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 
-interface CostSettings {
-  auction_fee_percent: number;
-  reconditioning_cost: number;
-  transport_cost: number;
-  floor_plan_rate: number;
-  target_margin_percent: number;
-  target_days_to_sale: number;
-}
+import { TenantCostSettings, AuctionFeeThreshold } from '../types/database';
 
-const DEFAULT_COST_SETTINGS: CostSettings = {
-  auction_fee_percent: 2,
+const DEFAULT_COST_SETTINGS: TenantCostSettings = {
+  auction_fee_thresholds: [
+    { min_price: 0, max_price: 5000, fee: 200 },
+    { min_price: 5000, max_price: 10000, fee: 350 },
+    { min_price: 10000, max_price: 999999, fee: 500 },
+  ],
   reconditioning_cost: 800,
   transport_cost: 150,
   floor_plan_rate: 0.08,
@@ -42,7 +39,7 @@ export default function SettingsPage() {
   const [zipCodeLoading, setZipCodeLoading] = useState(false);
   const [zipCodeError, setZipCodeError] = useState('');
 
-  const [costSettings, setCostSettings] = useState<CostSettings>(DEFAULT_COST_SETTINGS);
+  const [costSettings, setCostSettings] = useState<TenantCostSettings>(DEFAULT_COST_SETTINGS);
 
   const handleSignOut = async () => {
     try {
@@ -181,8 +178,8 @@ export default function SettingsPage() {
       const location = zipCode && city && state
         ? `${city}, ${state} (${zipCode})`
         : city && state
-        ? `${city}, ${state}`
-        : '';
+          ? `${city}, ${state}`
+          : '';
 
       const { error } = await supabase
         .from('tenants')
@@ -264,11 +261,10 @@ export default function SettingsPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
 
         {message && (
-          <div className={`mb-6 p-4 rounded-lg ${
-            message.includes('Error')
-              ? 'bg-red-50 border border-red-200 text-red-800'
-              : 'bg-green-50 border border-green-200 text-green-800'
-          }`}>
+          <div className={`mb-6 p-4 rounded-lg ${message.includes('Error')
+            ? 'bg-red-50 border border-red-200 text-red-800'
+            : 'bg-green-50 border border-green-200 text-green-800'
+            }`}>
             {message}
           </div>
         )}
@@ -386,16 +382,85 @@ export default function SettingsPage() {
 
           <form onSubmit={handleSaveCostSettings} className="space-y-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Auction Fee (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={costSettings.auction_fee_percent}
-                  onChange={(e) => setCostSettings({ ...costSettings, auction_fee_percent: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                />
+              <div className="md:col-span-2">
+                <label className="block text-sm font-medium text-gray-700 mb-2">Auction Fee Thresholds</label>
+                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
+                  <div className="grid grid-cols-12 gap-4 mb-2 text-xs font-medium text-gray-500 uppercase">
+                    <div className="col-span-4">Min Price</div>
+                    <div className="col-span-4">Max Price</div>
+                    <div className="col-span-3">Fee</div>
+                    <div className="col-span-1"></div>
+                  </div>
+
+                  {costSettings.auction_fee_thresholds?.map((threshold, index) => (
+                    <div key={index} className="grid grid-cols-12 gap-4 mb-3 items-center">
+                      <div className="col-span-4 relative">
+                        <span className="absolute left-3 top-2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={threshold.min_price}
+                          onChange={(e) => {
+                            const newThresholds = [...(costSettings.auction_fee_thresholds || [])];
+                            newThresholds[index].min_price = Number(e.target.value);
+                            setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
+                          }}
+                          className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded text-sm"
+                        />
+                      </div>
+                      <div className="col-span-4 relative">
+                        <span className="absolute left-3 top-2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={threshold.max_price}
+                          onChange={(e) => {
+                            const newThresholds = [...(costSettings.auction_fee_thresholds || [])];
+                            newThresholds[index].max_price = Number(e.target.value);
+                            setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
+                          }}
+                          className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded text-sm"
+                        />
+                      </div>
+                      <div className="col-span-3 relative">
+                        <span className="absolute left-3 top-2 text-gray-500">$</span>
+                        <input
+                          type="number"
+                          value={threshold.fee}
+                          onChange={(e) => {
+                            const newThresholds = [...(costSettings.auction_fee_thresholds || [])];
+                            newThresholds[index].fee = Number(e.target.value);
+                            setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
+                          }}
+                          className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded text-sm"
+                        />
+                      </div>
+                      <div className="col-span-1 text-right">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const newThresholds = costSettings.auction_fee_thresholds.filter((_, i) => i !== index);
+                            setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
+                          }}
+                          className="text-red-500 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newThresholds = [...(costSettings.auction_fee_thresholds || [])];
+                      newThresholds.push({ min_price: 0, max_price: 999999, fee: 0 });
+                      setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
+                    }}
+                    className="mt-2 flex items-center text-sm text-blue-600 hover:text-blue-800"
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Threshold
+                  </button>
+                </div>
               </div>
 
               <div>
@@ -490,11 +555,10 @@ export default function SettingsPage() {
             </div>
             <div className="flex justify-between">
               <span className="text-gray-600">Status:</span>
-              <span className={`font-semibold capitalize ${
-                tenant.status === 'active' ? 'text-green-600' :
+              <span className={`font-semibold capitalize ${tenant.status === 'active' ? 'text-green-600' :
                 tenant.status === 'trial' ? 'text-yellow-600' :
-                'text-red-600'
-              }`}>
+                  'text-red-600'
+                }`}>
                 {tenant.status || 'Unknown'}
               </span>
             </div>
