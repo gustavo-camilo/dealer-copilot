@@ -56,6 +56,7 @@ export default function CompetitorAnalysisPage() {
   const [scanning, setScanning] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [newCompetitorUrl, setNewCompetitorUrl] = useState('');
+  const [submissionSuccess, setSubmissionSuccess] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<string>('starter');
   const [addingToQueue, setAddingToQueue] = useState(false);
@@ -151,9 +152,7 @@ export default function CompetitorAnalysisPage() {
 
       if (insertError) throw insertError;
 
-      toast.success('Competitor added to the analysis queue. There are other dealerships in front. You will receive a notification as soon as the analysis is complete.', {
-        duration: 6000,
-      });
+      setSubmissionSuccess(true);
 
       // Clear form
       setNewCompetitorUrl('');
@@ -389,254 +388,299 @@ export default function CompetitorAnalysisPage() {
           </div>
         )}
 
-        {/* Scan Form */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Competitor</h2>
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-            <p className="text-sm text-blue-800">
-              Add competitors to the waiting list for our team to scrape and analyze. You'll be notified when the data is ready.
-            </p>
-          </div>
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row gap-4">
-              <div className="flex-1">
-                <input
-                  type="url"
-                  placeholder="Competitor website URL (e.g., https://competitor.com)"
-                  value={newCompetitorUrl}
-                  onChange={(e) => setNewCompetitorUrl(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  disabled={scanning || addingToQueue}
-                />
+        {/* Processing State */}
+        {submissionSuccess ? (
+          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-8 mb-8 text-center">
+            <div className="flex flex-col items-center">
+              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+                <RefreshCw className="h-8 w-8 text-blue-600 animate-spin" />
               </div>
+              <h2 className="text-2xl font-bold text-blue-900 mb-2">
+                Competitor Analysis Requested
+              </h2>
+              <p className="text-blue-800 mb-4 max-w-lg mx-auto">
+                Your request has been added to the queue. There are other dealerships in front.
+                You will receive a notification as soon as the competitor has been analyzed and it's available for you to check.
+              </p>
+
+              <div className="bg-white rounded-lg p-6 max-w-md w-full mb-6">
+                <h3 className="font-semibold text-gray-900 mb-3 text-left">While you wait, you can:</h3>
+                <ul className="text-left space-y-2 text-sm text-gray-700">
+                  <li className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
+                    <span><Link to="/scan" className="text-blue-600 hover:underline">Scan VINs</Link> for purchase recommendations</span>
+                  </li>
+                  <li className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
+                    <span>Check your <Link to="/inventory" className="text-blue-600 hover:underline">current inventory</Link> performance</span>
+                  </li>
+                  <li className="flex items-center">
+                    <span className="text-green-600 mr-2">✓</span>
+                    <span>Explore the <Link to="/dashboard" className="text-blue-600 hover:underline">dashboard</Link></span>
+                  </li>
+                </ul>
+              </div>
+
               <button
-                onClick={handleAddToWaitingList}
-                disabled={addingToQueue || scanning || !newCompetitorUrl.trim()}
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                onClick={() => setSubmissionSuccess(false)}
+                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
-                {addingToQueue ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Requesting...
-                  </>
-                ) : (
-                  <>
-                    <TrendingUp className="w-5 h-5" />
-                    Request Analysis
-                  </>
-                )}
+                Analyze Another Competitor
               </button>
             </div>
           </div>
-        </div>
-
-        {/* Competitors List */}
-        {loading ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        ) : competitors.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No competitors scanned yet</h3>
-            <p className="text-gray-600">Enter a competitor URL above to get started</p>
-          </div>
         ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {competitors.map((competitor) => (
-              <div
-                key={competitor.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
-              >
-                {/* Header */}
-                <div className="flex items-start justify-between mb-4">
+          <>
+            {/* Scan Form */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Competitor</h2>
+              <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
+                <p className="text-sm text-blue-800">
+                  Add competitors to the waiting list for our team to scrape and analyze. You'll be notified when the data is ready.
+                </p>
+              </div>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
-                    <h3 className="text-lg font-semibold text-gray-900">
-                      {competitor.competitor_name || new URL(competitor.competitor_url).hostname}
-                    </h3>
-                    <a
-                      href={competitor.competitor_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-blue-600 hover:underline break-all"
-                    >
-                      {competitor.competitor_url}
-                    </a>
-                    <p className="text-xs text-gray-500 mt-1">
-                      Scanned {formatDate(competitor.scanned_at)}
-                    </p>
+                    <input
+                      type="url"
+                      placeholder="Competitor website URL (e.g., https://competitor.com)"
+                      value={newCompetitorUrl}
+                      onChange={(e) => setNewCompetitorUrl(e.target.value)}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      disabled={scanning || addingToQueue}
+                    />
                   </div>
-                  <div className="flex items-center gap-2 ml-4">
-                    <button
-                      onClick={() => handleScanCompetitor(competitor.competitor_url, competitor.competitor_name || undefined)}
-                      disabled={scanning}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-50"
-                      title="Rescan"
-                    >
-                      <RefreshCw className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteCompetitor(competitor.id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
-                  </div>
-                </div>
-
-                {/* Stats Grid */}
-                <div className="space-y-3">
-                  {/* Vehicle Count & Total Value */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-blue-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <Car className="w-4 h-4 text-blue-600" />
-                        <span className="text-xs text-gray-600">Total Vehicles</span>
-                      </div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {formatNumber(competitor.vehicle_count)}
-                      </div>
-                    </div>
-                    <div className="bg-green-50 rounded-lg p-3">
-                      <div className="flex items-center gap-2 mb-1">
-                        <DollarSign className="w-4 h-4 text-green-600" />
-                        <span className="text-xs text-gray-600">Total Value</span>
-                      </div>
-                      <div className="text-2xl font-bold text-gray-900">
-                        {formatCurrency(competitor.total_inventory_value)}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Price Range */}
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <BarChart3 className="w-4 h-4 text-gray-600" />
-                      <span className="text-xs font-medium text-gray-600">Price Range</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm text-gray-600">Min:</span>
-                      <span className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(competitor.min_price)}
-                      </span>
-                      <span className="text-gray-400">|</span>
-                      <span className="text-sm text-gray-600">Avg:</span>
-                      <span className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(competitor.avg_price)}
-                      </span>
-                      <span className="text-gray-400">|</span>
-                      <span className="text-sm text-gray-600">Max:</span>
-                      <span className="text-lg font-semibold text-gray-900">
-                        {formatCurrency(competitor.max_price)}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Mileage Range */}
-                  <div className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <Gauge className="w-4 h-4 text-gray-600" />
-                      <span className="text-xs font-medium text-gray-600">Mileage Range</span>
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm text-gray-600">Min:</span>
-                      <span className="text-lg font-semibold text-gray-900">
-                        {formatNumber(competitor.min_mileage)} mi
-                      </span>
-                      <span className="text-gray-400">|</span>
-                      <span className="text-sm text-gray-600">Avg:</span>
-                      <span className="text-lg font-semibold text-gray-900">
-                        {formatNumber(competitor.avg_mileage)} mi
-                      </span>
-                      <span className="text-gray-400">|</span>
-                      <span className="text-sm text-gray-600">Max:</span>
-                      <span className="text-lg font-semibold text-gray-900">
-                        {formatNumber(competitor.max_mileage)} mi
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Top Makes */}
-                  {Object.keys(competitor.top_makes).length > 0 && (
-                    <div className="bg-gray-50 rounded-lg p-3">
-                      <div className="text-xs font-medium text-gray-600 mb-2">Top Brands</div>
-                      <div className="space-y-1">
-                        {Object.entries(competitor.top_makes)
-                          .slice(0, 5)
-                          .map(([make, count]) => (
-                            <div key={make} className="flex items-center justify-between text-sm">
-                              <span className="text-gray-700">{make}</span>
-                              <span className="font-semibold text-gray-900">({count})</span>
-                            </div>
-                          ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* History Section */}
-                  <div className="border-t border-gray-200 pt-3">
-                    {subscriptionTier === 'enterprise' ? (
-                      <button
-                        onClick={() => toggleHistory(competitor.competitor_url)}
-                        className="w-full flex items-center justify-between px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition text-sm font-medium text-blue-700"
-                      >
-                        <span>View Scan History</span>
-                        <TrendingUp className="w-4 h-4" />
-                      </button>
+                  <button
+                    onClick={handleAddToWaitingList}
+                    disabled={addingToQueue || scanning || !newCompetitorUrl.trim()}
+                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
+                  >
+                    {addingToQueue ? (
+                      <>
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Requesting...
+                      </>
                     ) : (
-                      <Link
-                        to="/upgrade"
-                        className="w-full flex items-center justify-between px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-sm font-medium text-gray-600"
-                      >
-                        <span>Scan History (Enterprise Feature)</span>
-                        <AlertCircle className="w-4 h-4" />
-                      </Link>
+                      <>
+                        <TrendingUp className="w-5 h-5" />
+                        Request Analysis
+                      </>
                     )}
+                  </button>
+                </div>
+              </div>
+            </div>
 
-                    {/* History Data (Enterprise only) */}
-                    {subscriptionTier === 'enterprise' && expandedHistory === competitor.competitor_url && (
-                      <div className="mt-3 space-y-2">
-                        {historyData[competitor.competitor_url]?.length > 0 ? (
-                          <>
-                            <div className="text-xs font-medium text-gray-600 mb-2">Recent Scans</div>
-                            {historyData[competitor.competitor_url].map((history) => (
-                              <div
-                                key={history.id}
-                                className="flex items-center justify-between text-xs bg-white rounded p-2 border border-gray-200"
-                              >
-                                <span className="text-gray-600">
-                                  {formatDate(history.scanned_at)}
-                                </span>
-                                <div className="flex items-center gap-3">
-                                  <span className="text-gray-700">
-                                    {history.vehicle_count} vehicles
-                                  </span>
-                                  <span className="font-semibold text-gray-900">
-                                    {formatCurrency(history.avg_price)} avg
-                                  </span>
+            {/* Competitors List */}
+            {loading ? (
+              <div className="flex justify-center items-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              </div>
+            ) : competitors.length === 0 ? (
+              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 mb-2">No competitors scanned yet</h3>
+                <p className="text-gray-600">Enter a competitor URL above to get started</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {competitors.map((competitor) => (
+                  <div
+                    key={competitor.id}
+                    className="bg-white rounded-lg shadow-sm border border-gray-200 p-6"
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex-1">
+                        <h3 className="text-lg font-semibold text-gray-900">
+                          {competitor.competitor_name || new URL(competitor.competitor_url).hostname}
+                        </h3>
+                        <a
+                          href={competitor.competitor_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-sm text-blue-600 hover:underline break-all"
+                        >
+                          {competitor.competitor_url}
+                        </a>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Scanned {formatDate(competitor.scanned_at)}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 ml-4">
+                        <button
+                          onClick={() => handleScanCompetitor(competitor.competitor_url, competitor.competitor_name || undefined)}
+                          disabled={scanning}
+                          className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-50"
+                          title="Rescan"
+                        >
+                          <RefreshCw className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCompetitor(competitor.id)}
+                          className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                          title="Delete"
+                        >
+                          <Trash2 className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Stats Grid */}
+                    <div className="space-y-3">
+                      {/* Vehicle Count & Total Value */}
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="bg-blue-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <Car className="w-4 h-4 text-blue-600" />
+                            <span className="text-xs text-gray-600">Total Vehicles</span>
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {formatNumber(competitor.vehicle_count)}
+                          </div>
+                        </div>
+                        <div className="bg-green-50 rounded-lg p-3">
+                          <div className="flex items-center gap-2 mb-1">
+                            <DollarSign className="w-4 h-4 text-green-600" />
+                            <span className="text-xs text-gray-600">Total Value</span>
+                          </div>
+                          <div className="text-2xl font-bold text-gray-900">
+                            {formatCurrency(competitor.total_inventory_value)}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Price Range */}
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <BarChart3 className="w-4 h-4 text-gray-600" />
+                          <span className="text-xs font-medium text-gray-600">Price Range</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-sm text-gray-600">Min:</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {formatCurrency(competitor.min_price)}
+                          </span>
+                          <span className="text-gray-400">|</span>
+                          <span className="text-sm text-gray-600">Avg:</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {formatCurrency(competitor.avg_price)}
+                          </span>
+                          <span className="text-gray-400">|</span>
+                          <span className="text-sm text-gray-600">Max:</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {formatCurrency(competitor.max_price)}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Mileage Range */}
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Gauge className="w-4 h-4 text-gray-600" />
+                          <span className="text-xs font-medium text-gray-600">Mileage Range</span>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-sm text-gray-600">Min:</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {formatNumber(competitor.min_mileage)} mi
+                          </span>
+                          <span className="text-gray-400">|</span>
+                          <span className="text-sm text-gray-600">Avg:</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {formatNumber(competitor.avg_mileage)} mi
+                          </span>
+                          <span className="text-gray-400">|</span>
+                          <span className="text-sm text-gray-600">Max:</span>
+                          <span className="text-lg font-semibold text-gray-900">
+                            {formatNumber(competitor.max_mileage)} mi
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Top Makes */}
+                      {Object.keys(competitor.top_makes).length > 0 && (
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="text-xs font-medium text-gray-600 mb-2">Top Brands</div>
+                          <div className="space-y-1">
+                            {Object.entries(competitor.top_makes)
+                              .slice(0, 5)
+                              .map(([make, count]) => (
+                                <div key={make} className="flex items-center justify-between text-sm">
+                                  <span className="text-gray-700">{make}</span>
+                                  <span className="font-semibold text-gray-900">({count})</span>
                                 </div>
-                              </div>
-                            ))}
-                            <button
-                              onClick={() => navigate(`/competitor-history/${competitor.id}`)}
-                              className="w-full text-xs text-blue-600 hover:text-blue-800 mt-2"
-                            >
-                              View Detailed History →
-                            </button>
-                          </>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* History Section */}
+                      <div className="border-t border-gray-200 pt-3">
+                        {subscriptionTier === 'enterprise' ? (
+                          <button
+                            onClick={() => toggleHistory(competitor.competitor_url)}
+                            className="w-full flex items-center justify-between px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition text-sm font-medium text-blue-700"
+                          >
+                            <span>View Scan History</span>
+                            <TrendingUp className="w-4 h-4" />
+                          </button>
                         ) : (
-                          <div className="text-xs text-gray-500 text-center py-2">
-                            No history available yet
+                          <Link
+                            to="/upgrade"
+                            className="w-full flex items-center justify-between px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-sm font-medium text-gray-600"
+                          >
+                            <span>Scan History (Enterprise Feature)</span>
+                            <AlertCircle className="w-4 h-4" />
+                          </Link>
+                        )}
+
+                        {/* History Data (Enterprise only) */}
+                        {subscriptionTier === 'enterprise' && expandedHistory === competitor.competitor_url && (
+                          <div className="mt-3 space-y-2">
+                            {historyData[competitor.competitor_url]?.length > 0 ? (
+                              <>
+                                <div className="text-xs font-medium text-gray-600 mb-2">Recent Scans</div>
+                                {historyData[competitor.competitor_url].map((history) => (
+                                  <div
+                                    key={history.id}
+                                    className="flex items-center justify-between text-xs bg-white rounded p-2 border border-gray-200"
+                                  >
+                                    <span className="text-gray-600">
+                                      {formatDate(history.scanned_at)}
+                                    </span>
+                                    <div className="flex items-center gap-3">
+                                      <span className="text-gray-700">
+                                        {history.vehicle_count} vehicles
+                                      </span>
+                                      <span className="font-semibold text-gray-900">
+                                        {formatCurrency(history.avg_price)} avg
+                                      </span>
+                                    </div>
+                                  </div>
+                                ))}
+                                <button
+                                  onClick={() => navigate(`/competitor-history/${competitor.id}`)}
+                                  className="w-full text-xs text-blue-600 hover:text-blue-800 mt-2"
+                                >
+                                  View Detailed History →
+                                </button>
+                              </>
+                            ) : (
+                              <div className="text-xs text-gray-500 text-center py-2">
+                                No history available yet
+                              </div>
+                            )}
                           </div>
                         )}
                       </div>
-                    )}
+                    </div>
                   </div>
-                </div>
+                ))}
               </div>
-            ))}
-          </div>
+            )}
+          </>
         )}
       </div>
     </div>
