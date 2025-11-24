@@ -8,6 +8,7 @@ import CSVUploader from '../components/CSVUploader';
 import WaitingListCard from '../components/WaitingListCard';
 import CompetitorWaitingListCard from '../components/CompetitorWaitingListCard';
 import EditTenantModal from '../components/EditTenantModal';
+import SupportTicketCard from '../components/SupportTicketCard';
 import toast from 'react-hot-toast';
 
 interface UploadHistory {
@@ -126,6 +127,8 @@ export default function AdminPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [competitorWaitingList, setCompetitorWaitingList] = useState<CompetitorWaitingListEntry[]>([]);
   const [competitorStatusFilter, setCompetitorStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
+  const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
 
   const handleSignOut = async () => {
     try {
@@ -263,6 +266,42 @@ export default function AdminPage() {
       setPendingReviews(mapped);
     } catch (error) {
       console.error('Error loading pending reviews:', error);
+    }
+  };
+
+  const loadSupportTickets = async () => {
+    try {
+      let query = supabase
+        .from('support_tickets')
+        .select(`
+          id,
+          type,
+          subject,
+          details,
+          status,
+          priority,
+          created_at,
+          tenants!inner (name, contact_email),
+          users!inner (full_name, email)
+        `)
+        .order('created_at', { ascending: false });
+
+      if (supportStatusFilter !== 'all') {
+        query = query.eq('status', supportStatusFilter);
+      }
+
+      const { data, error } = await query;
+
+      if (error) throw error;
+
+      const mapped = (data || []).map((item: any) => ({
+        ...item,
+        tenant: Array.isArray(item.tenants) ? item.tenants[0] : item.tenants,
+        user: Array.isArray(item.users) ? item.users[0] : item.users
+      }));
+      setSupportTickets(mapped);
+    } catch (error) {
+      console.error('Error loading support tickets:', error);
     }
   };
 
