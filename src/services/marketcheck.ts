@@ -1,7 +1,6 @@
 import { MarketPricingData } from '../types/market';
 
-const MARKETCHECK_API_URL = 'https://api.marketcheck.com/v2';
-const API_KEY = import.meta.env.VITE_MARKETCHECK_API_KEY;
+
 
 interface MarketcheckListing {
     id: string;
@@ -25,6 +24,11 @@ interface MarketcheckSearchResponse {
 /**
  * Search for active listings on Marketcheck
  */
+import { supabase } from '../lib/supabase';
+
+/**
+ * Search for active listings on Marketcheck via Supabase Edge Function
+ */
 export async function searchActiveListings(
     year: number,
     make: string,
@@ -33,38 +37,23 @@ export async function searchActiveListings(
     radius: number = 50,
     mileage?: number
 ): Promise<MarketcheckSearchResponse | null> {
-    if (!API_KEY) {
-        console.warn('Marketcheck API key not found');
-        return null;
-    }
-
     try {
-        const params = new URLSearchParams({
-            api_key: API_KEY,
-            year: `${year - 1}-${year + 1}`, // +/- 1 year range
-            make,
-            model,
-            radius: radius.toString(),
-            zip,
-            car_type: 'used',
-            start: '0',
-            rows: '50', // Get top 50 listings
+        const { data, error } = await supabase.functions.invoke('market-search', {
+            body: {
+                year,
+                make,
+                model,
+                zip,
+                radius,
+                mileage
+            }
         });
 
-        // Add mileage range if provided (+/- 10k miles)
-        if (mileage) {
-            const minMiles = Math.max(0, mileage - 10000);
-            const maxMiles = mileage + 10000;
-            params.append('miles_range', `${minMiles}-${maxMiles}`);
+        if (error) {
+            throw new Error(`Marketcheck API error: ${error.message}`);
         }
 
-        const response = await fetch(`${MARKETCHECK_API_URL}/search?${params.toString()}`);
-
-        if (!response.ok) {
-            throw new Error(`Marketcheck API error: ${response.statusText}`);
-        }
-
-        return await response.json();
+        return data;
     } catch (error) {
         console.error('Error fetching Marketcheck data:', error);
         return null;

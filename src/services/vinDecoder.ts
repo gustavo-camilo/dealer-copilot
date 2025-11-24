@@ -1,7 +1,6 @@
 import { DecodedVehicleData } from '../types/database';
 
-const AUTODEV_API_KEY = import.meta.env.VITE_AUTODEV_API_KEY;
-const AUTODEV_BASE_URL = 'https://api.auto.dev';
+
 
 export interface AutoDevVINResponse {
   vin: string;
@@ -30,21 +29,20 @@ export interface VINDecoderResult {
 /**
  * Decode VIN using Auto.dev API
  */
+import { supabase } from '../lib/supabase';
+
+/**
+ * Decode VIN using Auto.dev API via Supabase Edge Function
+ */
 async function decodeVINWithAutoDev(vin: string): Promise<VINDecoderResult> {
   try {
-    const response = await fetch(`${AUTODEV_BASE_URL}/vin/${vin}`, {
-      headers: {
-        'Authorization': `Bearer ${AUTODEV_API_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      mode: 'cors', // Explicitly request CORS
+    const { data, error } = await supabase.functions.invoke('decode-vin', {
+      body: { vin },
     });
 
-    if (!response.ok) {
-      throw new Error(`Auto.dev API error: ${response.status}`);
+    if (error) {
+      throw new Error(`Auto.dev API error: ${error.message}`);
     }
-
-    const data: AutoDevVINResponse = await response.json();
 
     if (!data.vinValid) {
       return {
