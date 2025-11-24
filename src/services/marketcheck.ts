@@ -1,6 +1,6 @@
 import { MarketPricingData } from '../types/market';
 
-const MARKETCHECK_API_URL = 'https://marketcheck-prod.apigee.net/v2';
+const MARKETCHECK_API_URL = 'https://api.marketcheck.com/v2';
 const API_KEY = import.meta.env.VITE_MARKETCHECK_API_KEY;
 
 interface MarketcheckListing {

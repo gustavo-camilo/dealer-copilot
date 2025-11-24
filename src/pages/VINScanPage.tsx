@@ -83,20 +83,9 @@ export default function VINScanPage() {
 
       const marketData = await getMarketPricing(enrichedData, tenant.zip_code);
 
-      // If no market data, stop here and show report UI
+      // If no market data, we still proceed but with limited info
       if (!marketData) {
-        setResult({
-          decoded_data: enrichedData,
-          market_data: null,
-          recommendation: 'caution', // Default to caution if no data
-          confidence_score: 0,
-          match_reasoning: [],
-          estimated_profit: 0,
-          max_bid_suggestion: 0,
-          estimated_days_to_sale: 0,
-        });
-        setLoading(false);
-        return;
+        console.warn('Market data unavailable, proceeding with limited analysis');
       }
 
       // Step 3: Get dealer's sales history for this vehicle type
@@ -114,13 +103,13 @@ export default function VINScanPage() {
       const salesRecords: SalesRecord[] = salesHistory || [];
 
       // Step 4: Calculate max bid
-      const maxBid = calculateMaxBid(
+      const maxBid = marketData ? calculateMaxBid(
         marketData.averagePrice,
         costSettings.target_margin_percent,
         costSettings.auction_fee_percent,
         costSettings.reconditioning_cost,
         costSettings.transport_cost
-      );
+      ) : 0;
 
       // Step 5: Generate recommendation
       const recommendation = await generateRecommendation(

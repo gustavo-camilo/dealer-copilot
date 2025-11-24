@@ -37,6 +37,7 @@ async function decodeVINWithAutoDev(vin: string): Promise<VINDecoderResult> {
         'Authorization': `Bearer ${AUTODEV_API_KEY}`,
         'Content-Type': 'application/json',
       },
+      mode: 'cors', // Explicitly request CORS
     });
 
     if (!response.ok) {

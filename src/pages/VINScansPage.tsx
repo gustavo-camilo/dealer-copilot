@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, AlertCircle, Target, Menu, X, ChevronRight } from 'lucide-react';
+import { Search, Target, Menu, X, Filter, Calendar, DollarSign, Trash2, AlertCircle, ChevronRight } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 import VINScanResult from '../components/VINScanResult';
 
@@ -130,6 +130,29 @@ export default function VINScansPage() {
       navigate('/signin');
     } catch (error) {
       console.error('Error signing out:', error);
+    }
+  };
+
+  const handleDeleteScan = async (e: React.MouseEvent, scanId: string) => {
+    e.stopPropagation(); // Prevent opening the modal
+    if (!window.confirm('Are you sure you want to delete this scan? This action cannot be undone.')) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('vin_scans')
+        .delete()
+        .eq('id', scanId);
+
+      if (error) throw error;
+
+      // Remove from local state
+      setScans(scans.filter(s => s.id !== scanId));
+      setFilteredScans(filteredScans.filter(s => s.id !== scanId));
+    } catch (error) {
+      console.error('Error deleting scan:', error);
+      alert('Failed to delete scan');
     }
   };
 
