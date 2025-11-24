@@ -1065,6 +1065,7 @@ export default function AdminPage() {
             onSave={handleUpdateTenant}
           />
         )}
-      </div >
-      );
+      </div>
+    </div>
+  );
 }
