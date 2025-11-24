@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
   TrendingUp,
-  Search,
   Trash2,
   RefreshCw,
   Target,
@@ -57,7 +56,6 @@ export default function CompetitorAnalysisPage() {
   const [scanning, setScanning] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [newCompetitorUrl, setNewCompetitorUrl] = useState('');
-  const [newCompetitorName, setNewCompetitorName] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<string>('starter');
   const [addingToQueue, setAddingToQueue] = useState(false);
@@ -146,18 +144,19 @@ export default function CompetitorAnalysisPage() {
         .insert({
           tenant_id: tenant.id,
           competitor_url: newCompetitorUrl.trim(),
-          competitor_name: newCompetitorName.trim() || null,
+          competitor_name: null,
           status: 'pending',
           priority: 2,
         });
 
       if (insertError) throw insertError;
 
-      toast.success('Competitor added to waiting list! Our team will process it soon.');
+      toast.success('Competitor added to the analysis queue. There are other dealerships in front. You will receive a notification as soon as the analysis is complete.', {
+        duration: 6000,
+      });
 
       // Clear form
       setNewCompetitorUrl('');
-      setNewCompetitorName('');
     } catch (error) {
       console.error('Error adding to waiting list:', error);
       setError(error instanceof Error ? error.message : 'Failed to add competitor to waiting list');
@@ -169,7 +168,7 @@ export default function CompetitorAnalysisPage() {
 
   const handleScanCompetitor = async (url?: string, name?: string) => {
     const competitorUrl = url || newCompetitorUrl;
-    const competitorName = name || newCompetitorName;
+    const competitorName = name;
 
     if (!competitorUrl.trim()) {
       setError('Please enter a competitor URL');
@@ -213,7 +212,6 @@ export default function CompetitorAnalysisPage() {
 
       // Clear form
       setNewCompetitorUrl('');
-      setNewCompetitorName('');
 
       // Reload competitors list from database
       await loadCompetitors();
@@ -411,49 +409,20 @@ export default function CompetitorAnalysisPage() {
                   disabled={scanning || addingToQueue}
                 />
               </div>
-              <div className="sm:w-64">
-                <input
-                  type="text"
-                  placeholder="Competitor name (optional)"
-                  value={newCompetitorName}
-                  onChange={(e) => setNewCompetitorName(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  disabled={scanning || addingToQueue}
-                />
-              </div>
-            </div>
-            <div className="flex flex-col sm:flex-row gap-3">
               <button
                 onClick={handleAddToWaitingList}
                 disabled={addingToQueue || scanning || !newCompetitorUrl.trim()}
-                className="flex-1 px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
               >
                 {addingToQueue ? (
                   <>
                     <Loader2 className="w-5 h-5 animate-spin" />
-                    Adding to Queue...
+                    Requesting...
                   </>
                 ) : (
                   <>
                     <TrendingUp className="w-5 h-5" />
-                    Add to Waiting List
-                  </>
-                )}
-              </button>
-              <button
-                onClick={() => handleScanCompetitor()}
-                disabled={scanning || addingToQueue || !newCompetitorUrl.trim()}
-                className="flex-1 px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-              >
-                {scanning ? (
-                  <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Scanning...
-                  </>
-                ) : (
-                  <>
-                    <Search className="w-5 h-5" />
-                    Quick Scan (Dev)
+                    Request Analysis
                   </>
                 )}
               </button>
