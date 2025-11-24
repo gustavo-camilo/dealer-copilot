@@ -7,7 +7,7 @@ export interface VehicleRecommendation {
   matchReasons: MatchReason[];
   estimatedProfit: number;
   maxBidSuggestion: number;
-  estimatedDaysToSale: number;
+  estimatedDaysToSale: number | null;
 }
 
 interface ScoringFactors {
@@ -24,10 +24,10 @@ interface ScoringFactors {
 function analyzeDealerHistory(
   vehicleData: DecodedVehicleData,
   salesHistory: SalesRecord[]
-): { score: number; reasons: MatchReason[]; avgDaysToSale: number } {
+): { score: number; reasons: MatchReason[]; avgDaysToSale: number | null } {
   const reasons: MatchReason[] = [];
   let score = 50; // Start at neutral
-  let avgDaysToSale = 30; // Default
+  let avgDaysToSale: number | null = null; // Default to null
 
   if (salesHistory.length === 0) {
     reasons.push({
@@ -370,6 +370,6 @@ export async function generateRecommendation(
     matchReasons: allReasons,
     estimatedProfit: Math.round(profitResult.estimatedProfit),
     maxBidSuggestion: Math.round(maxBid),
-    estimatedDaysToSale: Math.round(historyResult.avgDaysToSale),
+    estimatedDaysToSale: historyResult.avgDaysToSale !== null ? Math.round(historyResult.avgDaysToSale) : null,
   };
 }

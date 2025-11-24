@@ -13,7 +13,7 @@ interface VINScanResultProps {
         match_reasoning: any[];
         estimated_profit: number | null;
         max_bid_suggestion: number | null;
-        estimated_days_to_sale?: number;
+        estimated_days_to_sale?: number | null;
     };
     onClose?: () => void;
     onScanAnother?: () => void;
@@ -127,7 +127,7 @@ export default function VINScanResult({
                         {scanData.estimated_days_to_sale !== undefined && (
                             <div>
                                 <p className="text-gray-600">Est. Days to Sale</p>
-                                <p className="font-semibold">{scanData.estimated_days_to_sale} days</p>
+                                <p className="font-semibold">{scanData.estimated_days_to_sale ? `${scanData.estimated_days_to_sale} days` : 'N/A'}</p>
                             </div>
                         )}
                     </div>
@@ -166,35 +166,33 @@ export default function VINScanResult({
                 )}
 
                 {/* Profit Calculator */}
-                {scanData.market_data && (
-                    <ProfitCalculator
-                        maxBidSuggestion={scanData.max_bid_suggestion || 0}
-                        marketPrice={scanData.market_data.averagePrice}
-                        defaultAuctionFee={defaultCostSettings.auction_fee_percent}
-                        defaultRecon={defaultCostSettings.reconditioning_cost}
-                        defaultTransport={defaultCostSettings.transport_cost}
-                        onCostsChange={async (costs) => {
-                            // Save custom costs to database if scan_id exists and costs were edited
-                            if (scanData.id && costs.costsEdited) {
-                                try {
-                                    await supabase
-                                        .from('vin_scans')
-                                        .update({
-                                            custom_auction_fee_percent: costs.auctionFee,
-                                            custom_recon_cost: costs.recon,
-                                            custom_transport_cost: costs.transport,
-                                            custom_max_bid: costs.maxBid,
-                                            custom_market_price: costs.marketPrice,
-                                            costs_edited: true,
-                                        })
-                                        .eq('id', scanData.id);
-                                } catch (error) {
-                                    console.error('Error saving custom costs:', error);
-                                }
+                <ProfitCalculator
+                    maxBidSuggestion={scanData.max_bid_suggestion || 0}
+                    marketPrice={scanData.market_data?.averagePrice || 0}
+                    defaultAuctionFee={defaultCostSettings.auction_fee_percent}
+                    defaultRecon={defaultCostSettings.reconditioning_cost}
+                    defaultTransport={defaultCostSettings.transport_cost}
+                    onCostsChange={async (costs) => {
+                        // Save custom costs to database if scan_id exists and costs were edited
+                        if (scanData.id && costs.costsEdited) {
+                            try {
+                                await supabase
+                                    .from('vin_scans')
+                                    .update({
+                                        custom_auction_fee_percent: costs.auctionFee,
+                                        custom_recon_cost: costs.recon,
+                                        custom_transport_cost: costs.transport,
+                                        custom_max_bid: costs.maxBid,
+                                        custom_market_price: costs.marketPrice,
+                                        costs_edited: true,
+                                    })
+                                    .eq('id', scanData.id);
+                            } catch (error) {
+                                console.error('Error saving custom costs:', error);
                             }
-                        }}
-                    />
-                )}
+                        }
+                    }}
+                />
 
                 {/* Market Context */}
                 {scanData.market_data ? (
