@@ -89,7 +89,6 @@ export default function CompetitorAnalysisPage() {
       const { data, error } = await supabase
         .from('competitor_snapshots')
         .select('*')
-        .eq('tenant_id', tenant?.id)
         .order('scanned_at', { ascending: false });
 
       if (error) throw error;
@@ -108,7 +107,6 @@ export default function CompetitorAnalysisPage() {
       const { data, error } = await supabase
         .from('competitor_scan_history')
         .select('id, scanned_at, vehicle_count, avg_price')
-        .eq('tenant_id', tenant?.id)
         .eq('competitor_url', competitorUrl)
         .order('scanned_at', { ascending: false })
         .limit(10);
@@ -233,8 +231,7 @@ export default function CompetitorAnalysisPage() {
         const { error } = await supabase
           .from('competitor_snapshots')
           .delete()
-          .eq('id', id)
-          .eq('tenant_id', tenant.id);
+          .eq('id', id);
 
         if (error) throw error;
 
