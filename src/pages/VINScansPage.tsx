@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import { Search, Target, Menu, X, Filter, Calendar, DollarSign, Trash2, AlertCircle, ChevronRight } from 'lucide-react';
+import toast from 'react-hot-toast';
 import NavigationMenu from '../components/NavigationMenu';
 import VINScanResult from '../components/VINScanResult';
 
@@ -133,27 +134,78 @@ export default function VINScansPage() {
     }
   };
 
+  const formatVehicleName = (name: string) => {
+    if (!name) return '';
+    // Special case for BMW
+    if (name.toUpperCase() === 'BMW') return 'BMW';
+
+    // Capitalize first letter of each word
+    return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   const handleDeleteScan = async (e: React.MouseEvent, scanId: string) => {
     e.stopPropagation(); // Prevent opening the modal
-    if (!window.confirm('Are you sure you want to delete this scan? This action cannot be undone.')) {
-      return;
-    }
 
-    try {
-      const { error } = await supabase
-        .from('vin_scans')
-        .delete()
-        .eq('id', scanId);
+    toast.custom((t) => (
+      <div
+        className={`${t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+      >
+        <div className="flex-1 w-0 p-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 pt-0.5">
+              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm font-medium text-gray-900">
+                Delete Scan?
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                Are you sure you want to delete this scan? This action cannot be undone.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex border-l border-gray-200">
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                const { error } = await supabase
+                  .from('vin_scans')
+                  .delete()
+                  .eq('id', scanId);
 
-      if (error) throw error;
+                if (error) throw error;
 
-      // Remove from local state
-      setScans(scans.filter(s => s.id !== scanId));
-      setFilteredScans(filteredScans.filter(s => s.id !== scanId));
-    } catch (error) {
-      console.error('Error deleting scan:', error);
-      alert('Failed to delete scan');
-    }
+                // Remove from local state
+                setScans(scans.filter(s => s.id !== scanId));
+                setFilteredScans(filteredScans.filter(s => s.id !== scanId));
+                toast.success('Scan deleted successfully');
+              } catch (error) {
+                console.error('Error deleting scan:', error);
+                toast.error('Failed to delete scan');
+              }
+            }}
+            className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-red-600 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            Delete
+          </button>
+        </div>
+        <div className="flex border-l border-gray-200">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="w-full border border-transparent rounded-none p-4 flex items-center justify-center text-sm font-medium text-gray-600 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 5000,
+    });
   };
 
   const getRecommendationBadge = (recommendation: string) => {
@@ -271,21 +323,21 @@ export default function VINScansPage() {
             {filteredScans.map((scan) => (
               <div
                 key={scan.id}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition"
+                onClick={() => setSelectedScan(scan)}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition cursor-pointer"
               >
                 <div className="flex items-center justify-between gap-4">
                   {/* Left: Vehicle Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
                       <h3 className="font-semibold text-gray-900 truncate">
-                        {scan.decoded_data.year} {scan.decoded_data.make} {scan.decoded_data.model}
+                        {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
                       </h3>
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
                         {scan.recommendation.toUpperCase()}
                       </span>
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span className="font-medium">{scan.confidence_score}% confidence</span>
                       <span className="hidden sm:inline">Max Bid: {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}</span>
                       <span className={`hidden sm:inline font-medium ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
                         Profit: {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
@@ -293,14 +345,26 @@ export default function VINScansPage() {
                     </div>
                   </div>
 
-                  {/* Right: View Details Button */}
-                  <button
-                    onClick={() => setSelectedScan(scan)}
-                    className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0 flex items-center gap-1"
-                  >
-                    Details
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedScan(scan);
+                      }}
+                      className="px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0 flex items-center gap-1"
+                    >
+                      Details
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteScan(e, scan.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition flex-shrink-0"
+                      title="Delete Scan"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Mobile: Show financial info */}
