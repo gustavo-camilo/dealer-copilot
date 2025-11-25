@@ -60,9 +60,11 @@ export default function CompetitorAnalysisPage() {
   const [error, setError] = useState<string | null>(null);
   const [subscriptionTier, setSubscriptionTier] = useState<string>('starter');
   const [addingToQueue, setAddingToQueue] = useState(false);
+  const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
   useEffect(() => {
     loadCompetitors();
+    loadPendingRequests();
     loadSubscriptionTier();
   }, []);
 
@@ -78,6 +80,24 @@ export default function CompetitorAnalysisPage() {
       setSubscriptionTier(data?.subscription_tier || 'starter');
     } catch (error) {
       console.error('Error loading subscription tier:', error);
+    }
+  };
+
+  const loadPendingRequests = async () => {
+    try {
+      if (!tenant?.id) return;
+
+      const { data, error } = await supabase
+        .from('competitor_scraping_waiting_list')
+        .select('*')
+        .eq('tenant_id', tenant.id)
+        .in('status', ['pending', 'in_progress'])
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPendingRequests(data || []);
+    } catch (error) {
+      console.error('Error loading pending requests:', error);
     }
   };
 
@@ -151,6 +171,7 @@ export default function CompetitorAnalysisPage() {
       if (insertError) throw insertError;
 
       setSubmissionSuccess(true);
+      loadPendingRequests(); // Reload pending requests
 
       // Clear form
       setNewCompetitorUrl('');
@@ -469,12 +490,46 @@ export default function CompetitorAnalysisPage() {
               </div>
             </div>
 
+            {/* Pending Requests */}
+            {pendingRequests.length > 0 && (
+              <div className="mb-8">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Processing Requests</h3>
+                <div className="grid grid-cols-1 gap-4">
+                  {pendingRequests.map((request) => (
+                    <div
+                      key={request.id}
+                      className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center">
+                          <Loader2 className="w-5 h-5 text-blue-600 animate-spin" />
+                        </div>
+                        <div>
+                          <h4 className="font-medium text-gray-900">
+                            {request.competitor_name || request.competitor_url}
+                          </h4>
+                          <p className="text-sm text-gray-500">
+                            Requested {formatDate(request.created_at)}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <span className="px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full uppercase">
+                          {request.status.replace('_', ' ')}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Competitors List */}
             {loading ? (
               <div className="flex justify-center items-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
               </div>
-            ) : competitors.length === 0 ? (
+            ) : competitors.length === 0 && pendingRequests.length === 0 ? (
               <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
                 <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 mb-2">No competitors scanned yet</h3>
