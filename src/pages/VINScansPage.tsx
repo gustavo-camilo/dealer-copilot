@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Target, Menu, X, Filter, Calendar, DollarSign, Trash2, AlertCircle, ChevronRight } from 'lucide-react';
+import { Search, Target, Menu, X, Trash2, AlertCircle, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
 import NavigationMenu from '../components/NavigationMenu';
 import VINScanResult from '../components/VINScanResult';
@@ -352,10 +352,10 @@ export default function VINScansPage() {
                         e.stopPropagation();
                         setSelectedScan(scan);
                       }}
-                      className="px-3 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0 flex items-center gap-1"
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0"
+                      title="View Details"
                     >
-                      Details
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-5 h-5" />
                     </button>
                     <button
                       onClick={(e) => handleDeleteScan(e, scan.id)}
@@ -404,8 +404,14 @@ export default function VINScansPage() {
 
         {/* Details Modal */}
         {selectedScan && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-            <div className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
+            onClick={() => setSelectedScan(null)}
+          >
+            <div
+              className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* Modal Header */}
               <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>

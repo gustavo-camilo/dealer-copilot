@@ -101,10 +101,10 @@ export default function ProfitCalculator({
           )}
           <button
             onClick={() => setIsEditing(!isEditing)}
-            className="text-sm text-blue-900 hover:text-blue-700 flex items-center gap-1"
+            className="text-sm text-blue-900 hover:text-blue-700 flex items-center gap-1 p-1 hover:bg-blue-50 rounded"
+            title={isEditing ? 'Done' : 'Edit Costs'}
           >
             <Edit2 className="h-4 w-4" />
-            {isEditing ? 'Done' : 'Edit Costs'}
           </button>
         </div>
       </div>
