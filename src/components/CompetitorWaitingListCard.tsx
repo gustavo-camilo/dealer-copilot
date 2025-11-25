@@ -1,4 +1,5 @@
-import React from 'react';
+import { useState } from 'react';
+import { Upload, Play, CheckCircle, PlusCircle, MinusCircle, MapPin, Mail, Building2, Calendar } from 'lucide-react';
 
 interface CompetitorWaitingListEntry {
   id: string;
@@ -8,7 +9,6 @@ interface CompetitorWaitingListEntry {
   requested_at: string;
   status: string;
   assigned_to: string | null;
-  priority: number;
   notes: string | null;
   tenant: {
     name: string;
@@ -26,32 +26,26 @@ interface CompetitorWaitingListCardProps {
   entry: CompetitorWaitingListEntry;
   onUpload?: (entryId: string, tenantId: string) => void;
   onUpdateStatus?: (entryId: string, status: string) => void;
-  onUpdatePriority?: (entryId: string, priority: number) => void;
 }
 
 export default function CompetitorWaitingListCard({
   entry,
   onUpload,
   onUpdateStatus,
-  onUpdatePriority,
 }: CompetitorWaitingListCardProps) {
+  const [isExpanded, setIsExpanded] = useState(false);
+
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'pending':
-        return 'bg-yellow-100 text-yellow-800';
+        return 'text-yellow-600 bg-yellow-50 border-yellow-200';
       case 'in_progress':
-        return 'bg-purple-100 text-purple-800';
+        return 'text-purple-600 bg-purple-50 border-purple-200';
       case 'completed':
-        return 'bg-green-100 text-green-800';
+        return 'text-green-600 bg-green-50 border-green-200';
       default:
-        return 'bg-gray-100 text-gray-800';
+        return 'text-gray-600 bg-gray-50 border-gray-200';
     }
-  };
-
-  const getPriorityEmoji = (priority: number) => {
-    if (priority >= 5) return '🔴';
-    if (priority >= 3) return '🟡';
-    return '🟢';
   };
 
   const formatDate = (dateString: string) => {
@@ -71,121 +65,120 @@ export default function CompetitorWaitingListCard({
   };
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <div className="flex items-center gap-3 mb-2">
-            <h3 className="text-xl font-semibold text-gray-900">
-              {entry.tenant.name} → Competitor
+    <div className="bg-white rounded-lg shadow-sm border border-gray-200 hover:shadow-md transition overflow-hidden">
+      {/* Condensed Row */}
+      <div className="p-4 flex items-center justify-between gap-4">
+        {/* Left: Competitor Info */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-3">
+            <h3 className="text-base font-semibold text-gray-900 truncate" title={entry.competitor_url}>
+              {entry.competitor_url}
             </h3>
-            <span className="text-2xl">{getPriorityEmoji(entry.priority)}</span>
+            <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusColor(entry.status)}`}>
+              {entry.status.replace('_', ' ')}
+            </span>
           </div>
-          <div className="mb-2">
-            <p className="text-sm text-gray-500 mb-1">Competitor:</p>
-            <a
-              href={entry.competitor_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm text-blue-600 hover:text-blue-800 hover:underline"
+          <p className="text-sm text-gray-500 mt-1 flex items-center gap-2">
+            <Calendar className="h-3 w-3" />
+            Requested {formatDate(entry.requested_at)}
+          </p>
+        </div>
+
+        {/* Right: Actions */}
+        <div className="flex items-center gap-2">
+          {onUpload && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpload(entry.id, entry.tenant_id);
+              }}
+              className="p-2 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-full transition"
+              title="Upload CSV"
             >
-              {entry.competitor_name || entry.competitor_url}
-            </a>
+              <Upload className="h-5 w-5" />
+            </button>
+          )}
+
+          {onUpdateStatus && entry.status === 'pending' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateStatus(entry.id, 'in_progress');
+              }}
+              className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-full transition"
+              title="Mark In Progress"
+            >
+              <Play className="h-5 w-5" />
+            </button>
+          )}
+
+          {onUpdateStatus && entry.status === 'in_progress' && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onUpdateStatus(entry.id, 'completed');
+              }}
+              className="p-2 text-gray-500 hover:text-green-600 hover:bg-green-50 rounded-full transition"
+              title="Mark Complete"
+            >
+              <CheckCircle className="h-5 w-5" />
+            </button>
+          )}
+
+          <button
+            onClick={() => setIsExpanded(!isExpanded)}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-full transition"
+            title={isExpanded ? "Hide Details" : "View Details"}
+          >
+            {isExpanded ? <MinusCircle className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
+          </button>
+        </div>
+      </div>
+
+      {/* Expanded Details */}
+      {isExpanded && (
+        <div className="px-4 pb-4 pt-0 bg-gray-50 border-t border-gray-100">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                <Building2 className="h-3 w-3" /> Dealership
+              </p>
+              <p className="text-sm text-gray-900">{entry.tenant.name}</p>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                <Mail className="h-3 w-3" /> Contact
+              </p>
+              <p className="text-sm text-gray-900">{entry.tenant.contact_email}</p>
+              {entry.tenant.contact_phone && (
+                <p className="text-xs text-gray-500">{entry.tenant.contact_phone}</p>
+              )}
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-gray-500 mb-1 flex items-center gap-1">
+                <MapPin className="h-3 w-3" /> Location
+              </p>
+              <p className="text-sm text-gray-900">{entry.tenant.location || 'Not specified'}</p>
+            </div>
           </div>
-        </div>
 
-        <span className={`px-3 py-1 rounded-full text-xs font-semibold uppercase ${getStatusColor(entry.status)}`}>
-          {entry.status.replace('_', ' ')}
-        </span>
-      </div>
+          {entry.notes && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Notes</p>
+              <p className="text-sm text-gray-700">{entry.notes}</p>
+            </div>
+          )}
 
-      {/* Details Grid */}
-      <div className="grid grid-cols-2 gap-4 mb-4">
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Dealership</p>
-          <p className="text-sm text-gray-900">{entry.tenant.name}</p>
-        </div>
-
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Contact Email</p>
-          <p className="text-sm text-gray-900">{entry.tenant.contact_email}</p>
-        </div>
-
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Location</p>
-          <p className="text-sm text-gray-900">{entry.tenant.location || 'Not specified'}</p>
-        </div>
-
-        <div>
-          <p className="text-xs text-gray-500 mb-1">Requested</p>
-          <p className="text-sm text-gray-900">{formatDate(entry.requested_at)}</p>
-        </div>
-      </div>
-
-      {/* Priority Selector */}
-      {onUpdatePriority && (
-        <div className="mb-4">
-          <label className="text-xs text-gray-500 mb-2 block">Priority Level</label>
-          <select
-            value={entry.priority}
-            onChange={(e) => onUpdatePriority(entry.id, parseInt(e.target.value))}
-            className="w-full px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 text-sm focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent"
-          >
-            <option value={1}>🟢 Low (1)</option>
-            <option value={2}>🟢 Normal (2)</option>
-            <option value={3}>🟡 Medium (3)</option>
-            <option value={4}>🟡 High (4)</option>
-            <option value={5}>🔴 Urgent (5)</option>
-          </select>
+          {entry.assigned_user && (
+            <div className="mt-3 pt-3 border-t border-gray-200">
+              <p className="text-xs font-medium text-gray-500 mb-1">Assigned To</p>
+              <p className="text-sm text-gray-700">{entry.assigned_user.full_name} ({entry.assigned_user.email})</p>
+            </div>
+          )}
         </div>
       )}
-
-      {/* Assigned User */}
-      {entry.assigned_user && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <p className="text-xs text-gray-500 mb-1">Assigned To</p>
-          <p className="text-sm text-gray-900 font-medium">{entry.assigned_user.full_name}</p>
-          <p className="text-xs text-gray-500">{entry.assigned_user.email}</p>
-        </div>
-      )}
-
-      {/* Notes */}
-      {entry.notes && (
-        <div className="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-200">
-          <p className="text-xs text-gray-500 mb-1">Notes</p>
-          <p className="text-sm text-gray-900">{entry.notes}</p>
-        </div>
-      )}
-
-      {/* Actions */}
-      <div className="flex gap-2">
-        {onUpload && (
-          <button
-            onClick={() => onUpload(entry.id, entry.tenant_id)}
-            className="flex-1 px-4 py-2 bg-purple-600 hover:bg-purple-700 rounded-lg font-medium transition text-sm text-white"
-          >
-            Upload CSV
-          </button>
-        )}
-
-        {onUpdateStatus && entry.status === 'pending' && (
-          <button
-            onClick={() => onUpdateStatus(entry.id, 'in_progress')}
-            className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg font-medium transition text-sm text-white"
-          >
-            Mark In Progress
-          </button>
-        )}
-
-        {onUpdateStatus && entry.status === 'in_progress' && (
-          <button
-            onClick={() => onUpdateStatus(entry.id, 'completed')}
-            className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 rounded-lg font-medium transition text-sm text-white"
-          >
-            Mark Complete
-          </button>
-        )}
-      </div>
     </div>
   );
 }

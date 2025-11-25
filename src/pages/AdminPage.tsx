@@ -63,7 +63,6 @@ interface CompetitorWaitingListEntry {
   requested_at: string;
   status: string;
   assigned_to: string | null;
-  priority: number;
   notes: string | null;
   tenant: {
     name: string;
@@ -472,20 +471,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateCompetitorPriority = async (entryId: string, priority: number) => {
-    try {
-      const { error } = await supabase
-        .from('competitor_scraping_waiting_list')
-        .update({ priority })
-        .eq('id', entryId);
 
-      if (error) throw error;
-
-      loadCompetitorWaitingList();
-    } catch (error: any) {
-      console.error('Error updating competitor priority:', error);
-    }
-  };
 
   const handleUpdateTicketStatus = async (ticketId: string, status: string) => {
     try {
@@ -887,7 +873,7 @@ export default function AdminPage() {
                       key={entry.id}
                       entry={entry}
                       onUpdateStatus={isSuperAdmin ? handleUpdateCompetitorStatus : undefined}
-                      onUpdatePriority={isSuperAdmin ? handleUpdateCompetitorPriority : undefined}
+
                       onUpload={() => {
                         // Handle upload logic
                       }}
