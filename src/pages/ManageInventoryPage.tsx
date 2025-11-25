@@ -17,7 +17,7 @@ import {
   Trash2,
   LayoutGrid,
   List,
-  Clock,
+  RefreshCw,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 import toast, { Toaster } from 'react-hot-toast';
@@ -314,7 +314,7 @@ export default function ManageInventoryPage() {
             <div className="max-w-2xl w-full bg-white rounded-lg shadow-sm p-8">
               <div className="text-center mb-6">
                 <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <Clock className="h-10 w-10 text-blue-600" />
+                  <RefreshCw className="h-10 w-10 text-blue-600 animate-spin" />
                 </div>
                 <h2 className="text-3xl font-bold text-gray-900">Your inventory is being processed</h2>
                 <p className="text-gray-600 mt-2">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
@@ -329,17 +329,33 @@ export default function ManageInventoryPage() {
                 <ul className="space-y-2 text-sm text-gray-700">
                   <li className="flex items-center">
                     <span className="text-green-600 mr-2">✓</span>
-                    <span><Link to="/scan" className="text-blue-600 hover:underline">Scan VINs</Link> to get instant purchase recommendations</span>
+                    <span>Scan VINs to get instant purchase recommendations</span>
                   </li>
                   <li className="flex items-center">
                     <span className="text-green-600 mr-2">✓</span>
-                    <Link to="/settings" className="text-blue-600 hover:underline">Set up your default cost settings in Settings</Link>
+                    <span>Set up your default cost settings in Settings</span>
                   </li>
                   <li className="flex items-center">
                     <span className="text-green-600 mr-2">✓</span>
-                    <span>Explore the <Link to="/dashboard" className="text-blue-600 hover:underline">dashboard</Link> and familiarize yourself with the features</span>
+                    <span>Explore the dashboard and familiarize yourself with the features</span>
                   </li>
                 </ul>
+              </div>
+
+              <div className="space-y-3">
+                <button
+                  onClick={() => navigate('/dashboard')}
+                  className="w-full bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 transition"
+                >
+                  Go to Dashboard
+                </button>
+                <button
+                  onClick={() => navigate('/scan')}
+                  className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
+                >
+                  <Target className="w-4 h-4" />
+                  VIN Scan
+                </button>
               </div>
 
               {tenant?.inventory_ready_at && (

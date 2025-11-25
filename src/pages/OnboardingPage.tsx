@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { CheckCircle, Target, Clock, RefreshCw, AlertCircle, ExternalLink, Menu, X } from 'lucide-react';
+import { CheckCircle, Target, Clock, RefreshCw, AlertCircle, Menu, X } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 
 interface ScrapingResult {
@@ -285,7 +285,7 @@ export default function OnboardingPage() {
           <div className="max-w-2xl w-full bg-white rounded-lg shadow-sm p-8">
             <div className="text-center mb-6">
               <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <Clock className="h-10 w-10 text-blue-600" />
+                <RefreshCw className="h-10 w-10 text-blue-600 animate-spin" />
               </div>
               <h2 className="text-3xl font-bold text-gray-900">Your inventory is being processed</h2>
               <p className="text-gray-600 mt-2">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
@@ -321,11 +321,11 @@ export default function OnboardingPage() {
                 Go to Dashboard
               </button>
               <button
-                onClick={() => navigate('/inventory')}
+                onClick={() => navigate('/scan')}
                 className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
               >
-                <ExternalLink className="w-4 h-4" />
-                View Inventory
+                <Target className="w-4 h-4" />
+                VIN Scan
               </button>
             </div>
           </div>
