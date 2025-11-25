@@ -42,7 +42,7 @@ serve(async (req) => {
             params.append('miles_range', `${minMiles}-${maxMiles}`)
         }
 
-        const response = await fetch(`https://api.marketcheck.com/v2/search?${params.toString()}`)
+        const response = await fetch(`https://api.marketcheck.com/v2/search/car/active?${params.toString()}`)
 
         if (!response.ok) {
             const errorText = await response.text()
