@@ -1,7 +1,34 @@
 import React, { useState } from 'react';
-import { CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
+
+// Helper function to simplify body types to Sedan, SUV, Pickup, or hide if not matching
+function getSimplifiedBodyType(bodyType: string | undefined): string {
+    if (!bodyType) return '';
+
+    const normalized = bodyType.toLowerCase();
+
+    // Map to Sedan
+    if (normalized.includes('sedan') || normalized.includes('coupe')) {
+        return 'Sedan';
+    }
+
+    // Map to SUV
+    if (normalized.includes('suv') || normalized.includes('crossover') ||
+        normalized.includes('wagon') || normalized.includes('mpv') ||
+        normalized.includes('van') || normalized.includes('minivan')) {
+        return 'SUV';
+    }
+
+    // Map to Pickup
+    if (normalized.includes('pickup') || normalized.includes('truck')) {
+        return 'Pickup';
+    }
+
+    // If doesn't match any category, return empty string (hide it)
+    return '';
+}
 
 interface VINScanResultProps {
     scanData: {
@@ -33,6 +60,7 @@ export default function VINScanResult({
     const [reportLoading, setReportLoading] = useState(false);
     const [reportSuccess, setReportSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [reasoningExpanded, setReasoningExpanded] = useState(false);
 
     const handleReportMissingData = async () => {
         if (!scanData?.decoded_data) return;
@@ -81,8 +109,9 @@ export default function VINScanResult({
                                 {scanData.decoded_data.year} {scanData.decoded_data.make} {scanData.decoded_data.model}
                             </h2>
                             <p className="text-gray-600">
-                                {scanData.decoded_data.trim && `${scanData.decoded_data.trim} • `}
-                                {scanData.decoded_data.body_type}
+                                {scanData.decoded_data.trim}
+                                {scanData.decoded_data.trim && getSimplifiedBodyType(scanData.decoded_data.body_type) && ' • '}
+                                {getSimplifiedBodyType(scanData.decoded_data.body_type)}
                             </p>
                             {/* If VIN is available in decoded_data, show it. Otherwise it might be in the parent object but we didn't pass it explicitly in the interface above except inside decoded_data potentially */}
                             {/* We can assume decoded_data has what we need or pass vin separately if needed. For now, let's rely on what's there. */}
@@ -95,9 +124,9 @@ export default function VINScanResult({
                                     : 'bg-red-100 text-red-800'
                                 }`}
                         >
-                            {scanData.recommendation === 'buy' && '🟢 STRONG BUY'}
-                            {scanData.recommendation === 'caution' && '🟡 PROCEED WITH CAUTION'}
-                            {scanData.recommendation === 'pass' && '🔴 PASS'}
+                            {scanData.recommendation === 'buy' && '🟢 Strong Buy'}
+                            {scanData.recommendation === 'caution' && '🟡 Caution'}
+                            {scanData.recommendation === 'pass' && '🔴 Pass'}
                         </div>
                     </div>
 
@@ -124,10 +153,6 @@ export default function VINScanResult({
                                 <p className="font-semibold">{scanData.decoded_data.accident_count}</p>
                             </div>
                         )}
-                        <div>
-                            <p className="text-gray-600">Confidence Score</p>
-                            <p className="font-semibold">{scanData.confidence_score}%</p>
-                        </div>
                         {scanData.estimated_days_to_sale !== undefined && (
                             <div>
                                 <p className="text-gray-600">Est. Days to Sale</p>
@@ -137,70 +162,9 @@ export default function VINScanResult({
                     </div>
                 </div>
 
-                {/* Match Reasoning */}
-                {scanData.market_data && (
-                    <div
-                        className={`rounded-lg p-6 mb-6 ${scanData.recommendation === 'buy'
-                            ? 'bg-green-50 border border-green-200'
-                            : scanData.recommendation === 'caution'
-                                ? 'bg-yellow-50 border border-yellow-200'
-                                : 'bg-red-50 border border-red-200'
-                            }`}
-                    >
-                        <h3 className="font-bold text-gray-900 mb-3">
-                            {scanData.recommendation === 'buy' && '✅ Why This is a Strong Match'}
-                            {scanData.recommendation === 'caution' && '⚠️ Proceed Carefully - Here\'s Why'}
-                            {scanData.recommendation === 'pass' && '❌ Why You Should Pass'}
-                        </h3>
-                        <div className="space-y-2">
-                            {scanData.match_reasoning.map((reason: any, index: number) => (
-                                <div key={index} className="flex items-start">
-                                    {reason.type === 'positive' ? (
-                                        <CheckCircle className="h-5 w-5 text-green-600 mr-2 flex-shrink-0 mt-0.5" />
-                                    ) : reason.type === 'negative' ? (
-                                        <AlertCircle className="h-5 w-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
-                                    ) : (
-                                        <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
-                                    )}
-                                    <span className="text-gray-700">{reason.message}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-                )}
-
-                {/* Profit Calculator */}
-                <ProfitCalculator
-                    maxBidSuggestion={scanData.max_bid_suggestion || 0}
-                    marketPrice={scanData.market_data?.averagePrice || 0}
-                    auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
-                    defaultRecon={defaultCostSettings.reconditioning_cost}
-                    defaultTransport={defaultCostSettings.transport_cost}
-                    onCostsChange={async (costs) => {
-                        // Save custom costs to database if scan_id exists and costs were edited
-                        if (scanData.id && costs.costsEdited) {
-                            try {
-                                await supabase
-                                    .from('vin_scans')
-                                    .update({
-                                        custom_auction_fee: costs.auctionFee,
-                                        custom_recon_cost: costs.recon,
-                                        custom_transport_cost: costs.transport,
-                                        custom_max_bid: costs.maxBid,
-                                        custom_market_price: costs.marketPrice,
-                                        costs_edited: true,
-                                    })
-                                    .eq('id', scanData.id);
-                            } catch (error) {
-                                console.error('Error saving custom costs:', error);
-                            }
-                        }
-                    }}
-                />
-
-                {/* Market Context */}
+                {/* Market Context - Moved up */}
                 {scanData.market_data ? (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mt-6">
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
                         <h4 className="font-semibold text-blue-900 mb-2">📊 Market Context</h4>
                         <div className="text-sm text-blue-800 space-y-1">
                             <p>
@@ -211,11 +175,13 @@ export default function VINScanResult({
                                 • Price Range: ${scanData.market_data.minPrice.toLocaleString()} - $
                                 {scanData.market_data.maxPrice.toLocaleString()}
                             </p>
-                            <p>• Data Confidence: {scanData.market_data.confidence}%</p>
+                            <p>
+                                • Cheapest Listing: ${scanData.market_data.minPrice.toLocaleString()} (Within 50 Miles)
+                            </p>
                         </div>
                     </div>
                 ) : (
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mt-6 text-center">
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
                         <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-3" />
 
                         {!tenantZipCode ? (
@@ -254,6 +220,89 @@ export default function VINScanResult({
                                     </div>
                                 )}
                             </>
+                        )}
+                    </div>
+                )}
+
+                {/* Profit Calculator */}
+                <ProfitCalculator
+                    maxBidSuggestion={scanData.max_bid_suggestion || 0}
+                    marketPrice={scanData.market_data?.averagePrice || 0}
+                    auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
+                    defaultRecon={defaultCostSettings.reconditioning_cost}
+                    defaultTransport={defaultCostSettings.transport_cost}
+                    onCostsChange={async (costs) => {
+                        // Save custom costs to database if scan_id exists and costs were edited
+                        if (scanData.id && costs.costsEdited) {
+                            try {
+                                await supabase
+                                    .from('vin_scans')
+                                    .update({
+                                        custom_recon_cost: costs.recon,
+                                        custom_transport_cost: costs.transport,
+                                        custom_max_bid: costs.maxBid,
+                                        custom_market_price: costs.marketPrice,
+                                        costs_edited: true,
+                                    })
+                                    .eq('id', scanData.id);
+                            } catch (error) {
+                                console.error('Error saving custom costs:', error);
+                            }
+                        }
+                    }}
+                />
+
+                {/* Match Reasoning - Moved to bottom with collapsible */}
+                {scanData.market_data && scanData.match_reasoning && scanData.match_reasoning.length > 0 && (
+                    <div className="mt-6">
+                        <button
+                            onClick={() => setReasoningExpanded(!reasoningExpanded)}
+                            className={`w-full rounded-lg p-4 text-left transition-colors ${
+                                scanData.recommendation === 'buy'
+                                    ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                                    : scanData.recommendation === 'caution'
+                                        ? 'bg-yellow-50 border border-yellow-200 hover:bg-yellow-100'
+                                        : 'bg-red-50 border border-red-200 hover:bg-red-100'
+                            }`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-gray-900">
+                                    {scanData.recommendation === 'buy' && '✅ Why This is a Strong Match'}
+                                    {scanData.recommendation === 'caution' && '⚠️ Why Caution is Advised'}
+                                    {scanData.recommendation === 'pass' && '❌ Why You Should Pass'}
+                                </h3>
+                                {reasoningExpanded ? (
+                                    <ChevronUp className="h-5 w-5 text-gray-600" />
+                                ) : (
+                                    <ChevronDown className="h-5 w-5 text-gray-600" />
+                                )}
+                            </div>
+                        </button>
+                        {reasoningExpanded && (
+                            <div
+                                className={`rounded-b-lg p-4 border-x border-b ${
+                                    scanData.recommendation === 'buy'
+                                        ? 'bg-green-50 border-green-200'
+                                        : scanData.recommendation === 'caution'
+                                            ? 'bg-yellow-50 border-yellow-200'
+                                            : 'bg-red-50 border-red-200'
+                                }`}
+                            >
+                                <div className="space-y-2">
+                                    {scanData.match_reasoning.map((reason: any, index: number) => (
+                                        <div key={index} className="flex items-start">
+                                            {reason.type === 'positive' ? (
+                                                <CheckCircle className="h-5 w-5 text-green-600 mr-2 flex-shrink-0 mt-0.5" />
+                                            ) : reason.type === 'negative' ? (
+                                                <AlertCircle className="h-5 w-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+                                            ) : (
+                                                <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                                            )}
+                                            <span className="text-gray-700">{reason.message}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
                         )}
                     </div>
                 )}

@@ -217,16 +217,6 @@ function scoreMarketDemand(
   const reasons: MatchReason[] = [];
   let score = 60;
 
-  // Popular makes get bonus
-  const popularMakes = ['Toyota', 'Honda', 'Ford', 'Chevrolet', 'Nissan'];
-  if (popularMakes.includes(vehicleData.make)) {
-    score += 15;
-    reasons.push({
-      type: 'positive',
-      message: `${vehicleData.make} is a popular, reliable brand - easier to sell`,
-    });
-  }
-
   // Market confidence from pricing data
   if (marketData.confidence >= 80) {
     score += 10;
