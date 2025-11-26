@@ -375,8 +375,20 @@ export default function AdminPage() {
 
       if (error) throw error;
 
-      alert(`Scraping complete! Found ${data.total_scraped} vehicles. Review pending.`);
-      loadPendingReviews();
+      // The function returns results array and summary object
+      const vehiclesFound = data.summary?.total_vehicles || data.results?.[0]?.vehicles_found || 0;
+      const status = data.results?.[0]?.status || 'unknown';
+
+      if (status === 'success') {
+        alert(`Scraping complete! Found ${vehiclesFound} vehicles. Review pending.`);
+        loadPendingReviews();
+      } else if (status === 'failed') {
+        const errorMsg = data.results?.[0]?.error || 'Unknown error';
+        alert(`Scraping failed: ${errorMsg}`);
+      } else {
+        alert(`Scraping complete! Found ${vehiclesFound} vehicles. Review pending.`);
+        loadPendingReviews();
+      }
     } catch (error: any) {
       console.error('Scraping error:', error);
       alert(`Scraping failed: ${error.message}`);
