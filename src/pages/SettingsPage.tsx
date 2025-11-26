@@ -383,7 +383,7 @@ export default function SettingsPage() {
                 placeholder="https://yourdealership.com"
                 className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
               />
-              <p className="text-xs text-gray-500 mt-1">Changing this will add you to the scraping waiting list</p>
+              <p className="text-xs text-gray-500 mt-1">Changing this will trigger a new scan of your website's inventory.</p>
             </div>
 
             <div>

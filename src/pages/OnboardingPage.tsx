@@ -109,7 +109,7 @@ export default function OnboardingPage() {
       });
 
     } catch (error: any) {
-      console.error('Error adding to waiting list:', error);
+      console.error('Error requesting inventory scan:', error);
       setStep('error');
       setErrorMessage(error.message || 'An unexpected error occurred');
     }

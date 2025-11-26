@@ -176,9 +176,9 @@ export default function CompetitorAnalysisPage() {
       // Clear form
       setNewCompetitorUrl('');
     } catch (error) {
-      console.error('Error adding to waiting list:', error);
-      setError(error instanceof Error ? error.message : 'Failed to add competitor to waiting list');
-      toast.error('Failed to add competitor to waiting list');
+      console.error('Error adding to queue:', error);
+      setError(error instanceof Error ? error.message : 'Failed to add competitor request');
+      toast.error('Failed to add competitor request');
     } finally {
       setAddingToQueue(false);
     }

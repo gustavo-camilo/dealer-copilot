@@ -197,6 +197,51 @@ export default function ManageInventoryPage() {
     }
   };
 
+  const handleRequestUpdate = async () => {
+    if (!user?.tenant_id || !tenant) return;
+
+    const updatePromise = new Promise(async (resolve, reject) => {
+      try {
+        // Update tenant inventory_status to 'pending'
+        const { error: tenantError } = await supabase
+          .from('tenants')
+          .update({ inventory_status: 'pending' })
+          .eq('id', user.tenant_id);
+
+        if (tenantError) throw tenantError;
+
+        // Insert or update scraping_waiting_list entry
+        const { error: waitingListError } = await supabase
+          .from('scraping_waiting_list')
+          .upsert({
+            tenant_id: user.tenant_id,
+            website_url: tenant.website_url || '',
+            status: 'pending',
+            priority: 1,
+            requested_at: new Date().toISOString(),
+          }, {
+            onConflict: 'tenant_id'
+          });
+
+        if (waitingListError) throw waitingListError;
+
+        resolve('Update requested');
+      } catch (error) {
+        console.error('Error requesting update:', error);
+        reject(error);
+      }
+    });
+
+    toast.promise(
+      updatePromise,
+      {
+        loading: 'Requesting inventory update...',
+        success: 'Inventory update requested! Your inventory will be refreshed within 2-4 hours.',
+        error: (err) => `Failed to request update: ${err.message || 'Unknown error'}`,
+      }
+    );
+  };
+
   const handleDeleteVehicle = async (vehicleId: string, vehicleInfo: string) => {
     // Use toast.promise for a better user experience
     const deletePromise = new Promise(async (resolve, reject) => {
@@ -301,11 +346,22 @@ export default function ManageInventoryPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Manage Inventory</h1>
-          <p className="text-gray-600">
-            Track your current inventory and sales from website scraping
-          </p>
+        <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Manage Inventory</h1>
+            <p className="text-gray-600">
+              Track your current inventory and sales from website scraping
+            </p>
+          </div>
+          {tenant?.inventory_status === 'ready' && (
+            <button
+              onClick={handleRequestUpdate}
+              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition whitespace-nowrap self-start sm:self-auto"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Request Update
+            </button>
+          )}
         </div>
 
         {/* Processing Status Message */}
