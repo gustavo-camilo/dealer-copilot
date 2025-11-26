@@ -20,7 +20,17 @@ interface CompetitorCSVRow {
   Image_URL?: string;
 }
 
-// ... (ProcessingResult interface remains unchanged)
+interface ProcessingResult {
+  success: boolean;
+  upload_id?: string;
+  vehicles_processed: number;
+  vehicles_new?: number;
+  vehicles_updated?: number;
+  vehicles_sold?: number;
+  competitor_url?: string;
+  competitor_name?: string;
+  errors: string[];
+}
 
 // Parse CSV content
 function parseCSV(csvContent: string): CompetitorCSVRow[] {

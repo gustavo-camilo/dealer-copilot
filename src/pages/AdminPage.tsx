@@ -326,6 +326,7 @@ export default function AdminPage() {
         const text = e.target?.result as string;
 
         try {
+          console.log('Invoking upload-universal-csv...');
           const { data, error } = await supabase.functions.invoke('upload-universal-csv', {
             body: {
               csv_content: text,
@@ -334,9 +335,14 @@ export default function AdminPage() {
             }
           });
 
-          if (error) throw error;
+          console.log('Response received:', { data, error });
 
-          if (data.success) {
+          if (error) {
+            console.error('Supabase function error:', error);
+            throw error;
+          }
+
+          if (data && data.success) {
             setUploadMessage(`Successfully processed ${data.vehicles_processed} vehicles!`);
             if (data.vehicles_new > 0) setUploadMessage(prev => `${prev} (${data.vehicles_new} new)`);
             handleClearFile();
@@ -344,7 +350,7 @@ export default function AdminPage() {
             loadAdminData();
             loadCompetitorWaitingList();
           } else {
-            throw new Error(data.error || 'Upload failed');
+            throw new Error(data?.error || 'Upload failed');
           }
         } catch (err: any) {
           console.error('Upload error:', err);

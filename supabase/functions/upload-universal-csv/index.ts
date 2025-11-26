@@ -68,7 +68,12 @@ serve(async (req) => {
                 body: { csv_content, filename, tenant_id: tenant.id } // Use matched tenant_id
             });
 
-            if (error) throw error;
+            if (error) {
+                console.error('Error calling upload-manual-scraping:', error);
+                throw error;
+            }
+
+            console.log('upload-manual-scraping response:', data);
             return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
@@ -101,7 +106,12 @@ serve(async (req) => {
             }
         });
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error calling process-competitor-csv:', error);
+            throw error;
+        }
+
+        console.log('process-competitor-csv response:', data);
         return new Response(JSON.stringify(data), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     } catch (error) {
