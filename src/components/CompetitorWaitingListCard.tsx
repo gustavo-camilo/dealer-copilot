@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Upload, Play, CheckCircle, PlusCircle, MinusCircle, MapPin, Mail, Building2, Calendar } from 'lucide-react';
+import { Upload, Play, CheckCircle, PlusCircle, MinusCircle, MapPin, Mail, Building2, Calendar, Trash2 } from 'lucide-react';
 
 interface CompetitorWaitingListEntry {
   id: string;
@@ -26,12 +26,14 @@ interface CompetitorWaitingListCardProps {
   entry: CompetitorWaitingListEntry;
   onUpload?: (entryId: string, tenantId: string) => void;
   onUpdateStatus?: (entryId: string, status: string) => void;
+  onDelete?: (entryId: string) => void;
 }
 
 export default function CompetitorWaitingListCard({
   entry,
   onUpload,
   onUpdateStatus,
+  onDelete,
 }: CompetitorWaitingListCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
 
@@ -132,6 +134,21 @@ export default function CompetitorWaitingListCard({
           >
             {isExpanded ? <MinusCircle className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
           </button>
+
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
+                  onDelete(entry.id);
+                }
+              }}
+              className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition"
+              title="Delete Request"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
+          )}
         </div>
       </div>
 

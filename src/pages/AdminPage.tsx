@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Globe, Download, MessageSquare } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Globe, Download, MessageSquare, Search } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import WaitingListCard from '../components/WaitingListCard';
 import CompetitorWaitingListCard from '../components/CompetitorWaitingListCard';
@@ -126,6 +126,7 @@ export default function AdminPage() {
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [competitorWaitingList, setCompetitorWaitingList] = useState<CompetitorWaitingListEntry[]>([]);
   const [competitorStatusFilter, setCompetitorStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [competitorSearchQuery, setCompetitorSearchQuery] = useState('');
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
 
@@ -471,7 +472,22 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteCompetitorRequest = async (entryId: string) => {
+    try {
+      const { error } = await supabase
+        .from('competitor_scraping_waiting_list')
+        .delete()
+        .eq('id', entryId);
 
+      if (error) throw error;
+
+      toast.success('Request deleted successfully');
+      loadCompetitorWaitingList();
+    } catch (error: any) {
+      console.error('Error deleting competitor request:', error);
+      toast.error(`Failed to delete: ${error.message}`);
+    }
+  };
 
   const handleUpdateTicketStatus = async (ticketId: string, status: string) => {
     try {
@@ -829,19 +845,33 @@ export default function AdminPage() {
                 </div>
 
                 {/* Filter Controls */}
-                <div className="flex items-center justify-between gap-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium text-gray-700">Status:</label>
-                    <select
-                      value={competitorStatusFilter}
-                      onChange={(e) => setCompetitorStatusFilter(e.target.value as any)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
-                    >
-                      <option value="all">All Statuses</option>
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                    </select>
+                <div className="space-y-4 mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-medium text-gray-700">Status:</label>
+                      <select
+                        value={competitorStatusFilter}
+                        onChange={(e) => setCompetitorStatusFilter(e.target.value as any)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+
+                    {/* Search Field */}
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search by competitor URL, dealership name, or location..."
+                        value={competitorSearchQuery}
+                        onChange={(e) => setCompetitorSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
+                      />
+                    </div>
                   </div>
 
                   {/* Stats */}
@@ -861,25 +891,43 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {competitorWaitingList.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">
-                    {competitorStatusFilter === 'all'
-                      ? 'No competitors in queue'
-                      : `No ${competitorStatusFilter.replace('_', ' ')} entries`}
-                  </p>
-                ) : (
-                  competitorWaitingList.map((entry) => (
+                {(() => {
+                  // Filter by search query
+                  const filteredList = competitorWaitingList.filter((entry) => {
+                    if (!competitorSearchQuery) return true;
+                    const query = competitorSearchQuery.toLowerCase();
+                    return (
+                      entry.competitor_url.toLowerCase().includes(query) ||
+                      entry.competitor_name?.toLowerCase().includes(query) ||
+                      entry.tenant.name.toLowerCase().includes(query) ||
+                      entry.tenant.location?.toLowerCase().includes(query)
+                    );
+                  });
+
+                  if (filteredList.length === 0) {
+                    return (
+                      <p className="text-gray-500 text-center py-8">
+                        {competitorSearchQuery
+                          ? `No results found for "${competitorSearchQuery}"`
+                          : competitorStatusFilter === 'all'
+                          ? 'No competitors in queue'
+                          : `No ${competitorStatusFilter.replace('_', ' ')} entries`}
+                      </p>
+                    );
+                  }
+
+                  return filteredList.map((entry) => (
                     <CompetitorWaitingListCard
                       key={entry.id}
                       entry={entry}
                       onUpdateStatus={isSuperAdmin ? handleUpdateCompetitorStatus : undefined}
-
+                      onDelete={isSuperAdmin ? handleDeleteCompetitorRequest : undefined}
                       onUpload={() => {
-                        // Handle upload logic
+                        setActiveTab('upload');
                       }}
                     />
-                  ))
-                )}
+                  ));
+                })()}
               </div>
             )}
 

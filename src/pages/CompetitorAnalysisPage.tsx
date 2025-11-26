@@ -531,16 +531,24 @@ export default function CompetitorAnalysisPage() {
                     <div className="flex items-start justify-between mb-4">
                       <div className="flex-1">
                         <h3 className="text-lg font-semibold text-gray-900">
-                          {item.name || new URL(item.url).hostname}
+                          {item.name || (() => {
+                            try {
+                              return item.url ? new URL(item.url).hostname : 'Unknown Competitor';
+                            } catch {
+                              return item.url || 'Unknown Competitor';
+                            }
+                          })()}
                         </h3>
-                        <a
-                          href={item.url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline break-all"
-                        >
-                          {item.url}
-                        </a>
+                        {item.url && (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-blue-600 hover:underline break-all"
+                          >
+                            {item.url}
+                          </a>
+                        )}
                         <p className="text-xs text-gray-500 mt-1">
                           {item.type === 'pending' ? 'Requested' : 'Scanned'} {formatDate(item.date)}
                         </p>
