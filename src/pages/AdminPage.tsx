@@ -140,13 +140,13 @@ export default function AdminPage() {
 
   const loadScrapingQueue = async () => {
     try {
-      const params = new URLSearchParams({
-        status: queueFilter.status,
-        type: queueFilter.type,
-        assignee: queueFilter.assignee,
+      const { data, error } = await supabase.functions.invoke('get-scraping-queue', {
+        body: {
+          status: queueFilter.status,
+          type: queueFilter.type,
+          assignee: queueFilter.assignee,
+        }
       });
-
-      const { data, error } = await supabase.functions.invoke(`get-scraping-queue?${params.toString()}`);
 
       if (error) throw error;
       setScrapingQueue(data.queue || []);
@@ -672,6 +672,134 @@ export default function AdminPage() {
                     ))}
                   </tbody>
                 </table>
+              </div>
+            )}
+
+            {activeTab === 'scraping-queue' && (
+              <div>
+                <div className="mb-6 flex flex-col sm:flex-row gap-4">
+                  <div className="flex-1">
+                    <div className="relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                      <input
+                        type="text"
+                        placeholder="Search queue..."
+                        className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      />
+                    </div>
+                  </div>
+                  <div className="flex gap-2">
+                    <select
+                      className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      value={queueFilter.type}
+                      onChange={(e) => setQueueFilter({ ...queueFilter, type: e.target.value })}
+                    >
+                      <option value="all">All Types</option>
+                      <option value="dealer">Dealers</option>
+                      <option value="competitor">Competitors</option>
+                    </select>
+                    <select
+                      className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      value={queueFilter.status}
+                      onChange={(e) => setQueueFilter({ ...queueFilter, status: e.target.value })}
+                    >
+                      <option value="all">All Status</option>
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="active">Active</option>
+                      <option value="failed">Failed</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                  <ul className="divide-y divide-gray-200">
+                    {scrapingQueue.length === 0 ? (
+                      <li className="px-6 py-4 text-center text-gray-500">
+                        No requests found matching your filters.
+                      </li>
+                    ) : (
+                      scrapingQueue.map((item) => (
+                        <li key={item.id} className="px-6 py-4 hover:bg-gray-50">
+                          <div className="flex items-center justify-between">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center mb-1">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full mr-2 ${item.source_type === 'dealer' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                                  }`}>
+                                  {item.source_type === 'dealer' ? 'DEALER' : 'COMPETITOR'}
+                                </span>
+                                <h4 className="text-lg font-medium text-blue-600 truncate">
+                                  <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                    {item.source_name || new URL(item.source_url).hostname}
+                                  </a>
+                                </h4>
+                              </div>
+                              <div className="mt-1 flex items-center text-sm text-gray-500">
+                                <span className="truncate mr-4">
+                                  Requested by: {item.tenant_name || 'System'}
+                                </span>
+                                <span>
+                                  {new Date(item.requested_at).toLocaleDateString()}
+                                </span>
+                              </div>
+                              {item.notes && (
+                                <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                                  Note: {item.notes}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="flex flex-col items-end">
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  item.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                    item.status === 'active' ? 'bg-green-100 text-green-800' :
+                                      item.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                                  }`}>
+                                  {item.status.replace('_', ' ').toUpperCase()}
+                                </span>
+                                {item.assigned_user_name && (
+                                  <span className="text-xs text-gray-500 mt-1">
+                                    Assigned to: {item.assigned_user_name}
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex gap-2">
+                                {item.status === 'pending' && (
+                                  <button
+                                    onClick={() => handleQueueAction('update_status', item.id, { status: 'in_progress' })}
+                                    className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                                  >
+                                    Start
+                                  </button>
+                                )}
+                                {item.status === 'in_progress' && (
+                                  <button
+                                    onClick={() => handleQueueAction('update_status', item.id, { status: 'active' })}
+                                    className="text-green-600 hover:text-green-900 text-sm font-medium"
+                                  >
+                                    Complete
+                                  </button>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    if (confirm('Are you sure you want to delete this request?')) {
+                                      handleQueueAction('delete', item.id);
+                                    }
+                                  }}
+                                  className="text-red-600 hover:text-red-900 text-sm font-medium"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </li>
+                      ))
+                    )}
+                  </ul>
+                </div>
               </div>
             )}
 

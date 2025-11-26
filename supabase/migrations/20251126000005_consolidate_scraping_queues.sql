@@ -8,75 +8,86 @@ ADD COLUMN IF NOT EXISTS assigned_to UUID REFERENCES auth.users(id),
 ADD COLUMN IF NOT EXISTS priority INTEGER DEFAULT 0,
 ADD COLUMN IF NOT EXISTS notes TEXT;
 
--- 2. Migrate Dealer Waiting List (scraping_waiting_list)
-INSERT INTO source_registry (
-  source_url,
-  source_type,
-  source_name,
-  tenant_id,
-  status,
-  assigned_to,
-  priority,
-  notes,
-  created_at,
-  updated_at
-)
-SELECT 
-  t.website_url,
-  'dealer',
-  t.name,
-  swl.tenant_id,
-  CASE 
-    WHEN swl.status = 'completed' THEN 'active' -- Completed request means active scraping
-    ELSE swl.status 
-  END,
-  swl.assigned_to,
-  swl.priority,
-  swl.notes,
-  swl.requested_at,
-  COALESCE(swl.updated_at, swl.requested_at)
-FROM scraping_waiting_list swl
-JOIN tenants t ON swl.tenant_id = t.id
-WHERE t.website_url IS NOT NULL
-ON CONFLICT (source_url) DO UPDATE SET
-  status = EXCLUDED.status,
-  assigned_to = EXCLUDED.assigned_to,
-  priority = EXCLUDED.priority,
-  notes = EXCLUDED.notes;
 
--- 3. Migrate Competitor Queue (competitor_scraping_waiting_list)
-INSERT INTO source_registry (
-  source_url,
-  source_type,
-  source_name,
-  tenant_id, -- Keep NULL for competitors unless linked (which they aren't in this table usually)
-  status,
-  assigned_to,
-  priority,
-  notes,
-  created_at,
-  updated_at
-)
-SELECT 
-  cswl.competitor_url,
-  'competitor',
-  cswl.competitor_name,
-  NULL, -- Competitors are global in source_registry
-  CASE 
-    WHEN cswl.status = 'completed' THEN 'active'
-    ELSE cswl.status 
-  END,
-  cswl.assigned_to,
-  cswl.priority,
-  cswl.notes,
-  cswl.requested_at,
-  COALESCE(cswl.updated_at, cswl.requested_at)
-FROM competitor_scraping_waiting_list cswl
-ON CONFLICT (source_url) DO UPDATE SET
-  status = EXCLUDED.status,
-  assigned_to = EXCLUDED.assigned_to,
-  priority = EXCLUDED.priority,
-  notes = EXCLUDED.notes;
+-- 2. Migrate Dealer Waiting List (scraping_waiting_list) - only if table exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'scraping_waiting_list') THEN
+    INSERT INTO source_registry (
+      source_url,
+      source_type,
+      source_name,
+      tenant_id,
+      status,
+      assigned_to,
+      priority,
+      notes,
+      created_at,
+      updated_at
+    )
+    SELECT 
+      t.website_url,
+      'dealer',
+      t.name,
+      swl.tenant_id,
+      CASE 
+        WHEN swl.status = 'completed' THEN 'active'
+        ELSE swl.status 
+      END,
+      swl.assigned_to,
+      swl.priority,
+      swl.notes,
+      swl.requested_at,
+      swl.requested_at
+    FROM scraping_waiting_list swl
+    JOIN tenants t ON swl.tenant_id = t.id
+    WHERE t.website_url IS NOT NULL
+    ON CONFLICT (source_url) DO UPDATE SET
+      status = EXCLUDED.status,
+      assigned_to = EXCLUDED.assigned_to,
+      priority = EXCLUDED.priority,
+      notes = EXCLUDED.notes;
+  END IF;
+END $$;
+
+-- 3. Migrate Competitor Queue (competitor_scraping_waiting_list) - only if table exists
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 'competitor_scraping_waiting_list') THEN
+    INSERT INTO source_registry (
+      source_url,
+      source_type,
+      source_name,
+      tenant_id,
+      status,
+      assigned_to,
+      priority,
+      notes,
+      created_at,
+      updated_at
+    )
+    SELECT 
+      cswl.competitor_url,
+      'competitor',
+      cswl.competitor_name,
+      NULL,
+      CASE 
+        WHEN cswl.status = 'completed' THEN 'active'
+        ELSE cswl.status 
+      END,
+      cswl.assigned_to,
+      cswl.priority,
+      cswl.notes,
+      cswl.requested_at,
+      cswl.requested_at
+    FROM competitor_scraping_waiting_list cswl
+    ON CONFLICT (source_url) DO UPDATE SET
+      status = EXCLUDED.status,
+      assigned_to = EXCLUDED.assigned_to,
+      priority = EXCLUDED.priority,
+      notes = EXCLUDED.notes;
+  END IF;
+END $$;
 
 -- 4. Create View for Admin Dashboard
 CREATE OR REPLACE VIEW scraping_queue_view AS

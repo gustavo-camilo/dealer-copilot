@@ -105,7 +105,9 @@ SELECT
   id,
   tenant_id,
   snapshot_date,
+  scanned_at,
   vehicle_count as total_vehicles,
+  vehicle_count as vehicles_found,  -- Alias for backward compatibility
   total_inventory_value as total_value,
   avg_price,
   avg_mileage,
