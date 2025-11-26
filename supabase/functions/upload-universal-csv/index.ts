@@ -84,7 +84,7 @@ serve(async (req) => {
 
         const { data: competitorEntry } = await supabaseClient
             .from('competitor_scraping_waiting_list')
-            .select('competitor_name, competitor_url')
+            .select('id, competitor_name, competitor_url')
             .ilike('competitor_url', `%${cleanUrl}%`)
             .limit(1)
             .maybeSingle();
@@ -95,6 +95,7 @@ serve(async (req) => {
         // We pass the raw URL found in the CSV (or the one from waiting list if matched)
         const targetUrl = competitorEntry?.competitor_url || url;
         const targetName = competitorEntry?.competitor_name || null;
+        const waitingListId = competitorEntry?.id || null;
 
         const { data, error } = await supabaseClient.functions.invoke('process-competitor-csv', {
             body: {
@@ -102,6 +103,7 @@ serve(async (req) => {
                 filename,
                 competitor_url: targetUrl,
                 competitor_name: targetName,
+                waiting_list_entry_id: waitingListId, // Pass the waiting list ID to auto-complete it
                 tenant_id // Pass the uploader's tenant_id for logging (optional)
             }
         });

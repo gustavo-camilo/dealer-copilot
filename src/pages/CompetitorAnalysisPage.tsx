@@ -105,10 +105,24 @@ export default function CompetitorAnalysisPage() {
     try {
       setLoading(true);
 
-      // Load current snapshots from database
+      if (!tenant?.id) {
+        setCompetitors([]);
+        return;
+      }
+
+      // Load snapshots for competitors this tenant has requested
+      // Join with waiting list to filter by tenant
       const { data, error } = await supabase
         .from('competitor_snapshots')
-        .select('*')
+        .select(`
+          *,
+          competitor_scraping_waiting_list!inner (
+            tenant_id,
+            status,
+            requested_at
+          )
+        `)
+        .eq('competitor_scraping_waiting_list.tenant_id', tenant.id)
         .order('scanned_at', { ascending: false });
 
       if (error) throw error;

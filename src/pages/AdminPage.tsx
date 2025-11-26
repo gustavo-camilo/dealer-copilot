@@ -226,7 +226,7 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from('manual_scraping_uploads')
-        .select('id, filename, upload_date, status, vehicles_processed, vehicles_new, vehicles_updated, vehicles_sold, scraping_source, tenants!inner (name), users!inner (full_name)')
+        .select('id, filename, upload_date, status, vehicles_processed, vehicles_new, vehicles_updated, vehicles_sold, scraping_source, tenants (name), users (full_name)')
         .eq('status', 'completed') // Only show successful scrapes
         .order('upload_date', { ascending: false })
         .limit(100);
@@ -236,8 +236,8 @@ export default function AdminPage() {
       const mapped = (data || []).map((item: any) => ({
         ...item,
         scraping_source: item.scraping_source || 'dealer_inventory',
-        tenants: Array.isArray(item.tenants) && item.tenants.length > 0 ? item.tenants[0] : { name: 'Unknown' },
-        users: Array.isArray(item.users) && item.users.length > 0 ? item.users[0] : { full_name: 'Unknown' }
+        tenants: Array.isArray(item.tenants) && item.tenants.length > 0 ? item.tenants[0] : item.tenants || { name: 'Global/Competitor' },
+        users: Array.isArray(item.users) && item.users.length > 0 ? item.users[0] : item.users || { full_name: 'Unknown' }
       }));
       setUploadHistory(mapped);
     } catch (error) {
@@ -343,12 +343,30 @@ export default function AdminPage() {
           }
 
           if (data && data.success) {
-            setUploadMessage(`Successfully processed ${data.vehicles_processed} vehicles!`);
-            if (data.vehicles_new > 0) setUploadMessage(prev => `${prev} (${data.vehicles_new} new)`);
+            // Handle both dealer and competitor uploads
+            let message = `Successfully processed ${data.vehicles_processed} vehicles!`;
+
+            // Dealer upload has vehicles_new, vehicles_updated, vehicles_sold
+            if (data.vehicles_new !== undefined) {
+              const details = [];
+              if (data.vehicles_new > 0) details.push(`${data.vehicles_new} new`);
+              if (data.vehicles_updated > 0) details.push(`${data.vehicles_updated} updated`);
+              if (data.vehicles_sold > 0) details.push(`${data.vehicles_sold} sold`);
+              if (details.length > 0) message += ` (${details.join(', ')})`;
+            }
+
+            // Competitor upload has competitor_url
+            if (data.competitor_url) {
+              message += ` for competitor: ${data.competitor_name || data.competitor_url}`;
+            }
+
+            setUploadMessage(message);
             handleClearFile();
-            // Refresh data
+
+            // Refresh all data
             loadAdminData();
             loadCompetitorWaitingList();
+            loadUploadHistory();
           } else {
             throw new Error(data?.error || 'Upload failed');
           }
