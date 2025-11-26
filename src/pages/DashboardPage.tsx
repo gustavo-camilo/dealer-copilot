@@ -51,6 +51,15 @@ export default function DashboardPage() {
     return badges[recommendation as keyof typeof badges];
   };
 
+  const formatVehicleName = (name: string) => {
+    if (!name) return '';
+    // Special case for BMW
+    if (name.toUpperCase() === 'BMW') return 'BMW';
+
+    // Capitalize first letter of each word
+    return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  };
+
   useEffect(() => {
     loadDashboardData();
   }, [user]);
@@ -92,9 +101,9 @@ export default function DashboardPage() {
         .order('confidence_score', { ascending: false })
         .limit(5);
 
-      // Check if inventory has been requested (either processing, ready, or failed)
-      const hasInventoryBeenRequested = tenant?.inventory_status && tenant.inventory_status !== 'pending';
-      setHasRequestedInventory(hasInventoryBeenRequested || false);
+      // Check if inventory has been requested/submitted (any status means they've submitted)
+      const hasInventoryBeenRequested = tenant?.inventory_status !== null && tenant?.inventory_status !== undefined;
+      setHasRequestedInventory(hasInventoryBeenRequested);
 
       if (vehicles) {
         const totalValue = vehicles.reduce((sum, v) => sum + Number(v.price), 0);
@@ -365,7 +374,7 @@ export default function DashboardPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-2">
                           <h3 className="font-semibold text-gray-900 truncate">
-                            {scan.decoded_data.year} {scan.decoded_data.make} {scan.decoded_data.model}
+                            {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
                           </h3>
                           <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
                             {scan.recommendation.toUpperCase()}
@@ -409,14 +418,36 @@ export default function DashboardPage() {
             </div>
 
             {tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing' ? (
-              <div className="text-center py-8">
-                <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <RefreshCw className="h-10 w-10 text-blue-600 animate-spin" />
+              <div className="text-center py-6">
+                <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
+                  <RefreshCw className="h-6 w-6 text-blue-600 animate-spin" />
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">Processing Inventory</h3>
-                <p className="text-sm text-gray-600">
-                  Your inventory is being analyzed. This usually takes a few minutes.
-                </p>
+                <h3 className="text-lg font-bold text-gray-900 mb-2">Your inventory is being processed</h3>
+                <p className="text-sm text-gray-600 mb-3">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-center">
+                  <p className="text-xs text-blue-800 font-medium">You'll be notified when it is ready for you to review.</p>
+                </div>
+
+                <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                  <h4 className="text-xs font-bold text-gray-900 mb-2">While you wait, you can:</h4>
+                  <ul className="space-y-1 text-xs text-gray-700">
+                    <li className="flex items-center justify-center">
+                      <span className="text-green-600 mr-1 text-xs">✓</span>
+                      <span>Scan VINs to get instant purchase recommendations</span>
+                    </li>
+                    <li className="flex items-center justify-center">
+                      <span className="text-green-600 mr-1 text-xs">✓</span>
+                      <span>Set up your default cost settings in Settings</span>
+                    </li>
+                  </ul>
+                </div>
+
+                {tenant?.inventory_ready_at && (
+                  <p className="text-xs text-blue-600 mt-3">
+                    Last updated: {new Date(tenant.inventory_ready_at).toLocaleString()}
+                  </p>
+                )}
               </div>
             ) : tenant?.inventory_status === 'ready' && stats.totalVehicles > 0 ? (
               <div className="space-y-4">
