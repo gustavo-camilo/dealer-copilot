@@ -6,7 +6,6 @@ import SignInPage from './pages/SignInPage';
 import DashboardPage from './pages/DashboardPage';
 import OnboardingPage from './pages/OnboardingPage';
 import VINScanPage from './pages/VINScanPage';
-import VINScansPage from './pages/VINScansPage';
 import ManageInventoryPage from './pages/ManageInventoryPage';
 import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage';
 import CompetitorHistoryPage from './pages/CompetitorHistoryPage';
@@ -101,14 +100,6 @@ function App() {
             element={
               <ProtectedRoute>
                 <VINScanPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/vin-scans"
-            element={
-              <ProtectedRoute>
-                <VINScansPage />
               </ProtectedRoute>
             }
           />

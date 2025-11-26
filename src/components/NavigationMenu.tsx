@@ -60,12 +60,6 @@ export default function NavigationMenu({
     },
     {
       path: '/recommendations',
-      label: 'Recommendations',
-      icon: Target,
-      showOnMobile: true,
-    },
-    {
-      path: '/vin-scans',
       label: 'VIN Scans',
       icon: Package,
       showOnMobile: true,

@@ -291,7 +291,7 @@ export default function DashboardPage() {
               <h2 className="text-xl font-bold text-gray-900">Recent VIN Scans</h2>
               {recentScans.length > 0 && (
                 <Link
-                  to="/vin-scans"
+                  to="/recommendations"
                   className="text-sm text-blue-900 hover:text-blue-800 font-semibold flex items-center"
                 >
                   View All

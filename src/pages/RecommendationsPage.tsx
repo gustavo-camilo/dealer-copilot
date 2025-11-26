@@ -1,24 +1,23 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
-  TrendingUp,
-  TrendingDown,
-  Minus,
   AlertTriangle,
   ThumbsUp,
   Search,
-  Filter,
   DollarSign,
   Target,
-  Clock,
   Menu,
   X,
   ChevronRight,
+  Trash2,
+  AlertCircle,
+  TrendingDown,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import NavigationMenu from '../components/NavigationMenu';
-import { VehicleCommentSection } from '../components/VehicleCommentSection';
+import VINScanResult from '../components/VINScanResult';
 
 interface Recommendation {
   id: string;
@@ -34,14 +33,14 @@ interface Recommendation {
   confidence_score: number;
   estimated_profit: number | null;
   max_bid_suggestion: number | null;
+  market_data: any;
   match_reasoning: Array<{
     type: 'positive' | 'negative' | 'neutral';
     message: string;
   }>;
 }
 
-type RecommendationFilter = 'all' | 'buy' | 'caution' | 'pass';
-type ConfidenceFilter = 'all' | 'high' | 'medium' | 'low';
+const PAGE_SIZE = 25;
 
 export default function RecommendationsPage() {
   const { user, tenant, signOut } = useAuth();
@@ -50,12 +49,12 @@ export default function RecommendationsPage() {
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [filteredRecommendations, setFilteredRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasMore, setHasMore] = useState(true);
+  const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [recommendationFilter, setRecommendationFilter] =
-    useState<RecommendationFilter>('all');
-  const [confidenceFilter, setConfidenceFilter] = useState<ConfidenceFilter>('all');
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const observerTarget = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState({
     buy: 0,
     caution: 0,
@@ -64,48 +63,110 @@ export default function RecommendationsPage() {
     potentialProfit: 0,
   });
 
-  // Load recommendations
+  // Load recommendations with pagination
+  const loadRecommendations = useCallback(
+    async (pageNum: number, append = false) => {
+      if (!user?.tenant_id) return;
+
+      try {
+        const from = pageNum * PAGE_SIZE;
+        const to = from + PAGE_SIZE - 1;
+
+        const { data, error } = await supabase
+          .from('vin_scans')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .not('recommendation', 'is', null)
+          .order('created_at', { ascending: false })
+          .range(from, to);
+
+        if (error) throw error;
+
+        if (data) {
+          if (append) {
+            setRecommendations((prev) => [...prev, ...data]);
+          } else {
+            setRecommendations(data);
+          }
+          setHasMore(data.length === PAGE_SIZE);
+
+          // Calculate stats (only on initial load)
+          if (!append) {
+            const buy = data.filter((r) => r.recommendation === 'buy').length;
+            const caution = data.filter((r) => r.recommendation === 'caution').length;
+            const pass = data.filter((r) => r.recommendation === 'pass').length;
+            const avgConfidence =
+              data.reduce((sum, r) => sum + r.confidence_score, 0) / (data.length || 1);
+            const potentialProfit = data
+              .filter((r) => r.recommendation === 'buy' && r.confidence_score >= 70)
+              .reduce((sum, r) => sum + (r.estimated_profit || 0), 0);
+
+            setStats({
+              buy,
+              caution,
+              pass,
+              avgConfidence,
+              potentialProfit,
+            });
+          }
+        }
+      } catch (error) {
+        console.error('Error loading recommendations:', error);
+      } finally {
+        setLoading(false);
+      }
+    },
+    [user?.tenant_id]
+  );
+
+  // Initial load
   useEffect(() => {
-    loadRecommendations();
-  }, [user?.tenant_id]);
+    loadRecommendations(0);
+  }, [loadRecommendations]);
 
   // Filter recommendations
   useEffect(() => {
-    let filtered = [...recommendations];
-
-    // Apply recommendation filter
-    if (recommendationFilter !== 'all') {
-      filtered = filtered.filter((r) => r.recommendation === recommendationFilter);
+    if (!searchQuery.trim()) {
+      setFilteredRecommendations(recommendations);
+      return;
     }
 
-    // Apply confidence filter
-    if (confidenceFilter !== 'all') {
-      filtered = filtered.filter((r) => {
-        if (confidenceFilter === 'high') return r.confidence_score >= 70;
-        if (confidenceFilter === 'medium')
-          return r.confidence_score >= 50 && r.confidence_score < 70;
-        if (confidenceFilter === 'low') return r.confidence_score < 50;
-        return true;
-      });
-    }
-
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.vin.toLowerCase().includes(query) ||
-          r.decoded_data.make.toLowerCase().includes(query) ||
-          r.decoded_data.model.toLowerCase().includes(query) ||
-          `${r.decoded_data.year}`.includes(query)
-      );
-    }
-
-    // Sort by confidence score (highest first)
-    filtered.sort((a, b) => b.confidence_score - a.confidence_score);
-
+    const query = searchQuery.toLowerCase();
+    const filtered = recommendations.filter(
+      (r) =>
+        r.vin.toLowerCase().includes(query) ||
+        r.decoded_data.make.toLowerCase().includes(query) ||
+        r.decoded_data.model.toLowerCase().includes(query) ||
+        `${r.decoded_data.year}`.includes(query) ||
+        (r.decoded_data.trim && r.decoded_data.trim.toLowerCase().includes(query))
+    );
     setFilteredRecommendations(filtered);
-  }, [recommendations, recommendationFilter, confidenceFilter, searchQuery]);
+  }, [searchQuery, recommendations]);
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loading) {
+          const nextPage = page + 1;
+          setPage(nextPage);
+          loadRecommendations(nextPage, true);
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loading, page, loadRecommendations]);
 
   const handleSignOut = async () => {
     try {
@@ -116,88 +177,88 @@ export default function RecommendationsPage() {
     }
   };
 
-  const loadRecommendations = async () => {
-    if (!user?.tenant_id) return;
+  const formatVehicleName = (name: string) => {
+    if (!name) return '';
+    // Special case for BMW
+    if (name.toUpperCase() === 'BMW') return 'BMW';
 
-    try {
-      setLoading(true);
-
-      const { data, error } = await supabase
-        .from('vin_scans')
-        .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .not('recommendation', 'is', null)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      if (data) {
-        setRecommendations(data);
-
-        // Calculate stats
-        const buy = data.filter((r) => r.recommendation === 'buy').length;
-        const caution = data.filter((r) => r.recommendation === 'caution').length;
-        const pass = data.filter((r) => r.recommendation === 'pass').length;
-        const avgConfidence =
-          data.reduce((sum, r) => sum + r.confidence_score, 0) / (data.length || 1);
-        const potentialProfit = data
-          .filter((r) => r.recommendation === 'buy' && r.confidence_score >= 70)
-          .reduce((sum, r) => sum + r.estimated_profit, 0);
-
-        setStats({
-          buy,
-          caution,
-          pass,
-          avgConfidence,
-          potentialProfit,
-        });
-      }
-    } catch (error) {
-      console.error('Error loading recommendations:', error);
-    } finally {
-      setLoading(false);
-    }
+    // Capitalize first letter of each word
+    return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   };
 
-  const getRecommendationConfig = (recommendation: string) => {
-    const configs = {
-      buy: {
-        icon: <TrendingUp className="w-6 h-6" />,
-        bgColor: 'bg-green-50',
-        borderColor: 'border-green-200',
-        textColor: 'text-green-800',
-        badgeColor: 'bg-green-100 text-green-800',
-        label: 'Recommended to Buy',
-      },
-      caution: {
-        icon: <Minus className="w-6 h-6" />,
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200',
-        textColor: 'text-yellow-800',
-        badgeColor: 'bg-yellow-100 text-yellow-800',
-        label: 'Proceed with Caution',
-      },
-      pass: {
-        icon: <TrendingDown className="w-6 h-6" />,
-        bgColor: 'bg-red-50',
-        borderColor: 'border-red-200',
-        textColor: 'text-red-800',
-        badgeColor: 'bg-red-100 text-red-800',
-        label: 'Not Recommended',
-      },
+  const handleDeleteScan = async (e: React.MouseEvent, scanId: string) => {
+    e.stopPropagation(); // Prevent opening the modal
+
+    toast.custom((t) => (
+      <div
+        className={`${t.visible ? 'animate-enter' : 'animate-leave'
+          } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+      >
+        <div className="flex-1 w-0 p-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0 pt-0.5">
+              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
+                <Trash2 className="h-6 w-6 text-red-600" />
+              </div>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-sm font-medium text-gray-900">
+                Delete Scan?
+              </p>
+              <p className="mt-1 text-sm text-gray-500">
+                Are you sure you want to delete this scan? This action cannot be undone.
+              </p>
+            </div>
+          </div>
+        </div>
+        <div className="flex border-l border-gray-200">
+          <button
+            onClick={async () => {
+              toast.dismiss(t.id);
+              try {
+                const { error } = await supabase
+                  .from('vin_scans')
+                  .delete()
+                  .eq('id', scanId);
+
+                if (error) throw error;
+
+                // Remove from local state
+                setRecommendations(recommendations.filter(s => s.id !== scanId));
+                setFilteredRecommendations(filteredRecommendations.filter(s => s.id !== scanId));
+                toast.success('Scan deleted successfully');
+              } catch (error) {
+                console.error('Error deleting scan:', error);
+                toast.error('Failed to delete scan');
+              }
+            }}
+            className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-red-600 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+          >
+            Delete
+          </button>
+        </div>
+        <div className="flex border-l border-gray-200">
+          <button
+            onClick={() => toast.dismiss(t.id)}
+            className="w-full border border-transparent rounded-none p-4 flex items-center justify-center text-sm font-medium text-gray-600 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            Cancel
+          </button>
+        </div>
+      </div>
+    ), {
+      duration: 5000,
+    });
+  };
+
+  const getRecommendationBadge = (recommendation: string) => {
+    const badges = {
+      buy: 'bg-green-100 text-green-800',
+      caution: 'bg-yellow-100 text-yellow-800',
+      pass: 'bg-red-100 text-red-800',
     };
 
-    return configs[recommendation as keyof typeof configs];
-  };
-
-  const getConfidenceBadge = (score: number) => {
-    if (score >= 70) {
-      return <span className="text-green-600 font-medium">High Confidence</span>;
-    } else if (score >= 50) {
-      return <span className="text-yellow-600 font-medium">Medium Confidence</span>;
-    } else {
-      return <span className="text-red-600 font-medium">Low Confidence</span>;
-    }
+    return badges[recommendation as keyof typeof badges];
   };
 
   const formatCurrency = (value: number) => {
@@ -207,16 +268,6 @@ export default function RecommendationsPage() {
       minimumFractionDigits: 0,
       maximumFractionDigits: 0,
     }).format(value);
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: 'numeric',
-      minute: '2-digit',
-    });
   };
 
   return (
@@ -265,9 +316,9 @@ export default function RecommendationsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">AI Recommendations</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">VIN Scan Recommendations</h1>
           <p className="text-gray-600">
-            Smart buying recommendations powered by your sales history and market data
+            View all your scanned VINs with AI-powered buying recommendations
           </p>
         </div>
 
@@ -318,143 +369,141 @@ export default function RecommendationsPage() {
           </div>
         </div>
 
-        {/* Filters */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-          <div className="flex flex-col lg:flex-row gap-4">
-            {/* Search */}
-            <div className="flex-1">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search by VIN, make, model..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            {/* Recommendation Filter */}
-            <div className="flex items-center gap-2">
-              <Filter className="w-5 h-5 text-gray-400" />
-              <select
-                value={recommendationFilter}
-                onChange={(e) => setRecommendationFilter(e.target.value as RecommendationFilter)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Recommendations</option>
-                <option value="buy">Buy</option>
-                <option value="caution">Caution</option>
-                <option value="pass">Pass</option>
-              </select>
-            </div>
-
-            {/* Confidence Filter */}
-            <div>
-              <select
-                value={confidenceFilter}
-                onChange={(e) => setConfidenceFilter(e.target.value as ConfidenceFilter)}
-                className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              >
-                <option value="all">All Confidence</option>
-                <option value="high">High (70%+)</option>
-                <option value="medium">Medium (50-69%)</option>
-                <option value="low">Low (&lt;50%)</option>
-              </select>
-            </div>
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search by VIN, make, model, year..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
           </div>
         </div>
 
         {/* Results Count */}
-        <div className="mb-4 text-sm text-gray-600">
-          Showing {filteredRecommendations.length} of {recommendations.length} recommendations
-        </div>
+        {searchQuery && (
+          <div className="mb-4 text-sm text-gray-600">
+            Found {filteredRecommendations.length} result{filteredRecommendations.length !== 1 ? 's' : ''}
+          </div>
+        )}
 
         {/* Recommendations List */}
-        {loading ? (
+        {loading && recommendations.length === 0 ? (
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : filteredRecommendations.length === 0 ? (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 mb-2">
-              No recommendations found
+              {searchQuery ? 'No results found' : 'No VIN scans yet'}
             </h3>
             <p className="text-gray-600">
-              {searchQuery || recommendationFilter !== 'all' || confidenceFilter !== 'all'
-                ? 'Try adjusting your filters'
-                : 'Start scanning VINs to get AI-powered recommendations'}
+              {searchQuery
+                ? 'Try adjusting your search terms'
+                : 'Start scanning VINs to see recommendations here'}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredRecommendations.map((rec) => {
-              const config = getRecommendationConfig(rec.recommendation);
-              return (
-                <div
-                  key={rec.id}
-                  className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition"
-                >
-                  <div className="flex items-center justify-between gap-4">
-                    {/* Left: Vehicle Info */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-2">
-                        <h3 className="font-semibold text-gray-900 truncate">
-                          {rec.decoded_data.year} {rec.decoded_data.make} {rec.decoded_data.model}
-                        </h3>
-                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${config.badgeColor} flex-shrink-0`}>
-                          {rec.recommendation.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span className="font-medium">{rec.confidence_score}% confidence</span>
-                        <span className="hidden sm:inline">Max Bid: {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}</span>
-                        <span className={`hidden sm:inline font-medium ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                          Profit: {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
-                        </span>
-                      </div>
+            {filteredRecommendations.map((rec) => (
+              <div
+                key={rec.id}
+                onClick={() => setSelectedRec(rec)}
+                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition cursor-pointer"
+              >
+                <div className="flex items-center justify-between gap-4">
+                  {/* Left: Vehicle Info */}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-2">
+                      <h3 className="font-semibold text-gray-900 truncate">
+                        {rec.decoded_data.year} {formatVehicleName(rec.decoded_data.make)} {formatVehicleName(rec.decoded_data.model)}
+                      </h3>
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(rec.recommendation)} flex-shrink-0`}>
+                        {rec.recommendation.toUpperCase()}
+                      </span>
                     </div>
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                      <span className="hidden sm:inline">Max Bid: {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}</span>
+                      <span className={`hidden sm:inline font-medium ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                        Profit: {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
+                      </span>
+                    </div>
+                  </div>
 
-                    {/* Right: View Details Button */}
+                  {/* Right: Actions */}
+                  <div className="flex items-center gap-2">
                     <button
-                      onClick={() => setSelectedRec(rec)}
-                      className="px-4 py-2 text-sm font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0 flex items-center gap-1"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedRec(rec);
+                      }}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0"
+                      title="View Details"
                     >
-                      Details
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                    <button
+                      onClick={(e) => handleDeleteScan(e, rec.id)}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition flex-shrink-0"
+                      title="Delete Scan"
+                    >
+                      <Trash2 className="w-5 h-5" />
                     </button>
                   </div>
+                </div>
 
-                  {/* Mobile: Show financial info */}
-                  <div className="mt-3 pt-3 border-t border-gray-100 flex gap-4 text-sm sm:hidden">
-                    <div>
-                      <span className="text-gray-500">Max Bid:</span>
-                      <span className="ml-1 font-semibold text-blue-600">
-                        {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-gray-500">Profit:</span>
-                      <span className={`ml-1 font-semibold ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                        {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
-                      </span>
-                    </div>
+                {/* Mobile: Show financial info */}
+                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-4 text-sm sm:hidden">
+                  <div>
+                    <span className="text-gray-500">Max Bid:</span>
+                    <span className="ml-1 font-semibold text-blue-600">
+                      {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Profit:</span>
+                    <span className={`ml-1 font-semibold ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                      {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
+                    </span>
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            ))}
+
+            {/* Infinite Scroll Trigger */}
+            {hasMore && !searchQuery && (
+              <div ref={observerTarget} className="py-8 text-center">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="text-sm text-gray-500 mt-2">Loading more...</p>
+              </div>
+            )}
+
+            {/* End of Results */}
+            {!hasMore && recommendations.length > 0 && !searchQuery && (
+              <div className="py-8 text-center text-sm text-gray-500">
+                You've reached the end of your scan history
+              </div>
+            )}
           </div>
         )}
 
         {/* Details Modal */}
         {selectedRec && (
-          <div className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-            <div className="bg-white w-full md:max-w-3xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto">
+          <div
+            className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
+            onClick={() => setSelectedRec(null)}
+          >
+            <div
+              className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Recommendation Details</h2>
+              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
                 <button
                   onClick={() => setSelectedRec(null)}
                   className="p-2 hover:bg-gray-100 rounded-lg transition"
@@ -463,104 +512,21 @@ export default function RecommendationsPage() {
                 </button>
               </div>
 
-              {/* Modal Content */}
-              <div className="p-4 md:p-6">
-                {/* Vehicle Info */}
-                <div className="mb-6">
-                  <h3 className="text-2xl font-semibold text-gray-900 mb-2">
-                    {selectedRec.decoded_data.year} {selectedRec.decoded_data.make} {selectedRec.decoded_data.model}
-                    {selectedRec.decoded_data.trim && (
-                      <span className="text-gray-600 font-normal"> {selectedRec.decoded_data.trim}</span>
-                    )}
-                  </h3>
-                  <p className="text-sm text-gray-600 font-mono">{selectedRec.vin}</p>
-                  <p className="text-sm text-gray-500 mt-2">Scanned {formatDate(selectedRec.created_at)}</p>
-                </div>
-
-                {/* Recommendation Badge */}
-                <div className="mb-6">
-                  {(() => {
-                    const config = getRecommendationConfig(selectedRec.recommendation);
-                    return (
-                      <div className={`${config.bgColor} ${config.borderColor} border-2 rounded-lg p-4`}>
-                        <div className="flex items-center gap-3 mb-2">
-                          <div className={config.textColor}>{config.icon}</div>
-                          <div>
-                            <div className={`font-bold text-lg ${config.textColor}`}>
-                              {config.label}
-                            </div>
-                            <div className="text-sm">{getConfidenceBadge(selectedRec.confidence_score)}</div>
-                          </div>
-                        </div>
-                        <div className="text-3xl font-bold mt-2">{selectedRec.confidence_score}%</div>
-                      </div>
-                    );
-                  })()}
-                </div>
-
-                {/* Financial Info */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-600 mb-1">Max Bid</div>
-                    <div className="text-2xl font-bold text-blue-600">
-                      {selectedRec.max_bid_suggestion ? formatCurrency(selectedRec.max_bid_suggestion) : 'N/A'}
-                    </div>
-                  </div>
-                  <div className="bg-gray-50 rounded-lg p-4">
-                    <div className="text-sm text-gray-600 mb-1">Est. Profit</div>
-                    <div
-                      className={`text-2xl font-bold ${
-                        selectedRec.estimated_profit && selectedRec.estimated_profit > 0 ? 'text-green-600' : 'text-red-600'
-                      }`}
-                    >
-                      {selectedRec.estimated_profit ? formatCurrency(selectedRec.estimated_profit) : 'N/A'}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Positive Reasons */}
-                {selectedRec.match_reasoning && selectedRec.match_reasoning.filter(r => r.type === 'positive').length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="font-semibold text-gray-900 mb-3">Why this recommendation:</h4>
-                    <ul className="space-y-2">
-                      {selectedRec.match_reasoning.filter(r => r.type === 'positive').map((reason, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-gray-700">
-                          <span className="text-green-600 mt-0.5 flex-shrink-0">✓</span>
-                          <span>{reason.message}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Risk Factors */}
-                {selectedRec.match_reasoning && selectedRec.match_reasoning.filter(r => r.type === 'negative').length > 0 && (
-                  <div className="mb-6">
-                    <h4 className="font-semibold text-gray-900 mb-3">Risk factors to consider:</h4>
-                    <ul className="space-y-2">
-                      {selectedRec.match_reasoning.filter(r => r.type === 'negative').map((risk, idx) => (
-                        <li key={idx} className="flex items-start gap-2 text-gray-700">
-                          <span className="text-red-600 mt-0.5 flex-shrink-0">⚠</span>
-                          <span>{risk.message}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-
-                {/* Comments & Auction Source */}
-                <VehicleCommentSection vinScanId={selectedRec.id} tenantId={user?.tenant_id || ''} />
-              </div>
-
-              {/* Modal Footer */}
-              <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 p-4 md:p-6">
-                <button
-                  onClick={() => setSelectedRec(null)}
-                  className="w-full md:w-auto px-6 py-3 bg-blue-600 text-white font-medium rounded-lg hover:bg-blue-700 transition"
-                >
-                  Close
-                </button>
-              </div>
+              <VINScanResult
+                scanData={{
+                  id: selectedRec.id,
+                  decoded_data: selectedRec.decoded_data,
+                  market_data: selectedRec.market_data,
+                  recommendation: selectedRec.recommendation,
+                  confidence_score: selectedRec.confidence_score,
+                  match_reasoning: selectedRec.match_reasoning,
+                  estimated_profit: selectedRec.estimated_profit,
+                  max_bid_suggestion: selectedRec.max_bid_suggestion,
+                }}
+                isModal={true}
+                tenantZipCode={tenant?.zip_code}
+                onClose={() => setSelectedRec(null)}
+              />
             </div>
           </div>
         )}
