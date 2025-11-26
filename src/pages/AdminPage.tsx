@@ -12,17 +12,6 @@ import toast from 'react-hot-toast';
 interface UploadHistory {
   id: string;
   filename: string;
-  upload_date: string;
-  status: string;
-  vehicles_processed: number;
-  vehicles_new: number;
-  vehicles_updated: number;
-  vehicles_sold: number;
-  scraping_source: string;
-  tenants: { name: string };
-interface UploadHistory {
-  id: string;
-  filename: string;
   status: string;
   total_records: number;
   processed_records: number;
@@ -686,228 +675,6 @@ export default function AdminPage() {
               </div>
             )}
 
-            {activeTab === 'waiting-list' && (
-              <div className="space-y-4">
-                {isVAUploader && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <p className="text-sm text-blue-800">
-                      View dealerships waiting for inventory scraping. Click "Upload CSV" on any entry to upload data.
-                    </p>
-                  </div>
-                )}
-
-                {/* Filter Controls */}
-                <div className="space-y-4 mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="text-sm font-medium text-gray-700">Status:</label>
-                      <select
-                        value={waitingListStatusFilter}
-                        onChange={(e) => setWaitingListStatusFilter(e.target.value as any)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent text-sm"
-                      >
-                        <option value="all">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                    </div>
-
-                    {/* Search Field */}
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search by website URL, dealership name, or location..."
-                        value={waitingListSearchQuery}
-                        onChange={(e) => setWaitingListSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent text-sm"
-                      />
-                    </div>
-                  </div>
-
-                  {/* Stats */}
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                      Pending: {waitingList.filter(e => e.status === 'pending').length}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-purple-500"></span>
-                      In Progress: {waitingList.filter(e => e.status === 'in_progress').length}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                      Completed: {waitingList.filter(e => e.status === 'completed').length}
-                    </span>
-                  </div>
-                </div>
-
-                {(() => {
-                  // Filter by search query
-                  const filteredList = waitingList.filter((entry) => {
-                    if (!waitingListSearchQuery) return true;
-                    const query = waitingListSearchQuery.toLowerCase();
-                    return (
-                      entry.website_url.toLowerCase().includes(query) ||
-                      entry.tenant.name.toLowerCase().includes(query) ||
-                      entry.tenant.location?.toLowerCase().includes(query)
-                    );
-                  });
-
-                  if (filteredList.length === 0) {
-                    return (
-                      <p className="text-gray-500 text-center py-8">
-                        {waitingListSearchQuery
-                          ? `No results found for "${waitingListSearchQuery}"`
-                          : waitingListStatusFilter === 'all'
-                            ? 'No tenants in waiting list'
-                            : `No ${waitingListStatusFilter.replace('_', ' ')} entries`}
-                      </p>
-                    );
-                  }
-
-                  return filteredList.map((entry) => (
-                    <WaitingListCard
-                      key={entry.id}
-                      entry={entry}
-                      onUpdateStatus={isSuperAdmin ? handleUpdateWaitingListStatus : undefined}
-                      onDelete={isSuperAdmin ? handleDeleteWaitingListRequest : undefined}
-                      onUpload={() => {
-                        setActiveTab('upload');
-                      }}
-                    />
-                  ));
-                })()}
-              </div>
-            )}
-
-            {activeTab === 'competitor-queue' && (
-              <div className="space-y-4">
-                <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-purple-800">
-                    Competitor websites waiting for CSV upload. Click "Upload CSV" on any entry to upload competitor data.
-                  </p>
-                </div>
-
-                {/* Filter Controls */}
-                <div className="space-y-4 mb-6">
-                  <div className="flex items-center gap-4">
-                    <div className="flex items-center gap-3">
-                      <label className="text-sm font-medium text-gray-700">Status:</label>
-                      <select
-                        value={competitorStatusFilter}
-                        onChange={(e) => setCompetitorStatusFilter(e.target.value as any)}
-                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
-                      >
-                        <option value="all">All Statuses</option>
-                        <option value="pending">Pending</option>
-                        <option value="in_progress">In Progress</option>
-                        <option value="completed">Completed</option>
-                      </select>
-                    </div>
-
-                    {/* Search Field */}
-                    <div className="flex-1 relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <input
-                        type="text"
-                        placeholder="Search by competitor URL, dealership name, or location..."
-                        value={competitorSearchQuery}
-                        </div>
-                  </div>
-
-                  <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                    <ul className="divide-y divide-gray-200">
-                      {scrapingQueue.length === 0 ? (
-                        <li className="px-6 py-4 text-center text-gray-500">
-                          No requests found matching your filters.
-                        </li>
-                      ) : (
-                        scrapingQueue.map((item) => (
-                          <li key={item.id} className="px-6 py-4 hover:bg-gray-50">
-                            <div className="flex items-center justify-between">
-                              <div className="flex-1 min-w-0">
-                                <div className="flex items-center mb-1">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full mr-2 ${item.source_type === 'dealer' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
-                                    }`}>
-                                    {item.source_type === 'dealer' ? 'DEALER' : 'COMPETITOR'}
-                                  </span>
-                                  <h4 className="text-lg font-medium text-blue-600 truncate">
-                                    <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                      {item.source_name || new URL(item.source_url).hostname}
-                                    </a>
-                                  </h4>
-                                </div>
-                                <div className="mt-1 flex items-center text-sm text-gray-500">
-                                  <span className="truncate mr-4">
-                                    Requested by: {item.tenant_name || 'System'}
-                                  </span>
-                                  <span>
-                                    {new Date(item.requested_at).toLocaleDateString()}
-                                  </span>
-                                </div>
-                                {item.notes && (
-                                  <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
-                                    Note: {item.notes}
-                                  </div>
-                                )}
-                              </div>
-                              <div className="flex items-center gap-4">
-                                <div className="flex flex-col items-end">
-                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                    item.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                      item.status === 'active' ? 'bg-green-100 text-green-800' :
-                                        item.status === 'failed' ? 'bg-red-100 text-red-800' :
-                                          'bg-gray-100 text-gray-800'
-                                    }`}>
-                                    {item.status.replace('_', ' ').toUpperCase()}
-                                  </span>
-                                  {item.assigned_user_name && (
-                                    <span className="text-xs text-gray-500 mt-1">
-                                      Assigned to: {item.assigned_user_name}
-                                    </span>
-                                  )}
-                                </div>
-                                <div className="flex gap-2">
-                                  {item.status === 'pending' && (
-                                    <button
-                                      onClick={() => handleQueueAction('update_status', item.id, { status: 'in_progress' })}
-                                      className="text-blue-600 hover:text-blue-900 text-sm font-medium"
-                                    >
-                                      Start
-                                    </button>
-                                  )}
-                                  {item.status === 'in_progress' && (
-                                    <button
-                                      onClick={() => handleQueueAction('update_status', item.id, { status: 'active' })}
-                                      className="text-green-600 hover:text-green-900 text-sm font-medium"
-                                    >
-                                      Complete
-                                    </button>
-                                  )}
-                                  <button
-                                    onClick={() => {
-                                      if (confirm('Are you sure you want to delete this request?')) {
-                                        handleQueueAction('delete', item.id);
-                                      }
-                                    }}
-                                    className="text-red-600 hover:text-red-900 text-sm font-medium"
-                                  >
-                                    Delete
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          </li>
-                        ))
-                      )}
-                    </ul>
-                  </div>
-                </div>
-              </div>
-            )}
-
             {activeTab === 'support' && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4 mb-6">
@@ -1019,24 +786,21 @@ export default function AdminPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {uploadHistory.map((upload) => (
                         <tr key={upload.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.tenants.name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{upload.tenant?.name || 'N/A'}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
                           <td className="px-6 py-4 text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'competitor_data'
-                              ? 'bg-purple-100 text-purple-800'
-                              : 'bg-blue-100 text-blue-800'
-                              }`}>
-                              {upload.scraping_source === 'competitor_data' ? 'Competitor Data' : 'Dealer Inventory'}
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                              Upload
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.users.full_name}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{upload.users?.full_name || 'N/A'}</td>
                           <td className="px-6 py-4 text-sm text-gray-500">
-                            {new Date(upload.upload_date).toLocaleString()}
+                            {new Date(upload.created_at).toLocaleString()}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.vehicles_processed}</td>
-                          <td className="px-6 py-4 text-sm text-green-600">{upload.vehicles_new}</td>
-                          <td className="px-6 py-4 text-sm text-blue-600">{upload.vehicles_updated}</td>
-                          <td className="px-6 py-4 text-sm text-red-600">{upload.vehicles_sold}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{upload.total_records || 0}</td>
+                          <td className="px-6 py-4 text-sm text-green-600">{upload.success_count || 0}</td>
+                          <td className="px-6 py-4 text-sm text-blue-600">{upload.processed_records || 0}</td>
+                          <td className="px-6 py-4 text-sm text-red-600">{upload.error_count || 0}</td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 text-green-800' :
                               upload.status === 'processing' ? 'bg-blue-100 text-blue-800' :
@@ -1133,6 +897,6 @@ export default function AdminPage() {
           />
         )}
       </div>
-    </div>
+    </div >
   );
 }
