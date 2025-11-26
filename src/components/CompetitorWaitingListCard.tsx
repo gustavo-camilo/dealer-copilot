@@ -36,6 +36,7 @@ export default function CompetitorWaitingListCard({
   onDelete,
 }: CompetitorWaitingListCardProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -135,19 +136,41 @@ export default function CompetitorWaitingListCard({
             {isExpanded ? <MinusCircle className="h-5 w-5" /> : <PlusCircle className="h-5 w-5" />}
           </button>
 
-          {onDelete && (
+          {onDelete && !showDeleteConfirm && (
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                if (confirm('Are you sure you want to delete this request? This action cannot be undone.')) {
-                  onDelete(entry.id);
-                }
+                setShowDeleteConfirm(true);
               }}
               className="p-2 text-gray-500 hover:text-red-600 hover:bg-red-50 rounded-full transition"
               title="Delete Request"
             >
               <Trash2 className="h-5 w-5" />
             </button>
+          )}
+
+          {onDelete && showDeleteConfirm && (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete(entry.id);
+                  setShowDeleteConfirm(false);
+                }}
+                className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 transition"
+              >
+                Confirm Delete
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowDeleteConfirm(false);
+                }}
+                className="px-3 py-1.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-lg hover:bg-gray-300 transition"
+              >
+                Cancel
+              </button>
+            </div>
           )}
         </div>
       </div>

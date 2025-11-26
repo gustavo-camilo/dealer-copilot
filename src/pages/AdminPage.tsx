@@ -32,7 +32,6 @@ interface WaitingListEntry {
   requested_at: string;
   status: string;
   assigned_to: string | null;
-  priority: number;
   notes: string | null;
   tenant: {
     name: string;
@@ -117,6 +116,7 @@ export default function AdminPage() {
   const [uploadError, setUploadError] = useState('');
   const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
   const [waitingListStatusFilter, setWaitingListStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
+  const [waitingListSearchQuery, setWaitingListSearchQuery] = useState('');
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
   const [selectedTenantForScrape, setSelectedTenantForScrape] = useState('');
@@ -441,18 +441,20 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdatePriority = async (entryId: string, priority: number) => {
+  const handleDeleteWaitingListRequest = async (entryId: string) => {
     try {
       const { error } = await supabase
         .from('scraping_waiting_list')
-        .update({ priority })
+        .delete()
         .eq('id', entryId);
 
       if (error) throw error;
 
+      toast.success('Request deleted successfully');
       loadWaitingList();
     } catch (error: any) {
-      console.error('Error updating priority:', error);
+      console.error('Error deleting waiting list request:', error);
+      toast.error(`Failed to delete: ${error.message}`);
     }
   };
 
@@ -782,19 +784,33 @@ export default function AdminPage() {
                 )}
 
                 {/* Filter Controls */}
-                <div className="flex items-center justify-between gap-4 mb-6">
-                  <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium text-gray-700">Status:</label>
-                    <select
-                      value={waitingListStatusFilter}
-                      onChange={(e) => setWaitingListStatusFilter(e.target.value as any)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent text-sm"
-                    >
-                      <option value="all">All Statuses</option>
-                      <option value="pending">Pending</option>
-                      <option value="in_progress">In Progress</option>
-                      <option value="completed">Completed</option>
-                    </select>
+                <div className="space-y-4 mb-6">
+                  <div className="flex items-center gap-4">
+                    <div className="flex items-center gap-3">
+                      <label className="text-sm font-medium text-gray-700">Status:</label>
+                      <select
+                        value={waitingListStatusFilter}
+                        onChange={(e) => setWaitingListStatusFilter(e.target.value as any)}
+                        className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent text-sm"
+                      >
+                        <option value="all">All Statuses</option>
+                        <option value="pending">Pending</option>
+                        <option value="in_progress">In Progress</option>
+                        <option value="completed">Completed</option>
+                      </select>
+                    </div>
+
+                    {/* Search Field */}
+                    <div className="flex-1 relative">
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <input
+                        type="text"
+                        placeholder="Search by website URL, dealership name, or location..."
+                        value={waitingListSearchQuery}
+                        onChange={(e) => setWaitingListSearchQuery(e.target.value)}
+                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent text-sm"
+                      />
+                    </div>
                   </div>
 
                   {/* Stats */}
@@ -814,25 +830,42 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                {waitingList.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">
-                    {waitingListStatusFilter === 'all'
-                      ? 'No tenants in waiting list'
-                      : `No ${waitingListStatusFilter.replace('_', ' ')} entries`}
-                  </p>
-                ) : (
-                  waitingList.map((entry) => (
+                {(() => {
+                  // Filter by search query
+                  const filteredList = waitingList.filter((entry) => {
+                    if (!waitingListSearchQuery) return true;
+                    const query = waitingListSearchQuery.toLowerCase();
+                    return (
+                      entry.website_url.toLowerCase().includes(query) ||
+                      entry.tenant.name.toLowerCase().includes(query) ||
+                      entry.tenant.location?.toLowerCase().includes(query)
+                    );
+                  });
+
+                  if (filteredList.length === 0) {
+                    return (
+                      <p className="text-gray-500 text-center py-8">
+                        {waitingListSearchQuery
+                          ? `No results found for "${waitingListSearchQuery}"`
+                          : waitingListStatusFilter === 'all'
+                          ? 'No tenants in waiting list'
+                          : `No ${waitingListStatusFilter.replace('_', ' ')} entries`}
+                      </p>
+                    );
+                  }
+
+                  return filteredList.map((entry) => (
                     <WaitingListCard
                       key={entry.id}
                       entry={entry}
                       onUpdateStatus={isSuperAdmin ? handleUpdateWaitingListStatus : undefined}
-                      onUpdatePriority={isSuperAdmin ? handleUpdatePriority : undefined}
+                      onDelete={isSuperAdmin ? handleDeleteWaitingListRequest : undefined}
                       onUpload={() => {
                         setActiveTab('upload');
                       }}
                     />
-                  ))
-                )}
+                  ));
+                })()}
               </div>
             )}
 
