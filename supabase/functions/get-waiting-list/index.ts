@@ -114,7 +114,10 @@ serve(async (req) => {
           .select()
           .single();
 
-        if (!insertError && newEntry) {
+        if (insertError) {
+          console.error(`Failed to create waiting list entry for tenant ${tenant.id}:`, insertError);
+          // Continue anyway - we'll still show the tenant in the list
+        } else if (newEntry) {
           entry = newEntry;
         }
       }

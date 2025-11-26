@@ -197,9 +197,7 @@ export default function AdminPage() {
         include_completed: 'true', // Always include completed so we can filter client-side
       });
 
-      const { data, error } = await supabase.functions.invoke('get-waiting-list', {
-        body: params,
-      });
+      const { data, error } = await supabase.functions.invoke(`get-waiting-list?${params.toString()}`);
 
       if (error) throw error;
       setWaitingList(data.waiting_list || []);
@@ -215,9 +213,7 @@ export default function AdminPage() {
         include_completed: 'true',
       });
 
-      const { data, error } = await supabase.functions.invoke('get-competitor-waiting-list', {
-        body: params,
-      });
+      const { data, error } = await supabase.functions.invoke(`get-competitor-waiting-list?${params.toString()}`);
 
       if (error) throw error;
       setCompetitorWaitingList(data.waiting_list || []);
