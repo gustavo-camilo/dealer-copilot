@@ -127,7 +127,7 @@ serve(async (req) => {
     // Check if user is super_admin or va_uploader
     const { data: userData, error: userError } = await supabaseClient
       .from('users')
-      .select('role, id')
+      .select('role, id, tenant_id')
       .eq('id', user.id)
       .single();
 
@@ -137,7 +137,7 @@ serve(async (req) => {
 
     // Parse request body
     // Note: tenant_id is no longer required for the data itself, but we might still receive it for logging/auth context
-    const { csv_content, filename, competitor_url, competitor_name, waiting_list_entry_id } = await req.json();
+    const { csv_content, filename, competitor_url, competitor_name, waiting_list_entry_id, tenant_id } = await req.json();
 
     if (!csv_content || !competitor_url) {
       throw new Error('Missing required fields: csv_content, competitor_url');
@@ -160,9 +160,11 @@ serve(async (req) => {
 
     // 0. Fetch existing active vehicles for this competitor to track what's missing (sold)
     const { data: existingVehicles, error: existingError } = await supabaseClient
-      .from('competitor_vehicles')
+      .from('tracked_vehicles')
       .select('vin, id')
-      .eq('competitor_url', competitor_url)
+      .eq('source_url', competitor_url)
+      .eq('source_type', 'competitor')
+      .is('tenant_id', null)
       .eq('status', 'active');
 
     if (existingError) {
@@ -187,7 +189,9 @@ serve(async (req) => {
       csvVINs.add(vin);
 
       const vehicleData = {
-        competitor_url,
+        source_url: competitor_url,
+        source_type: 'competitor',
+        tenant_id: null,
         vin,
         year: parseInt(vehicle.Year) || null,
         make: vehicle.Make,
@@ -200,11 +204,11 @@ serve(async (req) => {
         status: 'active'
       };
 
-      // Upsert based on competitor_url + vin
+      // Upsert based on source_url + vin (where tenant_id is null)
       const { error: upsertError } = await supabaseClient
-        .from('competitor_vehicles')
+        .from('tracked_vehicles')
         .upsert(vehicleData, {
-          onConflict: 'competitor_url,vin',
+          onConflict: 'source_url,vin',
           ignoreDuplicates: false
         });
 
@@ -221,7 +225,7 @@ serve(async (req) => {
 
     for (const vehicle of vehiclesToMarkSold) {
       const { error: soldError } = await supabaseClient
-        .from('competitor_vehicles')
+        .from('tracked_vehicles')
         .update({
           status: 'sold',
           last_seen_at: new Date().toISOString(),
@@ -239,12 +243,16 @@ serve(async (req) => {
     // 2. Aggregate statistics
     const stats = aggregateVehicleData(vehicles);
 
-    // 3. UPSERT into competitor_snapshots (Global)
+    // 3. UPSERT into inventory_snapshots_unified (Global)
+    // This serves as both the "latest" snapshot and the history record
     const { data: snapshot, error: snapshotError } = await supabaseClient
-      .from('competitor_snapshots')
+      .from('inventory_snapshots_unified')
       .upsert({
-        competitor_url,
-        competitor_name: competitor_name || null,
+        source_url: competitor_url,
+        source_type: 'competitor',
+        source_name: competitor_name || null,
+        tenant_id: null,
+        snapshot_date: new Date().toISOString().split('T')[0],
         scanned_at: new Date().toISOString(),
         vehicle_count: stats.vehicle_count,
         avg_price: stats.avg_price,
@@ -254,11 +262,11 @@ serve(async (req) => {
         min_mileage: stats.min_mileage,
         max_mileage: stats.max_mileage,
         total_inventory_value: stats.total_inventory_value,
-        top_makes: stats.top_makes,
+        make_distribution: stats.top_makes,
         scraping_duration_ms: Date.now() - startTime,
         status: 'success',
       }, {
-        onConflict: 'competitor_url'
+        onConflict: 'source_url,snapshot_date'
       })
       .select()
       .single();
@@ -267,23 +275,8 @@ serve(async (req) => {
       throw new Error(`Failed to create snapshot: ${snapshotError.message}`);
     }
 
-    // 4. INSERT into competitor_scan_history (Global)
-    const { error: historyError } = await supabaseClient
-      .from('competitor_scan_history')
-      .insert({
-        competitor_url,
-        competitor_name: competitor_name || null,
-        scanned_at: new Date().toISOString(),
-        vehicle_count: stats.vehicle_count,
-        avg_price: stats.avg_price,
-        total_inventory_value: stats.total_inventory_value,
-        top_makes: stats.top_makes,
-      });
-
-    if (historyError) {
-      console.error('Failed to create history entry:', historyError);
-      errors.push(`Failed to create history: ${historyError.message}`);
-    }
+    // 4. History is automatically handled by the unified snapshot table
+    // No need for separate competitor_scan_history insert
 
     // 5. Create record in manual_scraping_uploads (This still needs a tenant_id if we want to track WHO uploaded it)
     // But if it's global, maybe we just assign it to the uploader's tenant?
@@ -303,9 +296,12 @@ serve(async (req) => {
     // If multiple dealers requested it, we just pick one (the one the VA is "working for" at that moment).
     // The request body usually has tenant_id. Let's keep using it for the LOG, but not for the DATA.
 
-    const logTenantId = await req.json().then(b => b.tenant_id).catch(() => null) || uploaderTenantId;
+    // Use tenant_id from request body (passed from upload-universal-csv)
+    // or fall back to uploader's tenant_id if they have one
+    const logTenantId = tenant_id || uploaderTenantId;
 
     if (logTenantId) {
+      console.log(`Creating upload record for tenant_id: ${logTenantId}`);
       const { data: uploadRecord, error: uploadError } = await supabaseClient
         .from('manual_scraping_uploads')
         .insert({
@@ -327,7 +323,11 @@ serve(async (req) => {
       if (uploadError) {
         console.error('Failed to create upload record:', uploadError);
         errors.push(`Failed to create upload record: ${uploadError.message}`);
+      } else {
+        console.log(`Upload record created successfully: ${uploadRecord.id}`);
       }
+    } else {
+      console.warn('No tenant_id available for upload logging - skipping manual_scraping_uploads record');
     }
 
     // Mark competitor_scraping_waiting_list entry as completed (if provided)

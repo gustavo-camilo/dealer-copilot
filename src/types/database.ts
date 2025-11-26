@@ -225,6 +225,7 @@ export interface SweetSpotAnalysis {
   avg_gross_profit: number;
   total_gross_profit: number;
   is_top_performer: boolean;
+  is_underperforming?: boolean;
 }
 
 export type ScrapingSource = 'dealer_inventory' | 'competitor_data';
@@ -289,4 +290,81 @@ export interface VehicleComment {
   updated_at: string;
   user?: User; // For joined queries
   auction_source?: AuctionSource; // For joined queries
+}
+
+// --- Unified Vehicle Tracking Types ---
+
+export type SourceType = 'dealer' | 'competitor';
+export type TrackedVehicleStatus = 'active' | 'sold' | 'removed';
+export type ListingDateConfidence = 'high' | 'medium' | 'low' | 'estimated';
+
+export interface TrackedVehicle {
+  id: string;
+  tenant_id: string | null; // NULL for competitor vehicles
+  source_url: string;
+  source_type: SourceType;
+  vin: string | null;
+  stock_number: string | null;
+  listing_url: string | null;
+  year: number | null;
+  make: string | null;
+  model: string | null;
+  trim: string | null;
+  price: number | null;
+  mileage: number | null;
+  exterior_color: string | null;
+  image_url: string | null;
+  first_seen_at: string;
+  last_seen_at: string;
+  status: TrackedVehicleStatus;
+  listing_date_confidence: ListingDateConfidence;
+  listing_date_source: string | null;
+  price_history: any[] | null; // JSONB
+  vehicle_id: string | null; // Link to manual entry
+  created_at: string;
+  updated_at: string;
+}
+
+export interface InventorySnapshotUnified {
+  id: string;
+  tenant_id: string | null;
+  source_url: string;
+  source_type: SourceType;
+  source_name: string | null;
+  snapshot_date: string;
+  scanned_at: string;
+  vehicle_count: number;
+  total_inventory_value: number | null;
+  avg_price: number | null;
+  min_price: number | null;
+  max_price: number | null;
+  avg_mileage: number | null;
+  min_mileage: number | null;
+  max_mileage: number | null;
+  avg_days_in_inventory: number | null;
+  avg_vehicle_age: number | null;
+  make_distribution: Record<string, number> | null; // JSONB
+  model_distribution: Record<string, number> | null; // JSONB
+  price_distribution: Record<string, number> | null; // JSONB
+  scraping_duration_ms: number | null;
+  status: 'pending' | 'success' | 'partial' | 'failed';
+  error_message: string | null;
+  raw_data: any | null; // JSONB
+  created_at: string;
+}
+
+export interface SourceRegistry {
+  id: string;
+  source_url: string;
+  source_type: SourceType;
+  source_name: string | null;
+  tenant_id: string | null;
+  scraping_enabled: boolean;
+  last_scraped_at: string | null;
+  next_scheduled_scrape: string | null;
+  scraping_frequency_hours: number;
+  created_at: string;
+  updated_at: string;
+  migrated_from_competitor_at: string | null;
+  original_competitor_url: string | null;
 }

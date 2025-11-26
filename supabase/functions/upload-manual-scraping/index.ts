@@ -218,8 +218,9 @@ serve(async (req) => {
       throw new Error(`No valid rows found in CSV. Errors: ${errors.join('; ')}`);
     }
 
-    // Get tenant_id from first row's dealership URL if not provided
+    // Get tenant_id and website_url
     let targetTenantId = tenant_id;
+    let targetWebsiteUrl = '';
 
     if (!targetTenantId) {
       const firstDealershipUrl = validRows[0].Dealership_URL.toLowerCase().trim();
@@ -227,7 +228,7 @@ serve(async (req) => {
       // Find tenant by website_url
       const { data: tenant, error: tenantError } = await supabaseClient
         .from('tenants')
-        .select('id, name')
+        .select('id, name, website_url')
         .ilike('website_url', `%${firstDealershipUrl}%`)
         .single();
 
@@ -236,7 +237,22 @@ serve(async (req) => {
       }
 
       targetTenantId = tenant.id;
+      targetWebsiteUrl = tenant.website_url || firstDealershipUrl;
       console.log(`Matched tenant: ${tenant.name} (${tenant.id})`);
+    } else {
+      // Fetch tenant to get website_url
+      const { data: tenant, error: tenantError } = await supabaseClient
+        .from('tenants')
+        .select('website_url')
+        .eq('id', targetTenantId)
+        .single();
+
+      if (tenantError) {
+        console.warn(`Could not fetch tenant details for ${targetTenantId}`);
+        targetWebsiteUrl = validRows[0].Dealership_URL; // Fallback
+      } else {
+        targetWebsiteUrl = tenant?.website_url || validRows[0].Dealership_URL;
+      }
     }
 
     // Create upload record
@@ -260,9 +276,10 @@ serve(async (req) => {
 
     // Get existing vehicles for this tenant
     const { data: existingVehicles, error: existingError } = await supabaseClient
-      .from('vehicle_history')
+      .from('tracked_vehicles')
       .select('vin, id, price, mileage')
       .eq('tenant_id', targetTenantId)
+      .eq('source_type', 'dealer')
       .eq('status', 'active');
 
     if (existingError) {
@@ -302,6 +319,8 @@ serve(async (req) => {
 
       const vehicleData = {
         tenant_id: targetTenantId,
+        source_url: targetWebsiteUrl,
+        source_type: 'dealer',
         vin,
         year: parseInt(row.Year),
         make: row.Make,
@@ -311,7 +330,7 @@ serve(async (req) => {
         mileage: row.Mileage ? parseInt(row.Mileage) : null,
         exterior_color: null,
         listing_url: row.Dealership_URL,
-        image_urls: row.Photo_URL ? [row.Photo_URL] : [],
+        image_url: row.Photo_URL || null,
         first_seen_at: existingVINs.has(vin) ? undefined : firstSeenAt,
         last_seen_at: new Date().toISOString(),
         status: 'active',
@@ -322,15 +341,16 @@ serve(async (req) => {
       if (existingVINs.has(vin)) {
         // Update existing vehicle
         const { error: updateError } = await supabaseClient
-          .from('vehicle_history')
+          .from('tracked_vehicles')
           .update({
             price: vehicleData.price,
             mileage: vehicleData.mileage,
             last_seen_at: vehicleData.last_seen_at,
-            image_urls: vehicleData.image_urls,
+            image_url: vehicleData.image_url,
           })
           .eq('vin', vin)
-          .eq('tenant_id', targetTenantId);
+          .eq('tenant_id', targetTenantId)
+          .eq('source_type', 'dealer');
 
         if (updateError) {
           errors.push(`Failed to update vehicle ${vin}: ${updateError.message}`);
@@ -340,7 +360,7 @@ serve(async (req) => {
       } else {
         // Insert new vehicle
         const { error: insertError } = await supabaseClient
-          .from('vehicle_history')
+          .from('tracked_vehicles')
           .insert(vehicleData);
 
         if (insertError) {
@@ -357,7 +377,7 @@ serve(async (req) => {
 
     for (const vehicle of vehiclesToMarkSold) {
       const { error: soldError } = await supabaseClient
-        .from('vehicle_history')
+        .from('tracked_vehicles')
         .update({
           status: 'sold',
           last_seen_at: new Date().toISOString(),

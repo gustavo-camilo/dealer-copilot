@@ -190,41 +190,19 @@ serve(async (req) => {
       scraping_duration_ms: duration,
     };
 
-    // Save to history table (for all tiers, but only Enterprise can view history)
-    try {
-      await supabase
-        .from('competitor_scan_history')
-        .insert({
-          tenant_id: tenantId,
-          competitor_url: normalizedUrl,
-          competitor_name: name || new URL(normalizedUrl).hostname,
-          vehicle_count: stats.vehicle_count,
-          avg_price: stats.avg_price,
-          min_price: stats.min_price,
-          max_price: stats.max_price,
-          avg_mileage: stats.avg_mileage,
-          min_mileage: stats.min_mileage,
-          max_mileage: stats.max_mileage,
-          total_inventory_value: stats.total_inventory_value,
-          top_makes: stats.top_makes,
-          scraping_duration_ms: duration,
-          status: 'success',
-        });
-      console.log(`✅ Saved scan to history for tenant: ${tenantId}`);
-    } catch (historyError) {
-      console.error('Failed to save scan history:', historyError);
-      // Continue even if history save fails
-    }
-
-    // Update or insert into competitor_snapshots (current snapshot)
+    // Save to unified snapshot table (serves as both history and latest state)
+    // Note: Competitor data is global (tenant_id is null), shared across all tenants
     try {
       const { error: upsertError } = await supabase
-        .from('competitor_snapshots')
+        .from('inventory_snapshots_unified')
         .upsert(
           {
-            tenant_id: tenantId,
-            competitor_url: normalizedUrl,
-            competitor_name: name || new URL(normalizedUrl).hostname,
+            tenant_id: null, // Global competitor data
+            source_url: normalizedUrl,
+            source_type: 'competitor',
+            source_name: name || new URL(normalizedUrl).hostname,
+            snapshot_date: new Date().toISOString().split('T')[0],
+            scanned_at: new Date().toISOString(),
             vehicle_count: stats.vehicle_count,
             avg_price: stats.avg_price,
             min_price: stats.min_price,
@@ -233,25 +211,26 @@ serve(async (req) => {
             min_mileage: stats.min_mileage,
             max_mileage: stats.max_mileage,
             total_inventory_value: stats.total_inventory_value,
-            top_makes: stats.top_makes,
+            make_distribution: stats.top_makes,
             scraping_duration_ms: duration,
             status: 'success',
-            scanned_at: new Date().toISOString(),
           },
           {
-            onConflict: 'tenant_id,competitor_url',
+            onConflict: 'source_url,snapshot_date',
           }
         );
 
       if (upsertError) {
         console.error('Failed to update snapshot:', upsertError);
       } else {
-        console.log(`✅ Updated current snapshot for tenant: ${tenantId}`);
+        console.log(`✅ Updated unified snapshot for competitor: ${normalizedUrl}`);
       }
     } catch (snapshotError) {
       console.error('Failed to update snapshot:', snapshotError);
       // Continue even if snapshot update fails
     }
+
+    // Previous separate snapshot update removed as it is now handled by the unified upsert above
 
     console.log(`✅ Competitor scan complete in ${duration}ms`);
 

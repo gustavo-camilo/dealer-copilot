@@ -3,10 +3,8 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Globe, Download, MessageSquare, Search } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Download, MessageSquare, Search } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
-import WaitingListCard from '../components/WaitingListCard';
-import CompetitorWaitingListCard from '../components/CompetitorWaitingListCard';
 import EditTenantModal from '../components/EditTenantModal';
 import SupportTicketCard from '../components/SupportTicketCard';
 import toast from 'react-hot-toast';
@@ -22,27 +20,18 @@ interface UploadHistory {
   vehicles_sold: number;
   scraping_source: string;
   tenants: { name: string };
-  users: { full_name: string };
-}
-
-interface WaitingListEntry {
+interface UploadHistory {
   id: string;
-  tenant_id: string;
-  website_url: string;
-  requested_at: string;
+  filename: string;
   status: string;
-  assigned_to: string | null;
-  notes: string | null;
-  tenant: {
-    name: string;
-    contact_email: string;
-    contact_phone: string | null;
-    location: string | null;
-  };
-  assigned_user?: {
-    full_name: string;
-    email: string;
-  } | null;
+  total_records: number;
+  processed_records: number;
+  success_count: number;
+  error_count: number;
+  created_at: string;
+  error_log: any;
+  tenant?: { name: string };
+  users?: { full_name: string };
 }
 
 interface PendingReview {
@@ -54,26 +43,7 @@ interface PendingReview {
   tenants: { name: string };
 }
 
-interface CompetitorWaitingListEntry {
-  id: string;
-  tenant_id: string;
-  competitor_url: string;
-  competitor_name: string | null;
-  requested_at: string;
-  status: string;
-  assigned_to: string | null;
-  notes: string | null;
-  tenant: {
-    name: string;
-    contact_email: string;
-    contact_phone: string | null;
-    location: string | null;
-  };
-  assigned_user?: {
-    full_name: string;
-    email: string;
-  } | null;
-}
+
 
 interface SupportTicket {
   id: string;
@@ -96,7 +66,7 @@ interface SupportTicket {
 export default function AdminPage() {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState<'tenants' | 'waiting-list' | 'competitor-queue' | 'upload' | 'history' | 'reviews' | 'support'>('tenants');
+  const [activeTab, setActiveTab] = useState<'tenants' | 'scraping-queue' | 'upload' | 'history' | 'reviews' | 'support'>('tenants');
 
   // Check if user has access (super_admin or va_uploader)
   const isVAUploader = user?.role === 'va_uploader';
@@ -114,9 +84,8 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState('');
-  const [waitingList, setWaitingList] = useState<WaitingListEntry[]>([]);
-  const [waitingListStatusFilter, setWaitingListStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
-  const [waitingListSearchQuery, setWaitingListSearchQuery] = useState('');
+  const [scrapingQueue, setScrapingQueue] = useState<any[]>([]);
+  const [queueFilter, setQueueFilter] = useState({ status: 'all', type: 'all', assignee: 'all' });
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
   const [pendingReviews, setPendingReviews] = useState<PendingReview[]>([]);
   const [selectedTenantForScrape, setSelectedTenantForScrape] = useState('');
@@ -124,9 +93,6 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [selectedTenantForEdit, setSelectedTenantForEdit] = useState<Tenant | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
-  const [competitorWaitingList, setCompetitorWaitingList] = useState<CompetitorWaitingListEntry[]>([]);
-  const [competitorStatusFilter, setCompetitorStatusFilter] = useState<'all' | 'pending' | 'in_progress' | 'completed'>('all');
-  const [competitorSearchQuery, setCompetitorSearchQuery] = useState('');
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
 
@@ -142,13 +108,12 @@ export default function AdminPage() {
   useEffect(() => {
     loadAdminData();
     if (isVAUploader && activeTab === 'tenants') {
-      setActiveTab('waiting-list');
+      setActiveTab('scraping-queue');
     }
   }, []);
 
   useEffect(() => {
-    if (activeTab === 'waiting-list') loadWaitingList();
-    else if (activeTab === 'competitor-queue') loadCompetitorWaitingList();
+    if (activeTab === 'scraping-queue') loadScrapingQueue();
     else if (activeTab === 'history') loadUploadHistory();
     else if (activeTab === 'reviews') loadPendingReviews();
     else if (activeTab === 'support') loadSupportTickets();
@@ -159,16 +124,10 @@ export default function AdminPage() {
   }, [supportStatusFilter]);
 
   useEffect(() => {
-    if (activeTab === 'waiting-list') {
-      loadWaitingList();
+    if (activeTab === 'scraping-queue') {
+      loadScrapingQueue();
     }
-  }, [waitingListStatusFilter]);
-
-  useEffect(() => {
-    if (activeTab === 'competitor-queue') {
-      loadCompetitorWaitingList();
-    }
-  }, [competitorStatusFilter]);
+  }, [queueFilter]);
 
   const loadAdminData = async () => {
     try {
@@ -190,35 +149,20 @@ export default function AdminPage() {
     }
   };
 
-  const loadWaitingList = async () => {
+  const loadScrapingQueue = async () => {
     try {
       const params = new URLSearchParams({
-        status: waitingListStatusFilter,
-        include_completed: 'true', // Always include completed so we can filter client-side
+        status: queueFilter.status,
+        type: queueFilter.type,
+        assignee: queueFilter.assignee,
       });
 
-      const { data, error } = await supabase.functions.invoke(`get-waiting-list?${params.toString()}`);
+      const { data, error } = await supabase.functions.invoke(`get-scraping-queue?${params.toString()}`);
 
       if (error) throw error;
-      setWaitingList(data.waiting_list || []);
+      setScrapingQueue(data.queue || []);
     } catch (error) {
-      console.error('Error loading waiting list:', error);
-    }
-  };
-
-  const loadCompetitorWaitingList = async () => {
-    try {
-      const params = new URLSearchParams({
-        status: competitorStatusFilter,
-        include_completed: 'true',
-      });
-
-      const { data, error } = await supabase.functions.invoke(`get-competitor-waiting-list?${params.toString()}`);
-
-      if (error) throw error;
-      setCompetitorWaitingList(data.waiting_list || []);
-    } catch (error) {
-      console.error('Error loading competitor waiting list:', error);
+      console.error('Error loading scraping queue:', error);
     }
   };
 
@@ -365,7 +309,7 @@ export default function AdminPage() {
 
             // Refresh all data
             loadAdminData();
-            loadCompetitorWaitingList();
+            loadScrapingQueue();
             loadUploadHistory();
           } else {
             throw new Error(data?.error || 'Upload failed');
@@ -457,69 +401,19 @@ export default function AdminPage() {
     }
   };
 
-  const handleUpdateWaitingListStatus = async (entryId: string, status: string) => {
+  const handleQueueAction = async (action: string, id: string, payload: any = {}) => {
     try {
-      const { error } = await supabase
-        .from('scraping_waiting_list')
-        .update({ status })
-        .eq('id', entryId);
+      const { error } = await supabase.functions.invoke('manage-scraping-queue', {
+        body: { action, id, ...payload }
+      });
 
       if (error) throw error;
 
-      loadWaitingList();
+      toast.success('Queue updated successfully');
+      loadScrapingQueue();
     } catch (error: any) {
-      console.error('Error updating status:', error);
-      alert(`Failed to update: ${error.message}`);
-    }
-  };
-
-  const handleDeleteWaitingListRequest = async (entryId: string) => {
-    try {
-      const { error } = await supabase
-        .from('scraping_waiting_list')
-        .delete()
-        .eq('id', entryId);
-
-      if (error) throw error;
-
-      toast.success('Request deleted successfully');
-      loadWaitingList();
-    } catch (error: any) {
-      console.error('Error deleting waiting list request:', error);
-      toast.error(`Failed to delete: ${error.message}`);
-    }
-  };
-
-  const handleUpdateCompetitorStatus = async (entryId: string, status: string) => {
-    try {
-      const { error } = await supabase
-        .from('competitor_scraping_waiting_list')
-        .update({ status })
-        .eq('id', entryId);
-
-      if (error) throw error;
-
-      loadCompetitorWaitingList();
-    } catch (error: any) {
-      console.error('Error updating competitor status:', error);
+      console.error('Error updating queue:', error);
       toast.error(`Failed to update: ${error.message}`);
-    }
-  };
-
-  const handleDeleteCompetitorRequest = async (entryId: string) => {
-    try {
-      const { error } = await supabase
-        .from('competitor_scraping_waiting_list')
-        .delete()
-        .eq('id', entryId);
-
-      if (error) throw error;
-
-      toast.success('Request deleted successfully');
-      loadCompetitorWaitingList();
-    } catch (error: any) {
-      console.error('Error deleting competitor request:', error);
-      toast.error(`Failed to delete: ${error.message}`);
     }
   };
 
@@ -662,28 +556,15 @@ export default function AdminPage() {
               )}
 
               <button
-                onClick={() => setActiveTab('waiting-list')}
-                className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'waiting-list'
+                onClick={() => setActiveTab('scraping-queue')}
+                className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'scraping-queue'
                   ? 'border-blue-900 text-blue-900'
                   : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
               >
                 <Clock className="inline-block h-4 w-4 mr-2" />
-                Waiting List
+                Scraping Queue
               </button>
-
-              {(isSuperAdmin || isVAUploader) && (
-                <button
-                  onClick={() => setActiveTab('competitor-queue')}
-                  className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'competitor-queue'
-                    ? 'border-purple-600 text-purple-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-                    }`}
-                >
-                  <Globe className="inline-block h-4 w-4 mr-2" />
-                  Competitor Queue
-                </button>
-              )}
 
               <button
                 onClick={() => setActiveTab('upload')}
@@ -880,8 +761,8 @@ export default function AdminPage() {
                         {waitingListSearchQuery
                           ? `No results found for "${waitingListSearchQuery}"`
                           : waitingListStatusFilter === 'all'
-                          ? 'No tenants in waiting list'
-                          : `No ${waitingListStatusFilter.replace('_', ' ')} entries`}
+                            ? 'No tenants in waiting list'
+                            : `No ${waitingListStatusFilter.replace('_', ' ')} entries`}
                       </p>
                     );
                   }
@@ -933,66 +814,97 @@ export default function AdminPage() {
                         type="text"
                         placeholder="Search by competitor URL, dealership name, or location..."
                         value={competitorSearchQuery}
-                        onChange={(e) => setCompetitorSearchQuery(e.target.value)}
-                        className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent text-sm"
-                      />
-                    </div>
+                        </div>
                   </div>
 
-                  {/* Stats */}
-                  <div className="flex items-center gap-4 text-sm text-gray-600">
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                      Pending: {competitorWaitingList.filter(e => e.status === 'pending').length}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-purple-500"></span>
-                      In Progress: {competitorWaitingList.filter(e => e.status === 'in_progress').length}
-                    </span>
-                    <span className="flex items-center gap-2">
-                      <span className="w-3 h-3 rounded-full bg-green-500"></span>
-                      Completed: {competitorWaitingList.filter(e => e.status === 'completed').length}
-                    </span>
+                  <div className="bg-white shadow overflow-hidden sm:rounded-md">
+                    <ul className="divide-y divide-gray-200">
+                      {scrapingQueue.length === 0 ? (
+                        <li className="px-6 py-4 text-center text-gray-500">
+                          No requests found matching your filters.
+                        </li>
+                      ) : (
+                        scrapingQueue.map((item) => (
+                          <li key={item.id} className="px-6 py-4 hover:bg-gray-50">
+                            <div className="flex items-center justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center mb-1">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full mr-2 ${item.source_type === 'dealer' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                                    }`}>
+                                    {item.source_type === 'dealer' ? 'DEALER' : 'COMPETITOR'}
+                                  </span>
+                                  <h4 className="text-lg font-medium text-blue-600 truncate">
+                                    <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                      {item.source_name || new URL(item.source_url).hostname}
+                                    </a>
+                                  </h4>
+                                </div>
+                                <div className="mt-1 flex items-center text-sm text-gray-500">
+                                  <span className="truncate mr-4">
+                                    Requested by: {item.tenant_name || 'System'}
+                                  </span>
+                                  <span>
+                                    {new Date(item.requested_at).toLocaleDateString()}
+                                  </span>
+                                </div>
+                                {item.notes && (
+                                  <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                                    Note: {item.notes}
+                                  </div>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-4">
+                                <div className="flex flex-col items-end">
+                                  <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                    item.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
+                                      item.status === 'active' ? 'bg-green-100 text-green-800' :
+                                        item.status === 'failed' ? 'bg-red-100 text-red-800' :
+                                          'bg-gray-100 text-gray-800'
+                                    }`}>
+                                    {item.status.replace('_', ' ').toUpperCase()}
+                                  </span>
+                                  {item.assigned_user_name && (
+                                    <span className="text-xs text-gray-500 mt-1">
+                                      Assigned to: {item.assigned_user_name}
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  {item.status === 'pending' && (
+                                    <button
+                                      onClick={() => handleQueueAction('update_status', item.id, { status: 'in_progress' })}
+                                      className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                                    >
+                                      Start
+                                    </button>
+                                  )}
+                                  {item.status === 'in_progress' && (
+                                    <button
+                                      onClick={() => handleQueueAction('update_status', item.id, { status: 'active' })}
+                                      className="text-green-600 hover:text-green-900 text-sm font-medium"
+                                    >
+                                      Complete
+                                    </button>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      if (confirm('Are you sure you want to delete this request?')) {
+                                        handleQueueAction('delete', item.id);
+                                      }
+                                    }}
+                                    className="text-red-600 hover:text-red-900 text-sm font-medium"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              </div>
+                            </div>
+                          </li>
+                        ))
+                      )}
+                    </ul>
                   </div>
                 </div>
-
-                {(() => {
-                  // Filter by search query
-                  const filteredList = competitorWaitingList.filter((entry) => {
-                    if (!competitorSearchQuery) return true;
-                    const query = competitorSearchQuery.toLowerCase();
-                    return (
-                      entry.competitor_url.toLowerCase().includes(query) ||
-                      entry.competitor_name?.toLowerCase().includes(query) ||
-                      entry.tenant.name.toLowerCase().includes(query) ||
-                      entry.tenant.location?.toLowerCase().includes(query)
-                    );
-                  });
-
-                  if (filteredList.length === 0) {
-                    return (
-                      <p className="text-gray-500 text-center py-8">
-                        {competitorSearchQuery
-                          ? `No results found for "${competitorSearchQuery}"`
-                          : competitorStatusFilter === 'all'
-                          ? 'No competitors in queue'
-                          : `No ${competitorStatusFilter.replace('_', ' ')} entries`}
-                      </p>
-                    );
-                  }
-
-                  return filteredList.map((entry) => (
-                    <CompetitorWaitingListCard
-                      key={entry.id}
-                      entry={entry}
-                      onUpdateStatus={isSuperAdmin ? handleUpdateCompetitorStatus : undefined}
-                      onDelete={isSuperAdmin ? handleDeleteCompetitorRequest : undefined}
-                      onUpload={() => {
-                        setActiveTab('upload');
-                      }}
-                    />
-                  ));
-                })()}
               </div>
             )}
 

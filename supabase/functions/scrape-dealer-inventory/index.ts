@@ -54,7 +54,7 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
     const batchPromises = batch.map(async (vehicle) => {
       // Check if we have all critical data already
       const hasCriticalData = vehicle.year && vehicle.make && vehicle.model &&
-                              vehicle.price && vehicle.mileage && vehicle.vin;
+        vehicle.price && vehicle.mileage && vehicle.vin;
 
       // Only fetch detail page if missing critical information
       if (vehicle.url && !hasCriticalData) {
@@ -81,9 +81,9 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
               // CRITICAL: Validate that detail page matches the original vehicle
               // to avoid mixing data from different vehicles
               const yearMatches = !vehicle.year || !detailVehicle.year ||
-                                  vehicle.year === detailVehicle.year;
+                vehicle.year === detailVehicle.year;
               const makeMatches = !vehicle.make || !detailVehicle.make ||
-                                  vehicle.make.toLowerCase() === detailVehicle.make.toLowerCase();
+                vehicle.make.toLowerCase() === detailVehicle.make.toLowerCase();
 
               if (yearMatches && makeMatches) {
                 // Safe to merge - vehicles match
@@ -98,8 +98,8 @@ async function enhanceVehicleData(vehicles: any[]): Promise<any[]> {
                   model: vehicle.model || detailVehicle.model,
                   // Only keep first image - use detail page first image if exists
                   image_url: vehicle.image_url || (detailVehicle.images && detailVehicle.images.length > 0
-                                                   ? detailVehicle.images[0]
-                                                   : null),
+                    ? detailVehicle.images[0]
+                    : null),
                   url: vehicle.url, // Always keep the original URL
                 };
 
@@ -387,11 +387,15 @@ serve(async (req) => {
         console.log(`Scraping ${tenant.name} (${tenant.website_url})...`);
 
         // Create snapshot record
+        // Create snapshot record
         // If review_mode is true, set status to 'pending_review' instead of 'pending'
         const { data: snapshot, error: snapshotError } = await supabase
-          .from('inventory_snapshots')
+          .from('inventory_snapshots_unified')
           .insert({
             tenant_id: tenant.id,
+            source_url: tenant.website_url,
+            source_type: 'dealer',
+            source_name: tenant.name,
             status: review_mode ? 'pending_review' : 'pending',
           })
           .select()
@@ -542,9 +546,9 @@ serve(async (req) => {
 
           // Store vehicle data in raw_data for later approval
           await supabase
-            .from('inventory_snapshots')
+            .from('inventory_snapshots_unified')
             .update({
-              vehicles_found: enhancedVehicles.length,
+              vehicle_count: enhancedVehicles.length,
               status: 'pending_review',
               scraping_duration_ms: Date.now() - tenantStartTime,
               raw_data: { vehicles: enhancedVehicles }, // Store vehicles for approval
@@ -553,9 +557,10 @@ serve(async (req) => {
 
           // Return preview of what would change (without actually making changes)
           const { data: existingVehicles } = await supabase
-            .from('vehicle_history')
+            .from('tracked_vehicles')
             .select('vin')
             .eq('tenant_id', tenant.id)
+            .eq('source_type', 'dealer')
             .eq('status', 'active');
 
           const existingVINs = new Set((existingVehicles || []).map(v => v.vin));
@@ -572,7 +577,8 @@ serve(async (req) => {
             supabase,
             tenant.id,
             enhancedVehicles,
-            sitemapCache
+            sitemapCache,
+            tenant.website_url
           );
           newVehicles = result.newVehicles;
           updatedVehicles = result.updatedVehicles;
@@ -580,9 +586,9 @@ serve(async (req) => {
 
           // Update snapshot with results
           await supabase
-            .from('inventory_snapshots')
+            .from('inventory_snapshots_unified')
             .update({
-              vehicles_found: enhancedVehicles.length,
+              vehicle_count: enhancedVehicles.length,
               status: 'success',
               scraping_duration_ms: Date.now() - tenantStartTime,
               raw_data: { vehicles: enhancedVehicles },
@@ -691,7 +697,8 @@ async function processVehicles(
   supabase: any,
   tenant_id: string,
   vehicles: any[],
-  sitemapCache: SitemapCache = {}
+  sitemapCache: SitemapCache = {},
+  website_url: string
 ): Promise<{ newVehicles: number; updatedVehicles: number; soldVehicles: number }> {
   let newVehicles = 0;
   let updatedVehicles = 0;
@@ -744,9 +751,10 @@ async function processVehicles(
 
     // Check if vehicle exists in history (by VIN or generated identifier)
     const { data: existing } = await supabase
-      .from('vehicle_history')
+      .from('tracked_vehicles')
       .select('*')
       .eq('tenant_id', tenant_id)
+      .eq('source_type', 'dealer')
       .eq('vin', identifier)
       .eq('status', 'active')
       .single();
@@ -766,8 +774,10 @@ async function processVehicles(
       console.log(`Listing date for ${identifier}: ${listingDate.date.toISOString()} (${listingDate.confidence}, ${listingDate.source})`);
 
       // Insert new vehicle with extracted listing date
-      await supabase.from('vehicle_history').insert({
+      await supabase.from('tracked_vehicles').insert({
         tenant_id,
+        source_url: website_url,
+        source_type: 'dealer',
         vin: identifier, // Use identifier (real VIN or generated)
         stock_number: vehicle.stock_number,
         year: vehicle.year,
@@ -778,7 +788,7 @@ async function processVehicles(
         mileage: vehicle.mileage,
         exterior_color: vehicle.color,
         listing_url: vehicle.url,
-        image_urls: vehicle.images,
+        image_url: vehicle.images && vehicle.images.length > 0 ? vehicle.images[0] : null,
         first_seen_at: listingDate.date.toISOString(),
         listing_date_confidence: listingDate.confidence,
         listing_date_source: listingDate.source,
@@ -826,9 +836,9 @@ async function processVehicles(
       }
       // Only update images if we found a new image
       if (vehicle.images && vehicle.images.length > 0) {
-        updates.image_urls = vehicle.images;
+        updates.image_url = vehicle.images[0];
         console.log(`  Updating image: ${vehicle.images[0]}`);
-      } else if (existing.image_urls && existing.image_urls.length > 0) {
+      } else if (existing.image_url) {
         console.log(`  Preserving existing image`);
       }
 
@@ -860,7 +870,7 @@ async function processVehicles(
       }
 
       await supabase
-        .from('vehicle_history')
+        .from('tracked_vehicles')
         .update(updates)
         .eq('id', existing.id);
 
@@ -873,9 +883,10 @@ async function processVehicles(
   twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
   const { data: potentiallySold } = await supabase
-    .from('vehicle_history')
+    .from('tracked_vehicles')
     .select('*')
     .eq('tenant_id', tenant_id)
+    .eq('source_type', 'dealer')
     .eq('status', 'active')
     .lt('last_seen_at', twoDaysAgo.toISOString());
 
@@ -914,7 +925,7 @@ async function processVehicles(
 
         // Mark vehicle as sold
         await supabase
-          .from('vehicle_history')
+          .from('tracked_vehicles')
           .update({ status: 'sold' })
           .eq('id', vehicle.id);
 
