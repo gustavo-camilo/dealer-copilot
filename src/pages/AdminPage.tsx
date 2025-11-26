@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Download, MessageSquare, Search } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Download, MessageSquare, Search, Play, CheckCircle2, Trash2 } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import EditTenantModal from '../components/EditTenantModal';
 import SupportTicketCard from '../components/SupportTicketCard';
@@ -775,17 +775,19 @@ export default function AdminPage() {
                                 {item.status === 'pending' && (
                                   <button
                                     onClick={() => handleQueueAction('update_status', item.id, { status: 'in_progress' })}
-                                    className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                                    className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Start processing"
                                   >
-                                    Start
+                                    <Play className="w-5 h-5" />
                                   </button>
                                 )}
                                 {item.status === 'in_progress' && (
                                   <button
                                     onClick={() => handleQueueAction('update_status', item.id, { status: 'active' })}
-                                    className="text-green-600 hover:text-green-900 text-sm font-medium"
+                                    className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors"
+                                    title="Mark as complete"
                                   >
-                                    Complete
+                                    <CheckCircle2 className="w-5 h-5" />
                                   </button>
                                 )}
                                 <button
@@ -794,9 +796,10 @@ export default function AdminPage() {
                                       handleQueueAction('delete', item.id);
                                     }
                                   }}
-                                  className="text-red-600 hover:text-red-900 text-sm font-medium"
+                                  className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Delete request"
                                 >
-                                  Delete
+                                  <Trash2 className="w-5 h-5" />
                                 </button>
                               </div>
                             </div>
