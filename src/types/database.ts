@@ -266,3 +266,27 @@ export interface CompetitorWaitingListEntry {
   created_at: string;
   updated_at: string;
 }
+
+export interface AuctionSource {
+  id: string;
+  tenant_id: string;
+  name: string;
+  is_default: boolean;
+  display_order: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface VehicleComment {
+  id: string;
+  tenant_id: string;
+  user_id: string;
+  vin_scan_id: string;
+  comment: string;
+  auction_source_id: string | null;
+  auction_source_name: string | null;
+  created_at: string;
+  updated_at: string;
+  user?: User; // For joined queries
+  auction_source?: AuctionSource; // For joined queries
+}

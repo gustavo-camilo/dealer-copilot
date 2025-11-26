@@ -5,7 +5,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Target, Menu, X, Trash2, Plus } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 
-import { TenantCostSettings, AuctionFeeThreshold } from '../types/database';
+import { TenantCostSettings, AuctionFeeThreshold, AuctionSource } from '../types/database';
 
 const DEFAULT_COST_SETTINGS: TenantCostSettings = {
   auction_fee_thresholds: [
@@ -40,6 +40,11 @@ export default function SettingsPage() {
   const [zipCodeError, setZipCodeError] = useState('');
 
   const [costSettings, setCostSettings] = useState<TenantCostSettings>(DEFAULT_COST_SETTINGS);
+
+  // Auction sources state
+  const [auctionSources, setAuctionSources] = useState<AuctionSource[]>([]);
+  const [newAuctionName, setNewAuctionName] = useState('');
+  const [addingAuction, setAddingAuction] = useState(false);
 
   const handleSignOut = async () => {
     try {
@@ -88,8 +93,92 @@ export default function SettingsPage() {
           ...tenant.cost_settings,
         });
       }
+
+      // Load auction sources
+      loadAuctionSources();
     }
   }, [tenant]);
+
+  const loadAuctionSources = async () => {
+    if (!tenant?.id) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('auction_sources')
+        .select('*')
+        .eq('tenant_id', tenant.id)
+        .order('display_order', { ascending: true });
+
+      if (error) throw error;
+
+      setAuctionSources(data || []);
+    } catch (error: any) {
+      console.error('Error loading auction sources:', error);
+    }
+  };
+
+  const handleAddAuctionSource = async () => {
+    if (!newAuctionName.trim()) {
+      setMessage('Error: Please enter an auction name');
+      return;
+    }
+
+    setAddingAuction(true);
+    setMessage('');
+
+    try {
+      const maxOrder = auctionSources.length > 0
+        ? Math.max(...auctionSources.map(a => a.display_order))
+        : 0;
+
+      const { error } = await supabase
+        .from('auction_sources')
+        .insert({
+          tenant_id: tenant?.id,
+          name: newAuctionName.trim(),
+          display_order: maxOrder + 1,
+        });
+
+      if (error) {
+        if (error.code === '23505') { // Unique constraint violation
+          throw new Error('This auction source already exists');
+        }
+        throw error;
+      }
+
+      setMessage('Auction source added successfully!');
+      setNewAuctionName('');
+      loadAuctionSources();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error: any) {
+      console.error('Error adding auction source:', error);
+      setMessage(`Error: ${error.message}`);
+    } finally {
+      setAddingAuction(false);
+    }
+  };
+
+  const handleDeleteAuctionSource = async (id: string, name: string) => {
+    if (!confirm(`Are you sure you want to remove "${name}"? This cannot be undone.`)) {
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('auction_sources')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setMessage('Auction source removed successfully!');
+      loadAuctionSources();
+      setTimeout(() => setMessage(''), 3000);
+    } catch (error: any) {
+      console.error('Error deleting auction source:', error);
+      setMessage(`Error: ${error.message}`);
+    }
+  };
 
   const handleZipCodeLookup = async (zip: string) => {
     if (zip.length !== 5 || !/^\d{5}$/.test(zip)) {
@@ -542,6 +631,66 @@ export default function SettingsPage() {
               </button>
             </div>
           </form>
+        </div>
+
+        {/* Auction Sources Management */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+          <h2 className="text-xl font-semibold text-gray-900 mb-4">Auction Sources</h2>
+          <p className="text-sm text-gray-600 mb-6">
+            Manage the auction sources where you buy vehicles. These will appear as options when adding comments to vehicles.
+          </p>
+
+          {/* Add New Auction Source */}
+          <div className="mb-6">
+            <label className="block text-sm font-medium text-gray-700 mb-2">Add New Auction Source</label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={newAuctionName}
+                onChange={(e) => setNewAuctionName(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleAddAuctionSource()}
+                placeholder="e.g., CarMax, ADESA, Local Auction"
+                className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                disabled={addingAuction}
+              />
+              <button
+                onClick={handleAddAuctionSource}
+                disabled={addingAuction || !newAuctionName.trim()}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Plus className="h-4 w-4" />
+                {addingAuction ? 'Adding...' : 'Add'}
+              </button>
+            </div>
+          </div>
+
+          {/* Auction Sources List */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Current Auction Sources</label>
+            {auctionSources.length === 0 ? (
+              <div className="text-sm text-gray-500 text-center py-4 bg-gray-50 rounded-lg border border-gray-200">
+                No auction sources configured yet. Add one above to get started.
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {auctionSources.map((source) => (
+                  <div
+                    key={source.id}
+                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
+                  >
+                    <span className="font-medium text-gray-900">{source.name}</span>
+                    <button
+                      onClick={() => handleDeleteAuctionSource(source.id, source.name)}
+                      className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition"
+                      title="Remove auction source"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Subscription Info */}

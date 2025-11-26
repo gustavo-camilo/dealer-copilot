@@ -18,6 +18,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
+import { VehicleCommentSection } from '../components/VehicleCommentSection';
 
 interface Recommendation {
   id: string;
@@ -546,6 +547,9 @@ export default function RecommendationsPage() {
                     </ul>
                   </div>
                 )}
+
+                {/* Comments & Auction Source */}
+                <VehicleCommentSection vinScanId={selectedRec.id} tenantId={user?.tenant_id || ''} />
               </div>
 
               {/* Modal Footer */}

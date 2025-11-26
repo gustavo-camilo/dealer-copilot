@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
+import { VehicleCommentSection } from './VehicleCommentSection';
+import { useAuth } from '../contexts/AuthContext';
 
 // Helper function to simplify body types to Sedan, SUV, Pickup, or hide if not matching
 function getSimplifiedBodyType(bodyType: string | undefined): string {
@@ -57,6 +59,7 @@ export default function VINScanResult({
     costSettings,
     tenantZipCode,
 }: VINScanResultProps) {
+    const { user } = useAuth();
     const [reportLoading, setReportLoading] = useState(false);
     const [reportSuccess, setReportSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -304,6 +307,16 @@ export default function VINScanResult({
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {/* Comments & Auction Source */}
+                {scanData.id && user?.tenant_id && (
+                    <div className="mt-6">
+                        <VehicleCommentSection
+                            vinScanId={scanData.id}
+                            tenantId={user.tenant_id}
+                        />
                     </div>
                 )}
 
