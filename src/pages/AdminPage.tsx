@@ -730,8 +730,14 @@ export default function AdminPage() {
                                   {item.source_type === 'dealer' ? 'DEALER' : 'COMPETITOR'}
                                 </span>
                                 <h4 className="text-lg font-medium text-blue-600 truncate">
-                                  <a href={item.source_url} target="_blank" rel="noopener noreferrer" className="hover:underline">
-                                    {item.source_name || new URL(item.source_url).hostname}
+                                  <a href={item.source_url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                    {item.source_name || (() => {
+                                      try {
+                                        return new URL(item.source_url).hostname;
+                                      } catch {
+                                        return item.source_url || 'Unknown';
+                                      }
+                                    })()}
                                   </a>
                                 </h4>
                               </div>
