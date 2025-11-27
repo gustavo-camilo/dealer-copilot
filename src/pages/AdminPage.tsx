@@ -234,7 +234,7 @@ export default function AdminPage() {
     }
   };
 
-  const handleFileSelect = (file: File, content: string) => {
+  const handleFileSelect = (file: File, _content: string) => {
     setCsvFile(file);
     setUploadError('');
     setUploadMessage('');
@@ -260,6 +260,12 @@ export default function AdminPage() {
 
         try {
           console.log('Invoking upload-universal-csv...');
+          console.log('Request payload:', {
+            filename: csvFile.name,
+            tenant_id: user.tenant_id,
+            csv_size: text.length
+          });
+
           const { data, error } = await supabase.functions.invoke('upload-universal-csv', {
             body: {
               csv_content: text,
@@ -272,7 +278,18 @@ export default function AdminPage() {
 
           if (error) {
             console.error('Supabase function error:', error);
-            throw error;
+            // Try to extract more detailed error information
+            const errorMessage = error.message || 'Unknown error occurred';
+            const errorContext = error.context || '';
+            throw new Error(`${errorMessage}${errorContext ? ': ' + JSON.stringify(errorContext) : ''}`);
+          }
+
+          // Check if response indicates an error (even if error object wasn't set)
+          if (data && !data.success && data.error) {
+            const errorMsg = data.error;
+            const errorDetails = data.details ? `\n\nDetails: ${data.details}` : '';
+            console.error('Function returned error:', errorMsg, errorDetails);
+            throw new Error(errorMsg + errorDetails);
           }
 
           if (data && data.success) {

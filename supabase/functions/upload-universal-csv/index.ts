@@ -64,6 +64,10 @@ serve(async (req) => {
     }
 
     try {
+        console.log('=== Upload Universal CSV Function Called ===');
+        console.log('Request method:', req.method);
+        console.log('Request headers:', Object.fromEntries(req.headers.entries()));
+
         const supabaseClient = createClient(
             Deno.env.get('SUPABASE_URL') ?? '',
             Deno.env.get('SUPABASE_ANON_KEY') ?? '',
@@ -75,9 +79,23 @@ serve(async (req) => {
         );
 
         const authHeader = req.headers.get('Authorization') || undefined;
-        const { csv_content, filename, tenant_id } = await req.json();
+
+        let requestBody;
+        try {
+            requestBody = await req.json();
+            console.log('Request body keys:', Object.keys(requestBody));
+            console.log('Filename:', requestBody.filename);
+            console.log('Tenant ID:', requestBody.tenant_id);
+            console.log('CSV content length:', requestBody.csv_content?.length || 0);
+        } catch (jsonError) {
+            console.error('Failed to parse JSON body:', jsonError);
+            throw new Error('Invalid JSON in request body');
+        }
+
+        const { csv_content, filename, tenant_id } = requestBody;
 
         if (!csv_content) {
+            console.error('Validation failed: Missing csv_content');
             throw new Error('Missing csv_content');
         }
 
