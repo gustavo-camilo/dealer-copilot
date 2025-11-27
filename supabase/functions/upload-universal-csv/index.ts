@@ -219,17 +219,28 @@ serve(async (req) => {
         const rows = parseCSV(csv_content);
         if (rows.length === 0) throw new Error('CSV is empty or invalid');
 
-        // 1. Detect Domain
+        // 1. Detect and Validate Single Domain
+        const uniqueDomains = new Set<string>();
         let detectedUrl = '';
+
+        // Scan all rows to detect unique domains
         for (const row of rows) {
             const url = row.URL || row.Dealership_URL || row.website_url || row.website;
             if (url) {
-                detectedUrl = url.trim();
-                break;
+                const domain = extractDomain(url.trim());
+                uniqueDomains.add(domain);
+                if (!detectedUrl) detectedUrl = url.trim();
             }
         }
 
         if (!detectedUrl) throw new Error('Could not find URL in CSV.');
+
+        // Validate single source per file
+        if (uniqueDomains.size > 1) {
+            const domainList = Array.from(uniqueDomains).join(', ');
+            throw new Error(`CSV contains vehicles from multiple sources (${domainList}). Please upload one dealership at a time.`);
+        }
+
         const cleanDomain = extractDomain(detectedUrl);
         console.log(`Detected Domain: ${cleanDomain}`);
 

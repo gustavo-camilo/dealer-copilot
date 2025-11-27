@@ -241,8 +241,7 @@ export default function AdminPage() {
 
   const handleClearFile = () => {
     setCsvFile(null);
-    setUploadError('');
-    setUploadMessage('');
+    // Don't clear messages when clearing file - let user see the result
   };
 
   const handleUpload = async () => {
@@ -310,7 +309,8 @@ export default function AdminPage() {
             }
 
             setUploadMessage(message);
-            handleClearFile();
+            toast.success(message); // Show toast notification
+            handleClearFile(); // Clear file but keep message visible
 
             // Refresh all data
             loadAdminData();
@@ -327,6 +327,7 @@ export default function AdminPage() {
           const displayError = err.message || 'Failed to upload CSV';
           console.error('Displaying error to user:', displayError);
           setUploadError(displayError);
+          toast.error(displayError); // Show error toast
         } finally {
           setUploading(false);
         }
@@ -335,6 +336,7 @@ export default function AdminPage() {
     } catch (err: any) {
       console.error('File reading error:', err);
       setUploadError('Failed to read file');
+      toast.error('Failed to read file'); // Show error toast
       setUploading(false);
     }
   };
@@ -883,12 +885,23 @@ export default function AdminPage() {
                       <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
                       <div className="flex-1">
                         <p className="text-green-800 font-medium mb-3">{uploadMessage}</p>
-                        <button
-                          onClick={() => setActiveTab('history')}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
-                        >
-                          View Upload History
-                        </button>
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => {
+                              setUploadMessage('');
+                              setUploadError('');
+                            }}
+                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
+                          >
+                            Upload Another File
+                          </button>
+                          <button
+                            onClick={() => setActiveTab('history')}
+                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
+                          >
+                            View Upload History
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
