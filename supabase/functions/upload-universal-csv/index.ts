@@ -114,14 +114,16 @@ function validateVIN(vin: string): boolean {
     return checkDigit === vin[8].toUpperCase();
 }
 
-function generatePseudoVIN(vehicle: any, index: number): string {
+function generatePseudoVIN(vehicle: any, listingUrl: string): string {
+    // Create deterministic pseudo-VIN based on vehicle attributes + listing URL
+    // This ensures the same vehicle always gets the same pseudo-VIN across uploads
     const parts = [
         vehicle.Year || 'XXXX',
         vehicle.Make || 'UNKNOWN',
         vehicle.Model || 'UNKNOWN',
         vehicle.Mileage || '0',
         vehicle.Price || '0',
-        index.toString()
+        listingUrl || 'NOURL' // Use listing URL for uniqueness instead of index
     ];
     const pseudo = parts.join('_').replace(/\s+/g, '_').replace(/[^A-Z0-9_]/gi, '').toUpperCase().substring(0, 17).padEnd(17, '0');
     return `PSEUDO_${pseudo}`;
@@ -328,7 +330,6 @@ serve(async (req) => {
         const errors: string[] = [];
         let newCount = 0;
         let updatedCount = 0;
-        let pseudoVINCount = 0;
 
         for (let i = 0; i < rows.length; i++) {
             const row = rows[i];
@@ -339,21 +340,20 @@ serve(async (req) => {
             // Basic Validation
             if (!row.Dealership_URL && !row.URL) continue;
 
+            const listingUrl = row.Dealership_URL || row.URL || '';
+
             let vin = row.VIN?.trim();
             if (vin && vin.length === 17) {
                 if (!validateVIN(vin)) {
-                    vin = generatePseudoVIN(row, i);
-                    pseudoVINCount++;
+                    vin = generatePseudoVIN(row, listingUrl);
                 }
             } else {
-                vin = generatePseudoVIN(row, i);
-                pseudoVINCount++;
+                vin = generatePseudoVIN(row, listingUrl);
             }
             csvVINs.add(vin);
 
             const daysInStock = parseInt(row.Days_In_Stock || '0');
             const firstSeenAt = calculateFirstSeenAt(daysInStock);
-            const listingUrl = row.Dealership_URL || row.URL || null;
 
             const vehicleData = {
                 tenant_id: targetTenantId,
