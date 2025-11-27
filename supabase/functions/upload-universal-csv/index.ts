@@ -115,18 +115,39 @@ function validateVIN(vin: string): boolean {
 }
 
 function generatePseudoVIN(vehicle: any, listingUrl: string): string {
-    // Create deterministic pseudo-VIN based on vehicle attributes + listing URL
-    // This ensures the same vehicle always gets the same pseudo-VIN across uploads
-    const parts = [
-        vehicle.Year || 'XXXX',
-        vehicle.Make || 'UNKNOWN',
-        vehicle.Model || 'UNKNOWN',
-        vehicle.Mileage || '0',
-        vehicle.Price || '0',
-        listingUrl || 'NOURL' // Use listing URL for uniqueness instead of index
-    ];
-    const pseudo = parts.join('_').replace(/\s+/g, '_').replace(/[^A-Z0-9_]/gi, '').toUpperCase().substring(0, 17).padEnd(17, '0');
-    return `PSEUDO_${pseudo}`;
+    // Create deterministic, human-readable pseudo-VIN based on vehicle attributes
+    // Format: noVIN_YEAR_MAKE_MODEL_MILEAGE (or PRICE or URL_HASH as fallback)
+
+    const year = vehicle.Year || 'UNKN';
+    const make = (vehicle.Make || 'UNKNOWN').replace(/\s+/g, '_').toUpperCase();
+    const model = (vehicle.Model || 'UNKNOWN').replace(/\s+/g, '_').toUpperCase();
+
+    // Try to use mileage for uniqueness first (most stable identifier)
+    if (vehicle.Mileage && parseInt(vehicle.Mileage) > 0) {
+        const mileage = parseInt(vehicle.Mileage);
+        return `noVIN_${year}_${make}_${model}_${mileage}`;
+    }
+
+    // Fallback to price if mileage unavailable
+    if (vehicle.Price && parseFloat(vehicle.Price) > 0) {
+        const price = Math.round(parseFloat(vehicle.Price));
+        return `noVIN_${year}_${make}_${model}_$${price}`;
+    }
+
+    // Last resort: use a short hash of the listing URL for uniqueness
+    if (listingUrl) {
+        // Simple hash function to create a short, deterministic identifier
+        let hash = 0;
+        for (let i = 0; i < listingUrl.length; i++) {
+            hash = ((hash << 5) - hash) + listingUrl.charCodeAt(i);
+            hash = hash & hash; // Convert to 32-bit integer
+        }
+        const urlHash = Math.abs(hash).toString(36).toUpperCase();
+        return `noVIN_${year}_${make}_${model}_${urlHash}`;
+    }
+
+    // Absolute fallback (should rarely happen)
+    return `noVIN_${year}_${make}_${model}_NODATA`;
 }
 
 function calculateFirstSeenAt(daysInStock: number): string {

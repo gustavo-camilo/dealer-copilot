@@ -3,7 +3,7 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Download, MessageSquare, Search, Play, CheckCircle2, Trash2 } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Download, MessageSquare, Search, Play, CheckCircle2, Trash2, Loader2 } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import EditTenantModal from '../components/EditTenantModal';
 import SupportTicketCard from '../components/SupportTicketCard';
@@ -878,14 +878,28 @@ export default function AdminPage() {
             {activeTab === 'upload' && (
               <div className="max-w-3xl mx-auto">
                 {uploadMessage && (
-                  <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg text-green-800">
-                    {uploadMessage}
+                  <div className="mb-6 p-4 bg-green-50 border-2 border-green-300 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <p className="text-green-800 font-medium mb-3">{uploadMessage}</p>
+                        <button
+                          onClick={() => setActiveTab('history')}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
+                        >
+                          View Upload History
+                        </button>
+                      </div>
+                    </div>
                   </div>
                 )}
 
                 {uploadError && (
-                  <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg text-red-800">
-                    {uploadError}
+                  <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                    <div className="flex items-start gap-3">
+                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-xs font-bold">!</div>
+                      <p className="text-red-800 font-medium flex-1">{uploadError}</p>
+                    </div>
                   </div>
                 )}
 
@@ -914,9 +928,10 @@ export default function AdminPage() {
                 <button
                   onClick={handleUpload}
                   disabled={!csvFile || uploading}
-                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
-                  {uploading ? 'Processing...' : 'Upload CSV'}
+                  {uploading && <Loader2 className="h-5 w-5 animate-spin" />}
+                  {uploading ? 'Processing CSV...' : 'Upload CSV'}
                 </button>
               </div>
             )}
