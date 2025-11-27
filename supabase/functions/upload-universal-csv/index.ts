@@ -152,7 +152,14 @@ serve(async (req) => {
 
             if (error) {
                 console.error('Error calling upload-manual-scraping:', error);
-                throw new Error(error.message || 'upload-manual-scraping failed');
+                const context = (error as any).context;
+                let details = '';
+                if (context && context.error) {
+                    details = context.error;
+                } else if (context) {
+                    details = JSON.stringify(context);
+                }
+                throw new Error(details || error.message || 'upload-manual-scraping failed');
             }
 
             console.log('upload-manual-scraping response:', data);
@@ -197,7 +204,14 @@ serve(async (req) => {
 
         if (error) {
             console.error('Error calling process-competitor-csv:', error);
-            throw new Error(error.message || 'process-competitor-csv failed');
+            const context = (error as any).context;
+            let details = '';
+            if (context && context.error) {
+                details = context.error;
+            } else if (context) {
+                details = JSON.stringify(context);
+            }
+            throw new Error(details || error.message || 'process-competitor-csv failed');
         }
 
         console.log('process-competitor-csv response:', data);
