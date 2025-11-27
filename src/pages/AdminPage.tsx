@@ -13,13 +13,13 @@ interface UploadHistory {
   id: string;
   filename: string;
   status: string;
-  total_records: number;
-  processed_records: number;
-  success_count: number;
-  error_count: number;
-  created_at: string;
+  upload_date: string;
+  vehicles_processed: number;
+  vehicles_new: number;
+  vehicles_updated: number;
+  vehicles_sold: number;
+  scraping_source: string;
   error_log: any;
-  tenant?: { name: string };
   users?: { full_name: string };
 }
 
@@ -159,7 +159,7 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from('manual_scraping_uploads')
-        .select('id, filename, upload_date, status, vehicles_processed, vehicles_new, vehicles_updated, vehicles_sold, scraping_source, tenants (name), users (full_name)')
+        .select('id, filename, upload_date, status, vehicles_processed, vehicles_new, vehicles_updated, vehicles_sold, scraping_source, users (full_name)')
         .eq('status', 'completed') // Only show successful scrapes
         .order('upload_date', { ascending: false })
         .limit(100);
@@ -169,7 +169,6 @@ export default function AdminPage() {
       const mapped = (data || []).map((item: any) => ({
         ...item,
         scraping_source: item.scraping_source || 'dealer_inventory',
-        tenants: Array.isArray(item.tenants) && item.tenants.length > 0 ? item.tenants[0] : item.tenants || { name: 'Global/Competitor' },
         users: Array.isArray(item.users) && item.users.length > 0 ? item.users[0] : item.users || { full_name: 'Unknown' }
       }));
       setUploadHistory(mapped);
@@ -930,7 +929,6 @@ export default function AdminPage() {
                   <table className="w-full">
                     <thead className="bg-gray-50">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tenant</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
@@ -945,27 +943,26 @@ export default function AdminPage() {
                     <tbody className="bg-white divide-y divide-gray-200">
                       {uploadHistory.map((upload) => (
                         <tr key={upload.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.tenant?.name || 'N/A'}</td>
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
                           <td className="px-6 py-4 text-sm">
-                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                              Upload
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'dealer_inventory' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                              {upload.scraping_source === 'dealer_inventory' ? 'Dealer' : 'Competitor'}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-sm text-gray-900">{upload.users?.full_name || 'N/A'}</td>
                           <td className="px-6 py-4 text-sm text-gray-500">
-                            {new Date(upload.created_at).toLocaleString()}
+                            {new Date(upload.upload_date).toLocaleString()}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.total_records || 0}</td>
-                          <td className="px-6 py-4 text-sm text-green-600">{upload.success_count || 0}</td>
-                          <td className="px-6 py-4 text-sm text-blue-600">{upload.processed_records || 0}</td>
-                          <td className="px-6 py-4 text-sm text-red-600">{upload.error_count || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900">{upload.vehicles_processed || 0}</td>
+                          <td className="px-6 py-4 text-sm text-green-600">{upload.vehicles_new || 0}</td>
+                          <td className="px-6 py-4 text-sm text-blue-600">{upload.vehicles_updated || 0}</td>
+                          <td className="px-6 py-4 text-sm text-red-600">{upload.vehicles_sold || 0}</td>
                           <td className="px-6 py-4">
                             <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 text-green-800' :
                               upload.status === 'processing' ? 'bg-blue-100 text-blue-800' :
                                 'bg-red-100 text-red-800'
                               }`}>
-                              {upload.status}
+                              {upload.status.charAt(0).toUpperCase() + upload.status.slice(1)}
                             </span>
                           </td>
                         </tr>

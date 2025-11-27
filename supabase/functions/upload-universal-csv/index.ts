@@ -219,7 +219,23 @@ serve(async (req) => {
             .maybeSingle();
 
         if (!source) {
-            console.log(`Source not found in registry. Checking tenants...`);
+            console.log(`Source not found in registry. Checking for similar entries...`);
+
+            // Check for any existing entries with similar URLs (prevents duplicates from full URLs)
+            const { data: similarSources } = await supabaseClient
+                .from('source_registry')
+                .select('*')
+                .or(`source_url.eq.${cleanDomain},source_url.ilike.%${cleanDomain}%`);
+
+            if (similarSources && similarSources.length > 0) {
+                // Use the first matching source (prefer exact domain match)
+                source = similarSources.find((s: any) => s.source_url === cleanDomain) || similarSources[0];
+                console.log(`Found similar source: ${source.source_url}. Using existing entry.`);
+            }
+        }
+
+        if (!source) {
+            console.log(`No similar sources found. Checking tenants...`);
             // Check tenants
             const { data: tenant } = await supabaseClient
                 .from('tenants')
@@ -359,40 +375,21 @@ serve(async (req) => {
             };
 
             // Upsert
-            // We need to handle the unique constraint carefully
-            // unique_dealer_vehicle: (tenant_id, source_url, vin)
-            // unique_competitor_vehicle: (source_url, vin) WHERE tenant_id IS NULL
-
-            // We can use a single upsert call if we match the constraint
-            const matchCriteria = targetTenantId
-                ? { tenant_id: targetTenantId, source_url: targetSourceUrl, vin }
-                : { source_url: targetSourceUrl, vin }; // Implicitly tenant_id is null in DB for this constraint? 
-            // Actually, for upsert to work on the partial index, we might need to be explicit or rely on the conflict target.
-
-            // Let's try explicit upsert with onConflict
-            const onConflict = targetTenantId ? 'tenant_id,source_url,vin' : 'source_url,vin';
+            // The database constraint UNIQUE NULLS NOT DISTINCT (tenant_id, source_url, vin)
+            // handles BOTH dealer and competitor vehicles correctly:
+            // - Dealers: unique per (tenant_id, source_url, vin)
+            // - Competitors: unique per (NULL, source_url, vin)
+            // PostgreSQL's NULLS NOT DISTINCT ensures NULL values are treated as equal
 
             const { error: upsertError } = await supabaseClient
                 .from('tracked_vehicles')
-                .upsert(vehicleData, { onConflict });
+                .upsert(vehicleData, {
+                    onConflict: 'tenant_id,source_url,vin',
+                    ignoreDuplicates: false  // Always update existing records
+                });
 
             if (upsertError) {
-                // If it failed, it might be due to the partial index constraint not being picked up by 'onConflict' string
-                // But 'source_url,vin' should match the unique constraint for competitors if we don't pass tenant_id in the conflict?
-                // Actually, if tenant_id is null, 'tenant_id,source_url,vin' constraint (NULLS NOT DISTINCT) should work if defined that way.
-                // Our migration defined: UNIQUE NULLS NOT DISTINCT (tenant_id, source_url, vin)
-                // So we can ALWAYS use 'tenant_id,source_url,vin' as the conflict target!
-
-                // Retry with full constraint if first attempt failed (or just use full constraint always)
-                const { error: retryError } = await supabaseClient
-                    .from('tracked_vehicles')
-                    .upsert(vehicleData, { onConflict: 'tenant_id,source_url,vin' });
-
-                if (retryError) {
-                    errors.push(`Failed to upsert ${vin}: ${retryError.message}`);
-                } else {
-                    if (existingVINs.has(vin)) updatedCount++; else newCount++;
-                }
+                errors.push(`Failed to upsert ${vin}: ${upsertError.message}`);
             } else {
                 if (existingVINs.has(vin)) updatedCount++; else newCount++;
             }
