@@ -241,8 +241,17 @@ export default function AdminPage() {
 
   const handleClearFile = () => {
     setCsvFile(null);
-    // Don't clear messages when clearing file - let user see the result
+    setUploadError('');
+    setUploadMessage('');
   };
+
+  // Clear messages when switching away from upload tab
+  useEffect(() => {
+    if (activeTab !== 'upload') {
+      setUploadError('');
+      setUploadMessage('');
+    }
+  }, [activeTab]);
 
   const handleUpload = async () => {
     if (!csvFile || !user) return;
@@ -308,9 +317,19 @@ export default function AdminPage() {
               message += ` for competitor: ${data.competitor_name || data.competitor_url}`;
             }
 
+            // Show success toast with longer duration
+            toast.success(message, { duration: 5000 });
+
+            // Show inline success message temporarily
             setUploadMessage(message);
-            toast.success(message); // Show toast notification
-            handleClearFile(); // Clear file but keep message visible
+
+            // Clear file to unlock upload button
+            setCsvFile(null);
+
+            // Auto-dismiss inline message after 10 seconds
+            setTimeout(() => {
+              setUploadMessage('');
+            }, 10000);
 
             // Refresh all data
             loadAdminData();
@@ -327,7 +346,7 @@ export default function AdminPage() {
           const displayError = err.message || 'Failed to upload CSV';
           console.error('Displaying error to user:', displayError);
           setUploadError(displayError);
-          toast.error(displayError); // Show error toast
+          toast.error(displayError, { duration: 6000 }); // Show error toast with longer duration
         } finally {
           setUploading(false);
         }
@@ -336,7 +355,7 @@ export default function AdminPage() {
     } catch (err: any) {
       console.error('File reading error:', err);
       setUploadError('Failed to read file');
-      toast.error('Failed to read file'); // Show error toast
+      toast.error('Failed to read file', { duration: 6000 }); // Show error toast with longer duration
       setUploading(false);
     }
   };

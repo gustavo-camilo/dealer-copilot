@@ -87,15 +87,27 @@ export default function CompetitorAnalysisPage() {
     try {
       if (!tenant?.id) return;
 
+      // Query source_registry for competitor sources that are being scraped
       const { data, error } = await supabase
-        .from('competitor_scraping_waiting_list')
+        .from('source_registry')
         .select('*')
-        .eq('tenant_id', tenant.id)
-        .in('status', ['pending', 'in_progress'])
+        .eq('source_type', 'competitor')
+        .eq('scraping_enabled', true)
+        .is('last_scraped_at', null) // Sources that haven't been scraped yet
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPendingRequests(data || []);
+
+      // Transform to match the expected format
+      const transformed = (data || []).map(source => ({
+        id: source.id,
+        competitor_url: source.source_url,
+        competitor_name: source.source_name,
+        created_at: source.created_at,
+        status: 'pending'
+      }));
+
+      setPendingRequests(transformed);
     } catch (error) {
       console.error('Error loading pending requests:', error);
     }
