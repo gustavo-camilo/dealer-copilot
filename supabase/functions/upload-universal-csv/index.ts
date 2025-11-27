@@ -187,8 +187,16 @@ serve(async (req) => {
 
     } catch (error) {
         console.error('Error in universal upload:', error);
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const errorStack = error instanceof Error ? error.stack : undefined;
+        console.error('Error details:', { message: errorMessage, stack: errorStack });
+
         return new Response(
-            JSON.stringify({ success: false, error: error.message }),
+            JSON.stringify({
+                success: false,
+                error: errorMessage,
+                details: errorStack
+            }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
         );
     }

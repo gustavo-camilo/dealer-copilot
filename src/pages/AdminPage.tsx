@@ -301,11 +301,16 @@ export default function AdminPage() {
             loadScrapingQueue();
             loadUploadHistory();
           } else {
-            throw new Error(data?.error || 'Upload failed');
+            const errorMsg = data?.error || 'Upload failed';
+            const errorDetails = data?.details ? `\n\nDetails: ${data.details}` : '';
+            console.error('Function returned error:', errorMsg, errorDetails);
+            throw new Error(errorMsg + errorDetails);
           }
         } catch (err: any) {
           console.error('Upload error:', err);
-          setUploadError(err.message || 'Failed to upload CSV');
+          const displayError = err.message || 'Failed to upload CSV';
+          console.error('Displaying error to user:', displayError);
+          setUploadError(displayError);
         } finally {
           setUploading(false);
         }
