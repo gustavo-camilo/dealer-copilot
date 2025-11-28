@@ -63,9 +63,12 @@ export default function CompetitorAnalysisPage() {
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
 
   useEffect(() => {
-    loadCompetitors();
-    loadPendingRequests();
-    loadSubscriptionTier();
+    const loadData = async () => {
+      await loadSubscriptionTier();
+      await loadCompetitors();
+      await loadPendingRequests();
+    };
+    loadData();
   }, []);
 
   const loadSubscriptionTier = async () => {
@@ -87,27 +90,41 @@ export default function CompetitorAnalysisPage() {
     try {
       if (!tenant?.id) return;
 
-      // Query source_registry for competitor sources that are being scraped
-      const { data, error } = await supabase
+      // Query source_registry for competitor sources that haven't been scraped yet
+      // A source is pending if:
+      // 1. It's a competitor source
+      // 2. It hasn't been scraped yet (last_scraped_at is null)
+      // 3. OR there's no snapshot for it yet in inventory_snapshots_unified
+
+      const { data: allCompetitorSources, error: sourcesError } = await supabase
         .from('source_registry')
         .select('*')
         .eq('source_type', 'competitor')
         .eq('scraping_enabled', true)
-        .is('last_scraped_at', null) // Sources that haven't been scraped yet
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
+      if (sourcesError) throw sourcesError;
 
-      // Transform to match the expected format
-      const transformed = (data || []).map(source => ({
-        id: source.id,
-        competitor_url: source.source_url,
-        competitor_name: source.source_name,
-        created_at: source.created_at,
-        status: 'pending'
-      }));
+      // Get all competitor snapshots to check which sources have data
+      const { data: snapshots } = await supabase
+        .from('inventory_snapshots_unified')
+        .select('source_url')
+        .eq('source_type', 'competitor');
 
-      setPendingRequests(transformed);
+      const scrapedUrls = new Set((snapshots || []).map(s => s.source_url));
+
+      // Filter to only show sources that haven't been scraped yet
+      const pending = (allCompetitorSources || [])
+        .filter(source => !scrapedUrls.has(source.source_url))
+        .map(source => ({
+          id: source.id,
+          competitor_url: source.source_url,
+          competitor_name: source.source_name,
+          created_at: source.created_at,
+          status: 'pending'
+        }));
+
+      setPendingRequests(pending);
     } catch (error) {
       console.error('Error loading pending requests:', error);
     }

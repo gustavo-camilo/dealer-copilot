@@ -470,19 +470,20 @@ serve(async (req) => {
             }).eq('id', uploadRecordId);
         }
 
-        // 7. Update Tenant Inventory Status (if Dealer)
+        // 7. Update Source Registry (Mark as Scraped)
+        await supabaseClient.from('source_registry')
+            .update({
+                last_scraped_at: new Date().toISOString(),
+                next_scheduled_scrape: new Date(Date.now() + source.scraping_frequency_hours * 60 * 60 * 1000).toISOString()
+            })
+            .eq('id', source.id);
+
+        // 8. Update Tenant Inventory Status (if Dealer)
         if (targetTenantId) {
             await supabaseClient.from('tenants').update({
                 inventory_status: 'ready',
                 inventory_ready_at: new Date().toISOString()
             }).eq('id', targetTenantId);
-        }
-
-        // 8. Update Waiting List (if Competitor)
-        if (!targetTenantId) {
-            await supabaseClient.from('competitor_scraping_waiting_list')
-                .update({ status: 'completed', completed_at: new Date().toISOString() })
-                .ilike('competitor_url', `%${cleanDomain}%`);
         }
 
         return new Response(JSON.stringify({

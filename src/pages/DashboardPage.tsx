@@ -68,12 +68,12 @@ export default function DashboardPage() {
     if (!user?.tenant_id) return;
 
     try {
-      // Load vehicles
+      // Load vehicles from tracked_vehicles
       const { data: vehicles } = await supabase
-        .from('vehicles')
+        .from('tracked_vehicles')
         .select('*')
         .eq('tenant_id', user.tenant_id)
-        .eq('status', 'available');
+        .eq('status', 'active');
 
       // Load recent sales
       const { data: recentSales } = await supabase
