@@ -73,6 +73,7 @@ export default function AdminPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadMessage, setUploadMessage] = useState('');
   const [uploadError, setUploadError] = useState('');
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [scrapingQueue, setScrapingQueue] = useState<any[]>([]);
   const [queueFilter, setQueueFilter] = useState({ status: 'all', type: 'all', assignee: 'all' });
   const [uploadHistory, setUploadHistory] = useState<UploadHistory[]>([]);
@@ -245,11 +246,12 @@ export default function AdminPage() {
     setUploadMessage('');
   };
 
-  // Clear messages when switching away from upload tab
+  // Clear messages and modal when switching away from upload tab
   useEffect(() => {
     if (activeTab !== 'upload') {
       setUploadError('');
       setUploadMessage('');
+      setShowSuccessModal(false);
     }
   }, [activeTab]);
 
@@ -317,19 +319,12 @@ export default function AdminPage() {
               message += ` for competitor: ${data.competitor_name || data.competitor_url}`;
             }
 
-            // Show success toast with longer duration
-            toast.success(message, { duration: 5000 });
-
-            // Show inline success message temporarily
+            // Show success modal
             setUploadMessage(message);
+            setShowSuccessModal(true);
 
             // Clear file to unlock upload button
             setCsvFile(null);
-
-            // Auto-dismiss inline message after 10 seconds
-            setTimeout(() => {
-              setUploadMessage('');
-            }, 10000);
 
             // Refresh all data
             loadAdminData();
@@ -898,34 +893,6 @@ export default function AdminPage() {
 
             {activeTab === 'upload' && (
               <div className="max-w-3xl mx-auto">
-                {uploadMessage && (
-                  <div className="mb-6 p-4 bg-green-50 border-2 border-green-300 rounded-lg">
-                    <div className="flex items-start gap-3">
-                      <CheckCircle2 className="h-5 w-5 text-green-600 mt-0.5 flex-shrink-0" />
-                      <div className="flex-1">
-                        <p className="text-green-800 font-medium mb-3">{uploadMessage}</p>
-                        <div className="flex gap-3">
-                          <button
-                            onClick={() => {
-                              setUploadMessage('');
-                              setUploadError('');
-                            }}
-                            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-semibold hover:bg-blue-700 transition"
-                          >
-                            Upload Another File
-                          </button>
-                          <button
-                            onClick={() => setActiveTab('history')}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-semibold hover:bg-green-700 transition"
-                          >
-                            View Upload History
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
                 {uploadError && (
                   <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
                     <div className="flex items-start gap-3">
@@ -1098,6 +1065,54 @@ export default function AdminPage() {
             }}
             onSave={handleUpdateTenant}
           />
+        )}
+
+        {/* Upload Success Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-in fade-in duration-200">
+              <div className="flex items-start gap-4 mb-6">
+                <div className="flex-shrink-0">
+                  <CheckCircle2 className="h-12 w-12 text-green-500" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Successful!</h3>
+                  <p className="text-gray-700">{uploadMessage}</p>
+                </div>
+              </div>
+              <div className="flex flex-col gap-3">
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setUploadMessage('');
+                    setUploadError('');
+                  }}
+                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                >
+                  Upload Another File
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setUploadMessage('');
+                    setActiveTab('history');
+                  }}
+                  className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
+                >
+                  View Upload History
+                </button>
+                <button
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setUploadMessage('');
+                  }}
+                  className="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
         )}
       </div>
     </div >
