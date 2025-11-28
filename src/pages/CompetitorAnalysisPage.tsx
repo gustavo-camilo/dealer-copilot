@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
@@ -122,24 +122,64 @@ export default function CompetitorAnalysisPage() {
         return;
       }
 
-      // Load snapshots for competitors this tenant has requested
-      // Join with waiting list to filter by tenant
+      // Load snapshots from inventory_snapshots_unified for competitor sources
+      // We need to find competitors that this tenant has requested
+      // First, get the source_urls from source_registry that are competitors
+      const { data: competitorSources, error: sourcesError } = await supabase
+        .from('source_registry')
+        .select('source_url, source_name')
+        .eq('source_type', 'competitor');
+
+      if (sourcesError) throw sourcesError;
+
+      if (!competitorSources || competitorSources.length === 0) {
+        setCompetitors([]);
+        setLoading(false);
+        return;
+      }
+
+      const competitorUrls = competitorSources.map(s => s.source_url);
+
+      // Now get the latest snapshots for these competitors
       const { data, error } = await supabase
-        .from('competitor_snapshots')
-        .select(`
-          *,
-          competitor_scraping_waiting_list!inner (
-            tenant_id,
-            status,
-            requested_at
-          )
-        `)
-        .eq('competitor_scraping_waiting_list.tenant_id', tenant.id)
+        .from('inventory_snapshots_unified')
+        .select('*')
+        .eq('source_type', 'competitor')
+        .in('source_url', competitorUrls)
         .order('scanned_at', { ascending: false });
 
       if (error) throw error;
 
-      setCompetitors(data || []);
+      // Transform to match the expected CompetitorSnapshot interface
+      const transformed = (data || []).map(snapshot => ({
+        id: snapshot.id,
+        competitor_url: snapshot.source_url,
+        competitor_name: snapshot.source_name,
+        scanned_at: snapshot.scanned_at,
+        vehicle_count: snapshot.vehicle_count,
+        avg_price: snapshot.avg_price,
+        min_price: snapshot.min_price,
+        max_price: snapshot.max_price,
+        avg_mileage: snapshot.avg_mileage,
+        min_mileage: snapshot.min_mileage,
+        max_mileage: snapshot.max_mileage,
+        total_inventory_value: snapshot.total_inventory_value,
+        top_makes: snapshot.make_distribution || {},
+        scraping_duration_ms: null,
+        status: snapshot.status as 'success' | 'partial' | 'failed',
+        error_message: null
+      }));
+
+      // Group by source_url and keep only the latest snapshot for each
+      const latestSnapshots = new Map<string, any>();
+      transformed.forEach(snapshot => {
+        const existing = latestSnapshots.get(snapshot.competitor_url);
+        if (!existing || new Date(snapshot.scanned_at) > new Date(existing.scanned_at)) {
+          latestSnapshots.set(snapshot.competitor_url, snapshot);
+        }
+      });
+
+      setCompetitors(Array.from(latestSnapshots.values()));
     } catch (error) {
       console.error('Error loading competitors:', error);
       setError('Failed to load competitors');
@@ -151,9 +191,10 @@ export default function CompetitorAnalysisPage() {
   const loadHistory = async (competitorUrl: string) => {
     try {
       const { data, error } = await supabase
-        .from('competitor_scan_history')
+        .from('inventory_snapshots_unified')
         .select('id, scanned_at, vehicle_count, avg_price')
-        .eq('competitor_url', competitorUrl)
+        .eq('source_url', competitorUrl)
+        .eq('source_type', 'competitor')
         .order('scanned_at', { ascending: false })
         .limit(10);
 
@@ -183,15 +224,46 @@ export default function CompetitorAnalysisPage() {
       setAddingToQueue(true);
       setError(null);
 
-      // Add to competitor waiting list
+      // Extract domain from URL
+      const extractDomain = (url: string) => {
+        try {
+          const hasProtocol = /^https?:\/\//i.test(url);
+          const parsed = new URL(hasProtocol ? url : `https://${url}`);
+          return parsed.hostname.replace(/^www\./i, '').toLowerCase();
+        } catch {
+          return url
+            .replace(/^https?:\/\//i, '')
+            .replace(/^www\./i, '')
+            .replace(/\/.*$/, '')
+            .toLowerCase();
+        }
+      };
+
+      const cleanDomain = extractDomain(newCompetitorUrl.trim());
+
+      // Check if source already exists
+      const { data: existingSource } = await supabase
+        .from('source_registry')
+        .select('*')
+        .eq('source_url', cleanDomain)
+        .maybeSingle();
+
+      if (existingSource) {
+        setError('This competitor is already in the system');
+        toast.error('This competitor is already in the system');
+        setAddingToQueue(false);
+        return;
+      }
+
+      // Add to source_registry as a competitor
       const { error: insertError } = await supabase
-        .from('competitor_scraping_waiting_list')
+        .from('source_registry')
         .insert({
-          tenant_id: tenant.id,
-          competitor_url: newCompetitorUrl.trim(),
-          competitor_name: null,
-          status: 'pending',
-          priority: 2,
+          source_url: cleanDomain,
+          source_type: 'competitor',
+          tenant_id: null, // Competitors are global
+          source_name: cleanDomain,
+          scraping_enabled: true,
         });
 
       if (insertError) throw insertError;
@@ -201,6 +273,7 @@ export default function CompetitorAnalysisPage() {
 
       // Clear form
       setNewCompetitorUrl('');
+      toast.success('Competitor added to analysis queue');
     } catch (error) {
       console.error('Error adding to queue:', error);
       setError(error instanceof Error ? error.message : 'Failed to add competitor request');
@@ -275,8 +348,9 @@ export default function CompetitorAnalysisPage() {
       }
 
       try {
+        // Delete from inventory_snapshots_unified
         const { error } = await supabase
-          .from('competitor_snapshots')
+          .from('inventory_snapshots_unified')
           .delete()
           .eq('id', id);
 
