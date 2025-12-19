@@ -12,13 +12,17 @@
 --
 -- ============================================================
 
+-- Drop legacy views FIRST (before tables they depend on)
+DROP VIEW IF EXISTS vehicle_history CASCADE;
+DROP VIEW IF EXISTS competitor_vehicles CASCADE;
+DROP VIEW IF EXISTS competitor_snapshots CASCADE;
+DROP VIEW IF EXISTS competitor_snapshot_debug CASCADE;
+DROP VIEW IF EXISTS scraping_queue_view_old CASCADE;
+DROP VIEW IF EXISTS inventory_snapshots CASCADE;
+
 -- Drop legacy tables in dependency order
 DROP TABLE IF EXISTS vehicle_price_history CASCADE;
-DROP TABLE IF EXISTS vehicle_history CASCADE;
 DROP TABLE IF EXISTS vehicles CASCADE;
-DROP TABLE IF EXISTS competitor_vehicles CASCADE;
-DROP TABLE IF EXISTS competitor_snapshots CASCADE;
-DROP TABLE IF EXISTS inventory_snapshots CASCADE;
 DROP TABLE IF EXISTS scraping_waiting_list CASCADE;
 DROP TABLE IF EXISTS competitor_scraping_waiting_list CASCADE;
 
@@ -30,10 +34,6 @@ DROP TABLE IF EXISTS competitor_vehicles_deprecated CASCADE;
 DROP TABLE IF EXISTS inventory_snapshots_deprecated CASCADE;
 DROP TABLE IF EXISTS scraping_waiting_list_deprecated CASCADE;
 DROP TABLE IF EXISTS vehicle_history_deprecated CASCADE;
-
--- Drop legacy views
-DROP VIEW IF EXISTS competitor_snapshot_debug CASCADE;
-DROP VIEW IF EXISTS scraping_queue_view_old CASCADE;
 
 -- Drop legacy database functions (if any exist)
 DROP FUNCTION IF EXISTS process_competitor_csv() CASCADE;

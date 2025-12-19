@@ -3,9 +3,10 @@ import { Link, Navigate, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Tenant } from '../types/database';
-import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Download, MessageSquare, Search, Play, CheckCircle2, Trash2, Loader2 } from 'lucide-react';
+import { Target, Users, Building2, CreditCard, LogOut, LayoutDashboard, Upload, Database, FileText, Clock, Edit, Edit2, Download, MessageSquare, Search, Play, CheckCircle2, Trash2, Loader2 } from 'lucide-react';
 import CSVUploader from '../components/CSVUploader';
 import EditTenantModal from '../components/EditTenantModal';
+import EditCompetitorSourceModal from '../components/EditCompetitorSourceModal';
 import SupportTicketCard from '../components/SupportTicketCard';
 import toast from 'react-hot-toast';
 
@@ -83,6 +84,8 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true);
   const [selectedTenantForEdit, setSelectedTenantForEdit] = useState<Tenant | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
+  const [editSourceModalOpen, setEditSourceModalOpen] = useState(false);
+  const [selectedSourceForEdit, setSelectedSourceForEdit] = useState<any>(null);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
 
@@ -195,6 +198,29 @@ export default function AdminPage() {
       setPendingReviews(mapped);
     } catch (error) {
       console.error('Error loading pending reviews:', error);
+    }
+  };
+
+  const handleUpdateSource = async (updatedSource: { id: string; source_name: string; notes?: string }) => {
+    try {
+      const { data, error } = await supabase.functions.invoke('manage-scraping-queue', {
+        body: {
+          action: 'update_source_info',
+          id: updatedSource.id,
+          source_name: updatedSource.source_name,
+          notes: updatedSource.notes
+        }
+      });
+
+      if (error) throw error;
+
+      toast.success('Competitor source updated successfully');
+      setEditSourceModalOpen(false);
+      setSelectedSourceForEdit(null);
+      await loadScrapingQueue();
+    } catch (error) {
+      console.error('Error updating source:', error);
+      toast.error('Failed to update competitor source');
     }
   };
 
@@ -827,6 +853,19 @@ export default function AdminPage() {
                                     <CheckCircle2 className="w-5 h-5" />
                                   </button>
                                 )}
+                                {/* Edit Button (for competitor sources) */}
+                                {item.source_type === 'competitor' && (
+                                  <button
+                                    onClick={() => {
+                                      setSelectedSourceForEdit(item);
+                                      setEditSourceModalOpen(true);
+                                    }}
+                                    className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors"
+                                    title="Edit source name"
+                                  >
+                                    <Edit2 className="w-5 h-5" />
+                                  </button>
+                                )}
                                 <button
                                   onClick={() => {
                                     if (confirm('Are you sure you want to delete this request?')) {
@@ -1066,6 +1105,17 @@ export default function AdminPage() {
             onSave={handleUpdateTenant}
           />
         )}
+
+        {/* Edit Competitor Source Modal */}
+        <EditCompetitorSourceModal
+          isOpen={editSourceModalOpen}
+          onClose={() => {
+            setEditSourceModalOpen(false);
+            setSelectedSourceForEdit(null);
+          }}
+          source={selectedSourceForEdit}
+          onSave={handleUpdateSource}
+        />
 
         {/* Upload Success Modal */}
         {showSuccessModal && (

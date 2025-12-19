@@ -61,6 +61,7 @@ export default function CompetitorAnalysisPage() {
   const [subscriptionTier, setSubscriptionTier] = useState<string>('starter');
   const [addingToQueue, setAddingToQueue] = useState(false);
   const [pendingRequests, setPendingRequests] = useState<any[]>([]);
+  const [refreshPendingUrls, setRefreshPendingUrls] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     const loadData = async () => {
@@ -113,18 +114,36 @@ export default function CompetitorAnalysisPage() {
 
       const scrapedUrls = new Set((snapshots || []).map(s => s.source_url));
 
-      // Filter to only show sources that haven't been scraped yet
+      // Build refresh pending URLs set for UI state
+      const refreshPendingSet = new Set<string>();
+
+      // Filter to show:
+      // - Sources that haven't been scraped yet (initial requests)
+      // - Sources with is_refresh_pending = true
       const pending = (allCompetitorSources || [])
-        .filter(source => !scrapedUrls.has(source.source_url))
+        .filter(source => {
+          const hasSnapshot = scrapedUrls.has(source.source_url);
+          const isPendingRefresh = source.is_refresh_pending === true;
+
+          // Track refresh pending URLs
+          if (isPendingRefresh) {
+            refreshPendingSet.add(source.source_url);
+          }
+
+          // Show in pending list if: never scraped OR refresh pending
+          return !hasSnapshot || isPendingRefresh;
+        })
         .map(source => ({
           id: source.id,
           competitor_url: source.source_url,
           competitor_name: source.source_name,
           created_at: source.created_at,
-          status: 'pending'
+          status: source.is_refresh_pending ? 'refresh_pending' : 'pending',
+          refresh_requested_at: source.refresh_requested_at
         }));
 
       setPendingRequests(pending);
+      setRefreshPendingUrls(refreshPendingSet);
     } catch (error) {
       console.error('Error loading pending requests:', error);
     }
@@ -313,45 +332,61 @@ export default function CompetitorAnalysisPage() {
       setScanning(true);
       setError(null);
 
-      // Get the session token for authorization
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) {
-        throw new Error('Not authenticated');
-      }
-
-      console.log('Scanning competitor:', { url: competitorUrl, name: competitorName });
-
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/scrape-competitor`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            url: competitorUrl,
-            name: competitorName || null,
-          }),
+      // Extract domain from URL
+      const extractDomain = (url: string) => {
+        try {
+          const hasProtocol = /^https?:\/\//i.test(url);
+          const parsed = new URL(hasProtocol ? url : `https://${url}`);
+          return parsed.hostname.replace(/^www\./i, '').toLowerCase();
+        } catch {
+          return url
+            .replace(/^https?:\/\//i, '')
+            .replace(/^www\./i, '')
+            .replace(/\/.*$/, '')
+            .toLowerCase();
         }
-      );
+      };
 
-      const result = await response.json();
+      const cleanDomain = extractDomain(competitorUrl.trim());
 
-      if (!response.ok) {
-        throw new Error(result.error || 'Failed to scan competitor website');
+      // Check if source exists in source_registry
+      const { data: existingSource, error: checkError } = await supabase
+        .from('source_registry')
+        .select('*')
+        .eq('source_url', cleanDomain)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (!existingSource) {
+        // This shouldn't happen for refresh - user probably meant to add new competitor
+        setError('Competitor not found. Please add it first using "Request Analysis".');
+        return;
       }
 
-      console.log('Scan successful:', result);
+      // Update existing source to mark refresh as pending
+      const { error: updateError } = await supabase
+        .from('source_registry')
+        .update({
+          is_refresh_pending: true,
+          refresh_requested_at: new Date().toISOString(),
+          refresh_requested_by: user?.id,
+          status: 'in_progress', // Update status to show in admin queue
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingSource.id);
 
-      // Clear form
-      setNewCompetitorUrl('');
+      if (updateError) throw updateError;
 
-      // Reload competitors list from database
+      toast.success('Refresh requested! You\'ll be notified when the update is ready.');
+
+      // Reload data to show pending state
       await loadCompetitors();
+      await loadPendingRequests();
     } catch (error) {
-      console.error('Error scanning competitor:', error);
-      setError(error instanceof Error ? error.message : 'Failed to scan competitor website');
+      console.error('Error requesting refresh:', error);
+      setError(error instanceof Error ? error.message : 'Failed to request refresh');
+      toast.error('Failed to request refresh');
     } finally {
       setScanning(false);
     }
@@ -658,7 +693,7 @@ export default function CompetitorAnalysisPage() {
                         </h3>
                         {item.url && (
                           <a
-                            href={item.url}
+                            href={item.url.startsWith('http') ? item.url : `https://${item.url}`}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm text-blue-600 hover:underline break-all"
@@ -669,6 +704,16 @@ export default function CompetitorAnalysisPage() {
                         <p className="text-xs text-gray-500 mt-1">
                           {item.type === 'pending' ? 'Requested' : 'Scanned'} {formatDate(item.date)}
                         </p>
+
+                        {/* Show pending refresh alert if applicable */}
+                        {item.type === 'completed' && refreshPendingUrls.has(item.url) && (
+                          <div className="mt-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
+                            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
+                            <p className="text-xs text-yellow-800">
+                              Update requested. It'll be processed soon.
+                            </p>
+                          </div>
+                        )}
                       </div>
                       <div className="flex items-center gap-2 ml-4">
                         {item.type === 'pending' ? (
@@ -677,23 +722,14 @@ export default function CompetitorAnalysisPage() {
                             {item.status.replace('_', ' ')}
                           </span>
                         ) : (
-                          <>
-                            <button
-                              onClick={() => handleScanCompetitor(item.url, item.name || undefined)}
-                              disabled={scanning}
-                              className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-50"
-                              title="Rescan"
-                            >
-                              <RefreshCw className="w-5 h-5" />
-                            </button>
-                            <button
-                              onClick={() => handleDeleteCompetitor(item.id)}
-                              className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
-                              title="Delete"
-                            >
-                              <Trash2 className="w-5 h-5" />
-                            </button>
-                          </>
+                          <button
+                            onClick={() => handleScanCompetitor(item.url, item.name || undefined)}
+                            disabled={scanning || refreshPendingUrls.has(item.url)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            title={refreshPendingUrls.has(item.url) ? "Update pending" : "Request update"}
+                          >
+                            <RefreshCw className={`w-5 h-5 ${refreshPendingUrls.has(item.url) ? 'animate-spin' : ''}`} />
+                          </button>
                         )}
                       </div>
                     </div>
@@ -737,21 +773,29 @@ export default function CompetitorAnalysisPage() {
                             <BarChart3 className="w-4 h-4 text-gray-600" />
                             <span className="text-xs font-medium text-gray-600">Price Range</span>
                           </div>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm text-gray-600">Min:</span>
-                            <span className="text-lg font-semibold text-gray-900">
-                              {formatCurrency(item.data.min_price)}
-                            </span>
-                            <span className="text-gray-400">|</span>
-                            <span className="text-sm text-gray-600">Avg:</span>
-                            <span className="text-lg font-semibold text-gray-900">
+
+                          {/* Average Price - Prominent */}
+                          <div className="mb-2">
+                            <div className="text-xs text-gray-500 mb-0.5">Average</div>
+                            <div className="text-2xl font-bold text-gray-900">
                               {formatCurrency(item.data.avg_price)}
-                            </span>
-                            <span className="text-gray-400">|</span>
-                            <span className="text-sm text-gray-600">Max:</span>
-                            <span className="text-lg font-semibold text-gray-900">
-                              {formatCurrency(item.data.max_price)}
-                            </span>
+                            </div>
+                          </div>
+
+                          {/* Min/Max - Smaller Below */}
+                          <div className="flex items-center gap-4 text-xs">
+                            <div>
+                              <span className="text-gray-500">Min: </span>
+                              <span className="font-semibold text-gray-700">
+                                {formatCurrency(item.data.min_price)}
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Max: </span>
+                              <span className="font-semibold text-gray-700">
+                                {formatCurrency(item.data.max_price)}
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -761,21 +805,29 @@ export default function CompetitorAnalysisPage() {
                             <Gauge className="w-4 h-4 text-gray-600" />
                             <span className="text-xs font-medium text-gray-600">Mileage Range</span>
                           </div>
-                          <div className="flex items-baseline gap-2">
-                            <span className="text-sm text-gray-600">Min:</span>
-                            <span className="text-lg font-semibold text-gray-900">
-                              {formatNumber(item.data.min_mileage)} mi
-                            </span>
-                            <span className="text-gray-400">|</span>
-                            <span className="text-sm text-gray-600">Avg:</span>
-                            <span className="text-lg font-semibold text-gray-900">
+
+                          {/* Average Mileage - Prominent */}
+                          <div className="mb-2">
+                            <div className="text-xs text-gray-500 mb-0.5">Average</div>
+                            <div className="text-2xl font-bold text-gray-900">
                               {formatNumber(item.data.avg_mileage)} mi
-                            </span>
-                            <span className="text-gray-400">|</span>
-                            <span className="text-sm text-gray-600">Max:</span>
-                            <span className="text-lg font-semibold text-gray-900">
-                              {formatNumber(item.data.max_mileage)} mi
-                            </span>
+                            </div>
+                          </div>
+
+                          {/* Min/Max - Smaller Below */}
+                          <div className="flex items-center gap-4 text-xs">
+                            <div>
+                              <span className="text-gray-500">Min: </span>
+                              <span className="font-semibold text-gray-700">
+                                {formatNumber(item.data.min_mileage)} mi
+                              </span>
+                            </div>
+                            <div>
+                              <span className="text-gray-500">Max: </span>
+                              <span className="font-semibold text-gray-700">
+                                {formatNumber(item.data.max_mileage)} mi
+                              </span>
+                            </div>
                           </div>
                         </div>
 
@@ -785,6 +837,7 @@ export default function CompetitorAnalysisPage() {
                             <div className="text-xs font-medium text-gray-600 mb-2">Top Brands</div>
                             <div className="space-y-1">
                               {Object.entries(item.data.top_makes)
+                                .sort(([, countA], [, countB]) => (countB as number) - (countA as number))
                                 .slice(0, 5)
                                 .map(([make, count]) => (
                                   <div key={make} className="flex items-center justify-between text-sm">

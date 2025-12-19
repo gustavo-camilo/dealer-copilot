@@ -470,11 +470,15 @@ serve(async (req) => {
             }).eq('id', uploadRecordId);
         }
 
-        // 7. Update Source Registry (Mark as Scraped)
+        // 7. Update Source Registry (Mark as Scraped + Clear Refresh Pending)
         await supabaseClient.from('source_registry')
             .update({
                 last_scraped_at: new Date().toISOString(),
-                next_scheduled_scrape: new Date(Date.now() + source.scraping_frequency_hours * 60 * 60 * 1000).toISOString()
+                next_scheduled_scrape: new Date(Date.now() + source.scraping_frequency_hours * 60 * 60 * 1000).toISOString(),
+                is_refresh_pending: false,  // Clear pending refresh flag
+                refresh_requested_at: null,  // Clear refresh timestamp
+                refresh_requested_by: null,  // Clear refresh requester
+                status: 'active'  // Set status to active (completed)
             })
             .eq('id', source.id);
 

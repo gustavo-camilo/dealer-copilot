@@ -13,18 +13,18 @@
 
 DO $$
 DECLARE
-    competitor_url TEXT;
-    competitor_name TEXT;
-    source_id UUID;
-    vehicle_count INT;
-    avg_price DECIMAL;
-    min_price DECIMAL;
-    max_price DECIMAL;
-    avg_mileage INT;
-    min_mileage INT;
-    max_mileage INT;
-    total_value DECIMAL;
-    make_dist JSONB;
+    v_competitor_url TEXT;
+    v_competitor_name TEXT;
+    v_source_id UUID;
+    v_vehicle_count INT;
+    v_avg_price DECIMAL;
+    v_min_price DECIMAL;
+    v_max_price DECIMAL;
+    v_avg_mileage INT;
+    v_min_mileage INT;
+    v_max_mileage INT;
+    v_total_value DECIMAL;
+    v_make_dist JSONB;
 BEGIN
     RAISE NOTICE '=== Starting Legacy Competitor Data Migration ===';
 
@@ -37,30 +37,30 @@ BEGIN
     -- Find the competitor URL from competitor_vehicles
     -- Assuming all rows are for the same competitor
     SELECT DISTINCT
-        COALESCE(url, listing_url) INTO competitor_url
+        competitor_url INTO v_competitor_url
     FROM competitor_vehicles
-    WHERE url IS NOT NULL OR listing_url IS NOT NULL
+    WHERE competitor_url IS NOT NULL
     LIMIT 1;
 
     -- If no URL found, use a placeholder
-    IF competitor_url IS NULL THEN
+    IF v_competitor_url IS NULL THEN
         RAISE NOTICE 'No URL found in competitor_vehicles. Using placeholder.';
-        competitor_url := 'unknown-competitor.com';
+        v_competitor_url := 'unknown-competitor.com';
     END IF;
 
     -- Extract domain from URL
-    competitor_url := regexp_replace(competitor_url, '^https?://(www\.)?', '');
-    competitor_url := regexp_replace(competitor_url, '/.*$', '');
+    v_competitor_url := regexp_replace(v_competitor_url, '^https?://(www\.)?', '');
+    v_competitor_url := regexp_replace(v_competitor_url, '/.*$', '');
 
-    RAISE NOTICE 'Detected competitor URL: %', competitor_url;
+    RAISE NOTICE 'Detected competitor URL: %', v_competitor_url;
 
     -- Check if source exists in source_registry
-    SELECT id, source_name INTO source_id, competitor_name
+    SELECT id, source_name INTO v_source_id, v_competitor_name
     FROM source_registry
-    WHERE source_url = competitor_url;
+    WHERE source_url = v_competitor_url;
 
     -- If not exists, create source_registry entry
-    IF source_id IS NULL THEN
+    IF v_source_id IS NULL THEN
         INSERT INTO source_registry (
             source_url,
             source_type,
@@ -69,17 +69,17 @@ BEGIN
             scraping_enabled,
             last_scraped_at
         ) VALUES (
-            competitor_url,
+            v_competitor_url,
             'competitor',
-            COALESCE(competitor_name, competitor_url),
+            COALESCE(v_competitor_name, v_competitor_url),
             NULL,  -- competitor data is global
             true,
             NOW()
-        ) RETURNING id INTO source_id;
+        ) RETURNING id INTO v_source_id;
 
-        RAISE NOTICE 'Created source_registry entry for: %', competitor_url;
+        RAISE NOTICE 'Created source_registry entry for: %', v_competitor_url;
     ELSE
-        RAISE NOTICE 'Source registry entry already exists (ID: %)', source_id;
+        RAISE NOTICE 'Source registry entry already exists (ID: %)', v_source_id;
     END IF;
 
     -- Migrate vehicles from competitor_vehicles to tracked_vehicles
@@ -101,28 +101,28 @@ BEGIN
     )
     SELECT
         NULL as tenant_id,  -- competitor vehicles are global
-        competitor_url as source_url,
+        v_competitor_url as source_url,
         'competitor' as source_type,
-        COALESCE(vin, 'noVIN_' || year || '_' || make || '_' || model || '_' || COALESCE(mileage::text, price::text)) as vin,
-        year,
-        make,
-        model,
-        price,
-        mileage,
-        COALESCE(listing_url, url) as listing_url,
-        image_url,
-        COALESCE(first_seen_at, created_at, NOW()) as first_seen_at,
-        COALESCE(last_seen_at, updated_at, NOW()) as last_seen_at,
-        COALESCE(status, 'active') as status
-    FROM competitor_vehicles
+        COALESCE(cv.vin, 'noVIN_' || cv.year || '_' || cv.make || '_' || cv.model || '_' || COALESCE(cv.mileage::text, cv.price::text)) as vin,
+        cv.year,
+        cv.make,
+        cv.model,
+        cv.price,
+        cv.mileage,
+        cv.listing_url,
+        cv.image_url,
+        COALESCE(cv.first_seen_at, cv.created_at, NOW()) as first_seen_at,
+        COALESCE(cv.last_seen_at, cv.updated_at, NOW()) as last_seen_at,
+        COALESCE(cv.status, 'active') as status
+    FROM competitor_vehicles cv
     ON CONFLICT (tenant_id, source_url, vin) WHERE tenant_id IS NULL
     DO UPDATE SET
         price = EXCLUDED.price,
         mileage = EXCLUDED.mileage,
         last_seen_at = EXCLUDED.last_seen_at;
 
-    GET DIAGNOSTICS vehicle_count = ROW_COUNT;
-    RAISE NOTICE 'Migrated % vehicles to tracked_vehicles', vehicle_count;
+    GET DIAGNOSTICS v_vehicle_count = ROW_COUNT;
+    RAISE NOTICE 'Migrated % vehicles to tracked_vehicles', v_vehicle_count;
 
     -- Calculate aggregate statistics
     SELECT
@@ -135,26 +135,26 @@ BEGIN
         MAX(mileage)::INT,
         SUM(price)::DECIMAL
     INTO
-        vehicle_count,
-        avg_price,
-        min_price,
-        max_price,
-        avg_mileage,
-        min_mileage,
-        max_mileage,
-        total_value
+        v_vehicle_count,
+        v_avg_price,
+        v_min_price,
+        v_max_price,
+        v_avg_mileage,
+        v_min_mileage,
+        v_max_mileage,
+        v_total_value
     FROM tracked_vehicles
-    WHERE source_url = competitor_url
+    WHERE source_url = v_competitor_url
       AND source_type = 'competitor'
       AND status = 'active';
 
     -- Calculate make distribution
     SELECT jsonb_object_agg(make, make_count)
-    INTO make_dist
+    INTO v_make_dist
     FROM (
         SELECT make, COUNT(*)::INT as make_count
         FROM tracked_vehicles
-        WHERE source_url = competitor_url
+        WHERE source_url = v_competitor_url
           AND source_type = 'competitor'
           AND status = 'active'
         GROUP BY make
@@ -163,7 +163,7 @@ BEGIN
     ) subq;
 
     RAISE NOTICE 'Calculated stats: % vehicles, avg price: %, avg mileage: %',
-                 vehicle_count, avg_price, avg_mileage;
+                 v_vehicle_count, v_avg_price, v_avg_mileage;
 
     -- Create snapshot in inventory_snapshots_unified
     INSERT INTO inventory_snapshots_unified (
@@ -184,21 +184,21 @@ BEGIN
         make_distribution,
         status
     ) VALUES (
-        competitor_url,
+        v_competitor_url,
         'competitor',
-        COALESCE(competitor_name, competitor_url),
+        COALESCE(v_competitor_name, v_competitor_url),
         NULL,
         CURRENT_DATE,
         NOW(),
-        vehicle_count,
-        avg_price,
-        min_price,
-        max_price,
-        avg_mileage,
-        min_mileage,
-        max_mileage,
-        total_value,
-        make_dist,
+        v_vehicle_count,
+        v_avg_price,
+        v_min_price,
+        v_max_price,
+        v_avg_mileage,
+        v_min_mileage,
+        v_max_mileage,
+        v_total_value,
+        v_make_dist,
         'success'
     )
     ON CONFLICT (source_url, snapshot_date) WHERE tenant_id IS NULL
@@ -215,16 +215,16 @@ BEGIN
         scanned_at = EXCLUDED.scanned_at,
         status = EXCLUDED.status;
 
-    RAISE NOTICE 'Created/updated snapshot for % with % vehicles', competitor_url, vehicle_count;
+    RAISE NOTICE 'Created/updated snapshot for % with % vehicles', v_competitor_url, v_vehicle_count;
 
     -- Update source_registry last_scraped_at
     UPDATE source_registry
     SET last_scraped_at = NOW()
-    WHERE id = source_id;
+    WHERE id = v_source_id;
 
     RAISE NOTICE '=== Migration Completed Successfully ===';
-    RAISE NOTICE 'Competitor: %', competitor_url;
-    RAISE NOTICE 'Vehicles migrated: %', vehicle_count;
+    RAISE NOTICE 'Competitor: %', v_competitor_url;
+    RAISE NOTICE 'Vehicles migrated: %', v_vehicle_count;
     RAISE NOTICE 'Snapshot created: Yes';
     RAISE NOTICE 'Source registry updated: Yes';
 

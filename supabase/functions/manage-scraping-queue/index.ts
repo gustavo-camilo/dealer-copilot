@@ -71,6 +71,20 @@ serve(async (req) => {
                 .from('source_registry')
                 .update({ priority, updated_at: new Date().toISOString() })
                 .eq('id', id);
+        } else if (action === 'update_source_info') {
+            const { source_name, notes } = payload;
+
+            const updates: any = {
+                updated_at: new Date().toISOString()
+            };
+
+            if (source_name !== undefined) updates.source_name = source_name;
+            if (notes !== undefined) updates.notes = notes;
+
+            result = await supabaseClient
+                .from('source_registry')
+                .update(updates)
+                .eq('id', id);
         } else {
             throw new Error('Invalid action');
         }
