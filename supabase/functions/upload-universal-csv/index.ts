@@ -471,7 +471,9 @@ serve(async (req) => {
         }
 
         // 7. Update Source Registry (Mark as Scraped + Clear Refresh Pending)
-        await supabaseClient.from('source_registry')
+        console.log('Updating source_registry for source:', { id: source.id, source_url: source.source_url });
+
+        const { data: updateData, error: updateError } = await supabaseClient.from('source_registry')
             .update({
                 last_scraped_at: new Date().toISOString(),
                 next_scheduled_scrape: new Date(Date.now() + source.scraping_frequency_hours * 60 * 60 * 1000).toISOString(),
@@ -480,7 +482,14 @@ serve(async (req) => {
                 refresh_requested_by: null,  // Clear refresh requester
                 status: 'active'  // Set status to active (completed)
             })
-            .eq('id', source.id);
+            .eq('id', source.id)
+            .select();
+
+        if (updateError) {
+            console.error('Error updating source_registry:', updateError);
+        } else {
+            console.log('Successfully updated source_registry:', updateData);
+        }
 
         // 8. Update Tenant Inventory Status (if Dealer)
         if (targetTenantId) {

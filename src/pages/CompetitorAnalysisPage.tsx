@@ -217,10 +217,11 @@ export default function CompetitorAnalysisPage() {
       }));
 
       // Group by source_url and keep only the latest snapshot for each
+      // Since data is already sorted by scanned_at DESC, the first occurrence is the latest
       const latestSnapshots = new Map<string, any>();
       transformed.forEach(snapshot => {
-        const existing = latestSnapshots.get(snapshot.competitor_url);
-        if (!existing || new Date(snapshot.scanned_at) > new Date(existing.scanned_at)) {
+        if (!latestSnapshots.has(snapshot.competitor_url)) {
+          // Only set if we haven't seen this URL yet (first = latest due to DESC order)
           latestSnapshots.set(snapshot.competitor_url, snapshot);
         }
       });
