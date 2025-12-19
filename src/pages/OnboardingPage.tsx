@@ -38,9 +38,9 @@ export default function OnboardingPage() {
   const loadScanInfo = async () => {
     if (!user?.tenant_id) return;
 
-    // Check if tenant has been scanned before (check inventory_snapshots)
+    // Check if tenant has been scanned before (check inventory_snapshots_unified)
     const { data: snapshots } = await supabase
-      .from('inventory_snapshots')
+      .from('inventory_snapshots_unified')
       .select('*')
       .eq('tenant_id', user.tenant_id)
       .eq('status', 'success')
@@ -49,7 +49,7 @@ export default function OnboardingPage() {
 
     if (snapshots && snapshots.length > 0) {
       setLastScanDate(new Date(snapshots[0].created_at));
-      setVehicleCount(snapshots[0].vehicles_found || 0);
+      setVehicleCount(snapshots[0].vehicle_count || 0);
     }
   };
 

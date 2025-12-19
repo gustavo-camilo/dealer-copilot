@@ -184,8 +184,8 @@ export default function AdminPage() {
   const loadPendingReviews = async () => {
     try {
       const { data, error } = await supabase
-        .from('inventory_snapshots')
-        .select('id, tenant_id, snapshot_date, vehicles_found, status, tenants!inner (name)')
+        .from('inventory_snapshots_unified')
+        .select('id, tenant_id, snapshot_date, vehicle_count, status, tenants!inner (name)')
         .eq('status', 'pending_review')
         .order('snapshot_date', { ascending: false });
 

@@ -58,7 +58,7 @@ serve(async (req) => {
 
     // Fetch the snapshot
     const { data: snapshot, error: snapshotError } = await supabaseClient
-      .from('inventory_snapshots')
+      .from('inventory_snapshots_unified')
       .select('*')
       .eq('id', snapshot_id)
       .single();
@@ -74,7 +74,7 @@ serve(async (req) => {
     if (action === 'reject') {
       // Reject: Just update snapshot status
       const { error: updateError } = await supabaseClient
-        .from('inventory_snapshots')
+        .from('inventory_snapshots_unified')
         .update({
           status: 'failed',
           error_message: 'Rejected by admin during review',
@@ -98,7 +98,7 @@ serve(async (req) => {
       );
     }
 
-    // Approve: Apply the pending changes to vehicle_history
+    // Approve: Apply the pending changes to tracked_vehicles
     // The raw_data contains the vehicles that were found
     const vehiclesData = snapshot.raw_data?.vehicles || [];
 
@@ -112,7 +112,7 @@ serve(async (req) => {
 
     // Get existing vehicles for this tenant
     const { data: existingVehicles, error: existingError } = await supabaseClient
-      .from('vehicle_history')
+      .from('tracked_vehicles')
       .select('vin, id')
       .eq('tenant_id', snapshot.tenant_id)
       .eq('status', 'active');
@@ -133,12 +133,12 @@ serve(async (req) => {
       if (existingVINs.has(vehicle.vin)) {
         // Update existing vehicle
         const { error: updateError } = await supabaseClient
-          .from('vehicle_history')
+          .from('tracked_vehicles')
           .update({
             price: vehicle.price,
             mileage: vehicle.mileage,
             last_seen_at: new Date().toISOString(),
-            image_urls: vehicle.image_urls || [],
+            image_url: vehicle.image_url || vehicle.image_urls?.[0] || null,
           })
           .eq('vin', vehicle.vin)
           .eq('tenant_id', snapshot.tenant_id);
@@ -149,19 +149,19 @@ serve(async (req) => {
       } else {
         // Insert new vehicle
         const { error: insertError } = await supabaseClient
-          .from('vehicle_history')
+          .from('tracked_vehicles')
           .insert({
             tenant_id: snapshot.tenant_id,
+            source_url: snapshot.source_url,
+            source_type: snapshot.source_type || 'dealer',
             vin: vehicle.vin,
             year: vehicle.year,
             make: vehicle.make,
             model: vehicle.model,
-            trim: vehicle.trim,
             price: vehicle.price,
             mileage: vehicle.mileage,
-            exterior_color: vehicle.exterior_color,
             listing_url: vehicle.listing_url,
-            image_urls: vehicle.image_urls || [],
+            image_url: vehicle.image_url || vehicle.image_urls?.[0] || null,
             first_seen_at: vehicle.first_seen_at || new Date().toISOString(),
             last_seen_at: new Date().toISOString(),
             status: 'active',
@@ -180,7 +180,7 @@ serve(async (req) => {
 
     for (const vehicle of vehiclesToMarkSold) {
       const { error: soldError } = await supabaseClient
-        .from('vehicle_history')
+        .from('tracked_vehicles')
         .update({
           status: 'sold',
           last_seen_at: new Date().toISOString(),
@@ -194,10 +194,10 @@ serve(async (req) => {
 
     // Update snapshot status to approved/success
     const { error: approveError } = await supabaseClient
-      .from('inventory_snapshots')
+      .from('inventory_snapshots_unified')
       .update({
         status: 'success',
-        vehicles_found: vehiclesData.length,
+        vehicle_count: vehiclesData.length,
       })
       .eq('id', snapshot_id);
 
