@@ -117,28 +117,29 @@ export default function CompetitorAnalysisPage() {
       // Build refresh pending URLs set for UI state
       const refreshPendingSet = new Set<string>();
 
-      // Filter to show:
-      // - Sources that haven't been scraped yet (initial requests)
-      // - Sources with is_refresh_pending = true
+      // Track refresh pending URLs (for showing alert on existing cards)
+      (allCompetitorSources || []).forEach(source => {
+        if (source.is_refresh_pending === true) {
+          refreshPendingSet.add(source.source_url);
+        }
+      });
+
+      // Filter to show ONLY sources that have never been scraped yet (initial requests)
+      // Do NOT show refresh requests as pending items (they appear as alerts on existing cards)
       const pending = (allCompetitorSources || [])
         .filter(source => {
           const hasSnapshot = scrapedUrls.has(source.source_url);
           const isPendingRefresh = source.is_refresh_pending === true;
 
-          // Track refresh pending URLs
-          if (isPendingRefresh) {
-            refreshPendingSet.add(source.source_url);
-          }
-
-          // Show in pending list if: never scraped OR refresh pending
-          return !hasSnapshot || isPendingRefresh;
+          // Only show in pending list if: never scraped AND not a refresh request
+          return !hasSnapshot && !isPendingRefresh;
         })
         .map(source => ({
           id: source.id,
           competitor_url: source.source_url,
           competitor_name: source.source_name,
           created_at: source.created_at,
-          status: source.is_refresh_pending ? 'refresh_pending' : 'pending',
+          status: 'pending',
           refresh_requested_at: source.refresh_requested_at
         }));
 
@@ -176,6 +177,14 @@ export default function CompetitorAnalysisPage() {
 
       const competitorUrls = competitorSources.map(s => s.source_url);
 
+      // Create a map of source_url to source_name for quick lookup
+      const sourceNameMap = new Map<string, string>();
+      competitorSources.forEach(source => {
+        if (source.source_name) {
+          sourceNameMap.set(source.source_url, source.source_name);
+        }
+      });
+
       // Now get the latest snapshots for these competitors
       const { data, error } = await supabase
         .from('inventory_snapshots_unified')
@@ -187,10 +196,11 @@ export default function CompetitorAnalysisPage() {
       if (error) throw error;
 
       // Transform to match the expected CompetitorSnapshot interface
+      // Use source_name from source_registry (freshly edited) instead of snapshot (old data)
       const transformed = (data || []).map(snapshot => ({
         id: snapshot.id,
         competitor_url: snapshot.source_url,
-        competitor_name: snapshot.source_name,
+        competitor_name: sourceNameMap.get(snapshot.source_url) || snapshot.source_name,
         scanned_at: snapshot.scanned_at,
         vehicle_count: snapshot.vehicle_count,
         avg_price: snapshot.avg_price,
@@ -371,7 +381,7 @@ export default function CompetitorAnalysisPage() {
           is_refresh_pending: true,
           refresh_requested_at: new Date().toISOString(),
           refresh_requested_by: user?.id,
-          status: 'in_progress', // Update status to show in admin queue
+          status: 'pending', // Set as pending to show in admin queue
           updated_at: new Date().toISOString()
         })
         .eq('id', existingSource.id);
