@@ -214,13 +214,18 @@ export default function AdminPage() {
 
       if (error) throw error;
 
+      // Check if the function returned an error in the response data
+      if (data && !data.success) {
+        throw new Error(data.error || 'Failed to update source');
+      }
+
       toast.success('Competitor source updated successfully');
       setEditSourceModalOpen(false);
       setSelectedSourceForEdit(null);
       await loadScrapingQueue();
     } catch (error) {
       console.error('Error updating source:', error);
-      toast.error('Failed to update competitor source');
+      toast.error(error instanceof Error ? error.message : 'Failed to update competitor source');
     }
   };
 

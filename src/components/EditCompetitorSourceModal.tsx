@@ -84,11 +84,19 @@ export default function EditCompetitorSourceModal({
     setIsSubmitting(true);
 
     try {
+      console.log('Saving source:', {
+        id: source.id,
+        source_name: formData.source_name.trim(),
+        notes: formData.notes.trim() || undefined,
+      });
+
       await onSave({
         id: source.id,
         source_name: formData.source_name.trim(),
         notes: formData.notes.trim() || undefined,
       });
+
+      console.log('Save successful, closing modal');
       onClose();
     } catch (error) {
       console.error('Error saving competitor source:', error);
