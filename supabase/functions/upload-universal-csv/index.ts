@@ -439,7 +439,7 @@ serve(async (req) => {
 
         // 5. Create Snapshot (Unified)
         const stats = aggregateVehicleData(rows);
-        await supabaseClient.from('inventory_snapshots_unified').upsert({
+        const snapshotData = {
             source_url: targetSourceUrl,
             source_type: targetSourceType,
             source_name: source.source_name,
@@ -456,7 +456,23 @@ serve(async (req) => {
             total_inventory_value: stats.total_inventory_value,
             make_distribution: stats.top_makes,
             status: 'success',
-        }, { onConflict: targetTenantId ? 'tenant_id,snapshot_date' : 'source_url,snapshot_date' });
+        };
+
+        console.log('Creating/updating snapshot:', { source_url: targetSourceUrl, snapshot_date: snapshotData.snapshot_date, scanned_at: snapshotData.scanned_at });
+
+        // Use upsert to insert or update the snapshot
+        // If a snapshot exists for this source on this date, update it with new scanned_at timestamp
+        const { error: snapshotError } = await supabaseClient
+            .from('inventory_snapshots_unified')
+            .upsert(snapshotData, {
+                onConflict: targetTenantId ? 'tenant_id,snapshot_date' : 'source_url,snapshot_date',
+                ignoreDuplicates: false  // Important: update existing records instead of ignoring them
+            });
+
+        if (snapshotError) {
+            console.error('Error creating snapshot:', snapshotError);
+            throw snapshotError;
+        }
 
         // 6. Update Upload Record
         if (uploadRecordId) {
