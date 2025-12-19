@@ -60,13 +60,10 @@ serve(async (req) => {
                 .update({ assigned_to, updated_at: new Date().toISOString() })
                 .eq('id', id);
         } else if (action === 'delete') {
-            // Soft delete or hard delete? Let's do hard delete for now as per previous behavior
-            // But wait, source_registry is critical. Maybe just set status to 'rejected' or 'removed'?
-            // If it's a request, we can delete it. But if it's an active source...
-            // Let's set status to 'removed' instead of deleting to preserve history
+            // Hard delete to remove from queue and allow cleanup of bad data
             result = await supabaseClient
                 .from('source_registry')
-                .update({ status: 'removed', scraping_enabled: false, updated_at: new Date().toISOString() })
+                .delete()
                 .eq('id', id);
         } else if (action === 'update_priority') {
             const { priority } = payload;
