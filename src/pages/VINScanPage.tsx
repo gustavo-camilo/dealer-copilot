@@ -48,7 +48,7 @@ export default function VINScanPage() {
 
 
 
-  const handleScan = async () => {
+  const handleScan = async (customRadius?: number) => {
     if (!vin || !user?.tenant_id) return;
 
     setLoading(true);
@@ -85,7 +85,7 @@ export default function VINScanPage() {
         return;
       }
 
-      const marketData = await getMarketPricing(enrichedData, tenant.zip_code);
+      const marketData = await getMarketPricing(enrichedData, tenant.zip_code, customRadius || 50);
 
       // If no market data, we still proceed but with limited info
       if (!marketData) {
@@ -175,6 +175,76 @@ export default function VINScanPage() {
     }
   };
 
+  const handleRescan = async (radius: number) => {
+    if (!result?.decoded_data || !user?.tenant_id || !tenant?.zip_code) return;
+
+    setLoading(true);
+
+    try {
+      // Re-fetch market data with new radius
+      const marketData = await getMarketPricing(result.decoded_data, tenant.zip_code, radius);
+
+      // Recalculate max bid with new market data
+      const maxBid = marketData ? calculateMaxBid(
+        marketData.averagePrice,
+        costSettings.target_margin_percent,
+        costSettings.auction_fee_thresholds || [],
+        costSettings.reconditioning_cost,
+        costSettings.transport_cost
+      ) : 0;
+
+      // Fetch sales history again for recommendation
+      const { data: salesHistory } = await supabase
+        .from('sales_records')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .order('sale_date', { ascending: false })
+        .limit(100);
+
+      const salesRecords: SalesRecord[] = salesHistory || [];
+
+      // Re-generate recommendation with new market data
+      const recommendation = await generateRecommendation(
+        result.decoded_data,
+        marketData,
+        salesRecords,
+        maxBid,
+        costSettings.target_margin_percent
+      );
+
+      // Update result with new market data
+      setResult({
+        ...result,
+        market_data: marketData,
+        max_bid_suggestion: recommendation.maxBidSuggestion,
+        estimated_profit: recommendation.estimatedProfit,
+        recommendation: recommendation.recommendation,
+        confidence_score: recommendation.confidenceScore,
+        match_reasoning: recommendation.matchReasons,
+        estimated_days_to_sale: recommendation.estimatedDaysToSale,
+      });
+
+      // Update database with new market data if scan_id exists
+      if (result.scan_id) {
+        await supabase
+          .from('vin_scans')
+          .update({
+            market_data: marketData,
+            max_bid_suggestion: recommendation.maxBidSuggestion,
+            estimated_profit: recommendation.estimatedProfit,
+            recommendation: recommendation.recommendation,
+            confidence_score: recommendation.confidenceScore,
+            match_reasoning: recommendation.matchReasons,
+          })
+          .eq('id', result.scan_id);
+      }
+    } catch (error) {
+      console.error('Error rescanning with expanded radius:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   if (result) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -233,6 +303,7 @@ export default function VINScanPage() {
           }}
           costSettings={costSettings}
           tenantZipCode={tenant?.zip_code}
+          onRescan={handleRescan}
           onScanAnother={() => {
             setResult(null);
             setVin('');
@@ -336,7 +407,7 @@ export default function VINScanPage() {
             </p>
 
             <button
-              onClick={handleScan}
+              onClick={() => handleScan()}
               disabled={vin.length !== 17 || loading}
               className="w-full bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >

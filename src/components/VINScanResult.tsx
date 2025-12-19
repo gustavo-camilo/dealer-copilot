@@ -49,6 +49,7 @@ interface VINScanResultProps {
     isModal?: boolean;
     costSettings?: any; // Pass cost settings if available
     tenantZipCode?: string | null;
+    onRescan?: (radius: number) => Promise<void>; // NEW: Handler for expanding search
 }
 
 export default function VINScanResult({
@@ -58,12 +59,14 @@ export default function VINScanResult({
     isModal = false,
     costSettings,
     tenantZipCode,
+    onRescan,
 }: VINScanResultProps) {
     const { user } = useAuth();
     const [reportLoading, setReportLoading] = useState(false);
     const [reportSuccess, setReportSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [reasoningExpanded, setReasoningExpanded] = useState(false);
+    const [isExpandingSearch, setIsExpandingSearch] = useState(false);
 
     const handleReportMissingData = async () => {
         if (!scanData?.decoded_data) return;
@@ -87,6 +90,21 @@ export default function VINScanResult({
             setError('Failed to submit report. Please try again.');
         } finally {
             setReportLoading(false);
+        }
+    };
+
+    const handleExpandSearch = async () => {
+        if (!onRescan) return;
+
+        setIsExpandingSearch(true);
+        setError(null);
+        try {
+            await onRescan(500); // Expand to 500 miles
+        } catch (err) {
+            console.error('Failed to expand search:', err);
+            setError('Failed to expand search. Please try again.');
+        } finally {
+            setIsExpandingSearch(false);
         }
     };
 
@@ -167,22 +185,79 @@ export default function VINScanResult({
 
                 {/* Market Context - Moved up */}
                 {scanData.market_data ? (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-                        <h4 className="font-semibold text-blue-900 mb-2">📊 Market Context</h4>
-                        <div className="text-sm text-blue-800 space-y-1">
-                            <p>
-                                • Average Market Price: ${scanData.market_data.averagePrice.toLocaleString()} (
-                                {scanData.market_data.dataSource === 'estimated' ? 'estimated' : 'from real listings'})
-                            </p>
-                            <p>
-                                • Price Range: ${scanData.market_data.minPrice.toLocaleString()} - $
-                                {scanData.market_data.maxPrice.toLocaleString()}
-                            </p>
-                            <p>
-                                • Cheapest Listing: ${scanData.market_data.minPrice.toLocaleString()} (Within 50 Miles)
-                            </p>
+                    <>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <h4 className="font-semibold text-blue-900 mb-2">📊 Market Context</h4>
+                            <div className="text-sm text-blue-800 space-y-1">
+                                <p>
+                                    • Average Market Price: ${scanData.market_data.averagePrice.toLocaleString()} (
+                                    {scanData.market_data.dataSource === 'estimated' ? 'estimated' : 'from real listings'})
+                                </p>
+                                <p>
+                                    • Price Range: ${scanData.market_data.minPrice.toLocaleString()} - $
+                                    {scanData.market_data.maxPrice.toLocaleString()}
+                                </p>
+                                <p>
+                                    • Cheapest Listing: ${scanData.market_data.minPrice.toLocaleString()} (Within 50 Miles)
+                                </p>
+                            </div>
                         </div>
-                    </div>
+
+                        {/* Show warning and expand button if limited data */}
+                        {scanData.market_data.listingsCount < 5 && onRescan && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-yellow-900 mb-1">⚠️ Limited Market Data</h4>
+                                        <p className="text-sm text-yellow-800">
+                                            Found only {scanData.market_data.listingsCount} listing(s) within 50 miles.
+                                            Expand to 500 miles for more results?
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleExpandSearch}
+                                        disabled={isExpandingSearch}
+                                        className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center whitespace-nowrap"
+                                    >
+                                        {isExpandingSearch ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                Searching...
+                                            </>
+                                        ) : (
+                                            'Expand Search to 500 Miles'
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Show individual listings when <5 found */}
+                                {scanData.market_data.listings && scanData.market_data.listings.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t border-yellow-300">
+                                        <p className="font-semibold text-sm text-yellow-900 mb-2">Available Listings:</p>
+                                        <div className="space-y-2">
+                                            {scanData.market_data.listings.slice(0, 3).map((listing: any, idx: number) => (
+                                                <div key={idx} className="bg-white border border-yellow-200 rounded p-3 text-sm">
+                                                    <div className="font-semibold text-gray-900">
+                                                        {listing.title || `${scanData.decoded_data.year} ${scanData.decoded_data.make} ${scanData.decoded_data.model}`}
+                                                    </div>
+                                                    <div className="text-gray-600 mt-1">
+                                                        ${listing.price?.toLocaleString()} • {listing.miles?.toLocaleString()} mi
+                                                        {listing.distance && ` • ${Math.round(listing.distance)} mi away`}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {error && (
+                                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                                        {error}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
                 ) : (
                     <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
                         <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-3" />
@@ -198,9 +273,26 @@ export default function VINScanResult({
                             <>
                                 <h3 className="text-lg font-bold text-yellow-900 mb-2">Market Data Unavailable</h3>
                                 <p className="text-yellow-800 mb-6">
-                                    We couldn't find sufficient market data for this specific vehicle configuration in your area.
+                                    We couldn't find any market data for this specific vehicle configuration in your area.
                                     This can happen with rare trims or very new inventory.
                                 </p>
+
+                                {/* Show expand button if onRescan available and not already expanded */}
+                                {onRescan && !isExpandingSearch && (
+                                    <button
+                                        onClick={handleExpandSearch}
+                                        className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto mb-4"
+                                    >
+                                        Expand Search to 500 Miles
+                                    </button>
+                                )}
+
+                                {isExpandingSearch && (
+                                    <div className="flex items-center justify-center mb-4">
+                                        <Loader2 className="h-8 w-8 animate-spin text-yellow-600" />
+                                        <span className="ml-2 text-yellow-800">Searching wider area...</span>
+                                    </div>
+                                )}
 
                                 {reportSuccess ? (
                                     <div className="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-center">
