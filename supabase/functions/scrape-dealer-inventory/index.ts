@@ -386,18 +386,24 @@ serve(async (req) => {
       try {
         console.log(`Scraping ${tenant.name} (${tenant.website_url})...`);
 
-        // Create snapshot record
-        // Create snapshot record
-        // If review_mode is true, set status to 'pending_review' instead of 'pending'
+        // Create or update today's snapshot to avoid duplicate key conflicts
+        const snapshotDate = new Date().toISOString().split('T')[0];
         const { data: snapshot, error: snapshotError } = await supabase
           .from('inventory_snapshots_unified')
-          .insert({
-            tenant_id: tenant.id,
-            source_url: tenant.website_url,
-            source_type: 'dealer',
-            source_name: tenant.name,
-            status: review_mode ? 'pending_review' : 'pending',
-          })
+          .upsert(
+            {
+              tenant_id: tenant.id,
+              source_url: tenant.website_url,
+              source_type: 'dealer',
+              source_name: tenant.name,
+              snapshot_date: snapshotDate,
+              status: review_mode ? 'pending_review' : 'pending',
+              error_message: null,
+            },
+            {
+              onConflict: 'tenant_id,snapshot_date',
+            }
+          )
           .select()
           .single();
 
