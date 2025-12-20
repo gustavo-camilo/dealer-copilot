@@ -28,9 +28,13 @@ interface PendingReview {
   id: string;
   tenant_id: string;
   snapshot_date: string;
-  vehicles_found: number;
+  vehicle_count: number | null;
   status: string;
-  tenants: { name: string };
+  source_name: string | null;
+  source_url: string | null;
+  created_at: string;
+  scraping_duration_ms: number | null;
+  tenants?: { name: string };
 }
 
 
@@ -88,6 +92,45 @@ export default function AdminPage() {
   const [selectedSourceForEdit, setSelectedSourceForEdit] = useState<any>(null);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
+
+  const confirmAction = (message: string, confirmLabel = 'Confirm') =>
+    new Promise<boolean>((resolve) => {
+      let resolved = false;
+      const finish = (result: boolean) => {
+        if (resolved) return;
+        resolved = true;
+        resolve(result);
+      };
+
+      toast.custom(
+        (t) => (
+          <div className="max-w-sm w-full bg-white shadow-lg rounded-lg border border-gray-200 p-4">
+            <p className="text-sm text-gray-800">{message}</p>
+            <div className="mt-3 flex justify-end gap-2">
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  finish(false);
+                }}
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  toast.dismiss(t.id);
+                  finish(true);
+                }}
+                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+              >
+                {confirmLabel}
+              </button>
+            </div>
+          </div>
+        ),
+        { duration: Infinity }
+      );
+    });
 
   const handleSignOut = async () => {
     try {
@@ -185,16 +228,22 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from('inventory_snapshots_unified')
-        .select('id, tenant_id, snapshot_date, vehicle_count, status, tenants!inner (name)')
+        .select('id, tenant_id, snapshot_date, vehicle_count, status, source_name, source_url, created_at, scraping_duration_ms, tenants (name)')
         .eq('status', 'pending_review')
         .order('snapshot_date', { ascending: false });
 
       if (error) throw error;
 
-      const mapped = (data || []).map((item: any) => ({
-        ...item,
-        tenants: Array.isArray(item.tenants) && item.tenants.length > 0 ? item.tenants[0] : { name: 'Unknown' }
-      }));
+      const mapped = (data || []).map((item: any) => {
+        const tenantName = Array.isArray(item.tenants)
+          ? item.tenants[0]?.name
+          : item.tenants?.name;
+
+        return {
+          ...item,
+          tenants: { name: tenantName || 'Unknown' },
+        };
+      });
       setPendingReviews(mapped);
     } catch (error) {
       console.error('Error loading pending reviews:', error);
@@ -388,7 +437,7 @@ export default function AdminPage() {
 
   const handleTestScrape = async () => {
     if (!selectedTenantForScrape) {
-      alert('Please select a tenant');
+      toast.error('Please select a tenant');
       return;
     }
 
@@ -405,25 +454,26 @@ export default function AdminPage() {
       const status = data.results?.[0]?.status || 'unknown';
 
       if (status === 'success') {
-        alert(`Scraping complete! Found ${vehiclesFound} vehicles. Review pending.`);
+        toast.success(`Scraping complete! Found ${vehiclesFound} vehicles. Review pending.`);
         loadPendingReviews();
       } else if (status === 'failed') {
         const errorMsg = data.results?.[0]?.error || 'Unknown error';
-        alert(`Scraping failed: ${errorMsg}`);
+        toast.error(`Scraping failed: ${errorMsg}`);
       } else {
-        alert(`Scraping complete! Found ${vehiclesFound} vehicles. Review pending.`);
+        toast.success(`Scraping complete! Found ${vehiclesFound} vehicles. Review pending.`);
         loadPendingReviews();
       }
     } catch (error: any) {
       console.error('Scraping error:', error);
-      alert(`Scraping failed: ${error.message}`);
+      toast.error(`Scraping failed: ${error.message}`);
     } finally {
       setScraping(false);
     }
   };
 
   const handleApproveReview = async (snapshotId: string) => {
-    if (!confirm('Approve this scraping result and apply changes?')) return;
+    const confirmed = await confirmAction('Approve this scraping result and apply changes?', 'Approve');
+    if (!confirmed) return;
 
     try {
       const { data, error } = await supabase.functions.invoke('approve-scraping-results', {
@@ -432,16 +482,17 @@ export default function AdminPage() {
 
       if (error) throw error;
 
-      alert(`Approved! ${data.vehicles_new} new, ${data.vehicles_updated} updated, ${data.vehicles_sold} sold`);
+      toast.success(`Approved! ${data.vehicles_new} new, ${data.vehicles_updated} updated, ${data.vehicles_sold} sold`);
       loadPendingReviews();
     } catch (error: any) {
       console.error('Approval error:', error);
-      alert(`Failed to approve: ${error.message}`);
+      toast.error(`Failed to approve: ${error.message}`);
     }
   };
 
   const handleRejectReview = async (snapshotId: string) => {
-    if (!confirm('Reject this scraping result?')) return;
+    const confirmed = await confirmAction('Reject this scraping result?', 'Reject');
+    if (!confirmed) return;
 
     try {
       const { error } = await supabase.functions.invoke('approve-scraping-results', {
@@ -450,11 +501,11 @@ export default function AdminPage() {
 
       if (error) throw error;
 
-      alert('Review rejected');
+      toast.success('Review rejected');
       loadPendingReviews();
     } catch (error: any) {
       console.error('Rejection error:', error);
-      alert(`Failed to reject: ${error.message}`);
+      toast.error(`Failed to reject: ${error.message}`);
     }
   };
 
@@ -872,8 +923,9 @@ export default function AdminPage() {
                                   </button>
                                 )}
                                 <button
-                                  onClick={() => {
-                                    if (confirm('Are you sure you want to delete this request?')) {
+                                  onClick={async () => {
+                                    const confirmed = await confirmAction('Are you sure you want to delete this request?', 'Delete');
+                                    if (confirmed) {
                                       handleQueueAction('delete', item.id);
                                     }
                                   }}
@@ -1063,35 +1115,50 @@ export default function AdminPage() {
                   <p className="text-gray-500 text-center py-8">No pending reviews</p>
                 ) : (
                   <div className="space-y-4">
-                    {pendingReviews.map((review) => (
-                      <div key={review.id} className="border border-gray-200 rounded-lg p-4">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <h4 className="font-medium text-gray-900">{review.tenants.name}</h4>
-                            <p className="text-sm text-gray-500">
-                              {new Date(review.snapshot_date).toLocaleString()}
-                            </p>
-                            <p className="text-sm text-gray-600 mt-1">
-                              {review.vehicles_found} vehicles found
-                            </p>
-                          </div>
-                          <div className="flex gap-2">
-                            <button
-                              onClick={() => handleApproveReview(review.id)}
-                              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition"
-                            >
-                              Approve
-                            </button>
-                            <button
-                              onClick={() => handleRejectReview(review.id)}
-                              className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition"
-                            >
-                              Reject
-                            </button>
+                    {pendingReviews.map((review) => {
+                      const displayName = review.source_name || review.tenants?.name || 'Unknown';
+                      const timestamp = review.created_at
+                        ? new Date(review.created_at).toLocaleString()
+                        : new Date(`${review.snapshot_date}T00:00:00`).toLocaleDateString();
+                      const vehiclesFound = review.vehicle_count ?? 0;
+                      const durationSeconds = review.scraping_duration_ms !== null && review.scraping_duration_ms !== undefined
+                        ? Math.round(review.scraping_duration_ms / 1000)
+                        : null;
+
+                      return (
+                        <div key={review.id} className="border border-gray-200 rounded-lg p-4">
+                          <div className="flex justify-between items-start mb-4">
+                            <div>
+                              <h4 className="font-medium text-gray-900">{displayName}</h4>
+                              <p className="text-sm text-gray-500">{timestamp}</p>
+                              {review.source_url && (
+                                <p className="text-xs text-gray-500 mt-1">Source: {review.source_url}</p>
+                              )}
+                              <p className="text-sm text-gray-600 mt-1">
+                                {vehiclesFound} vehicles found
+                              </p>
+                              {durationSeconds !== null && (
+                                <p className="text-xs text-gray-500 mt-1">Duration: {durationSeconds}s</p>
+                              )}
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleApproveReview(review.id)}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition"
+                              >
+                                Approve
+                              </button>
+                              <button
+                                onClick={() => handleRejectReview(review.id)}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition"
+                              >
+                                Reject
+                              </button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

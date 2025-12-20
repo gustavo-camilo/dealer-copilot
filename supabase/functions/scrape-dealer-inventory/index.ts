@@ -386,12 +386,46 @@ serve(async (req) => {
       try {
         console.log(`Scraping ${tenant.name} (${tenant.website_url})...`);
 
-        // Create or update today's snapshot to avoid duplicate key conflicts
+        // Create or update today's snapshot without relying on a unique constraint
         const snapshotDate = new Date().toISOString().split('T')[0];
-        const { data: snapshot, error: snapshotError } = await supabase
+        const { data: existingSnapshot, error: existingSnapshotError } = await supabase
           .from('inventory_snapshots_unified')
-          .upsert(
-            {
+          .select('id')
+          .eq('tenant_id', tenant.id)
+          .eq('snapshot_date', snapshotDate)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (existingSnapshotError) {
+          throw new Error(`Failed to check existing snapshot: ${existingSnapshotError.message}`);
+        }
+
+        let snapshot;
+        if (existingSnapshot?.id) {
+          const { data: updatedSnapshot, error: updateError } = await supabase
+            .from('inventory_snapshots_unified')
+            .update({
+              source_url: tenant.website_url,
+              source_type: 'dealer',
+              source_name: tenant.name,
+              status: review_mode ? 'pending_review' : 'pending',
+              error_message: null,
+              raw_data: null,
+            })
+            .eq('id', existingSnapshot.id)
+            .select()
+            .single();
+
+          if (updateError) {
+            throw new Error(`Failed to update snapshot: ${updateError.message}`);
+          }
+
+          snapshot = updatedSnapshot;
+        } else {
+          const { data: newSnapshot, error: insertError } = await supabase
+            .from('inventory_snapshots_unified')
+            .insert({
               tenant_id: tenant.id,
               source_url: tenant.website_url,
               source_type: 'dealer',
@@ -399,16 +433,15 @@ serve(async (req) => {
               snapshot_date: snapshotDate,
               status: review_mode ? 'pending_review' : 'pending',
               error_message: null,
-            },
-            {
-              onConflict: 'tenant_id,snapshot_date',
-            }
-          )
-          .select()
-          .single();
+            })
+            .select()
+            .single();
 
-        if (snapshotError) {
-          throw new Error(`Failed to create snapshot: ${snapshotError.message}`);
+          if (insertError) {
+            throw new Error(`Failed to create snapshot: ${insertError.message}`);
+          }
+
+          snapshot = newSnapshot;
         }
 
         // Try to find inventory pages
