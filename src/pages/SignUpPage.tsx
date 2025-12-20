@@ -85,7 +85,7 @@ export default function SignUpPage() {
           contact_phone: formData.contactPhone || null,
         }
       );
-      navigate('/onboarding');
+      navigate('/upgrade');
     } catch (err: any) {
       setError(err.message || 'An error occurred during signup');
     } finally {
@@ -119,7 +119,7 @@ export default function SignUpPage() {
               Create Your Account
             </h2>
             <p className="text-slate-400">
-              Start your 14-day free trial. No credit card required.
+              Start your 7-day free trial. Card required to activate.
             </p>
           </div>
 
@@ -178,12 +178,9 @@ export default function SignUpPage() {
                       name="websiteUrl"
                       value={formData.websiteUrl}
                       onChange={handleChange}
-                      placeholder="https://www.yourdealership.com"
                       className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                      placeholder="https://yourdealership.com"
                     />
-                    <p className="text-xs text-slate-500 mt-2">
-                      We'll automatically detect your location from your website
-                    </p>
                   </div>
 
                   <div>
@@ -195,33 +192,20 @@ export default function SignUpPage() {
                       name="contactPhone"
                       value={formData.contactPhone}
                       onChange={handleChange}
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                       placeholder="(555) 123-4567"
-                      maxLength={14}
-                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-sm font-medium text-slate-300 mb-2">
-                      Email Address *
-                    </label>
-                    <input
-                      type="email"
-                      name="email"
-                      value={formData.email}
-                      onChange={handleChange}
-                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
-                      required
-                    />
+                  <div className="flex gap-3 pt-4">
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-orange-700 transition"
+                    >
+                      Continue
+                    </button>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={handleNext}
-                    className="w-full bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 mt-6"
-                  >
-                    Continue
-                  </button>
                 </div>
               )}
 
@@ -243,6 +227,20 @@ export default function SignUpPage() {
 
                   <div>
                     <label className="block text-sm font-medium text-slate-300 mb-2">
+                      Email *
+                    </label>
+                    <input
+                      type="email"
+                      name="email"
+                      value={formData.email}
+                      onChange={handleChange}
+                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-slate-300 mb-2">
                       Password *
                     </label>
                     <input
@@ -253,9 +251,6 @@ export default function SignUpPage() {
                       className="w-full px-4 py-3 bg-slate-800/50 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-orange-500 focus:border-transparent transition"
                       required
                     />
-                    <p className="text-xs text-slate-500 mt-2">
-                      Must be at least 6 characters
-                    </p>
                   </div>
 
                   <div>
@@ -272,37 +267,26 @@ export default function SignUpPage() {
                     />
                   </div>
 
-                  <div className="flex gap-3 mt-6">
+                  <div className="flex gap-3 pt-4">
                     <button
                       type="button"
                       onClick={() => setStep(1)}
-                      className="flex-1 border-2 border-slate-700 bg-slate-900/50 text-white py-3 rounded-xl font-bold hover:border-slate-600 hover:bg-slate-900 transition-all backdrop-blur"
+                      className="flex-1 bg-slate-800 text-slate-300 py-3 rounded-xl font-semibold hover:bg-slate-700 transition"
                     >
                       Back
                     </button>
                     <button
                       type="submit"
                       disabled={loading}
-                      className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg shadow-orange-500/30 hover:shadow-orange-500/50 disabled:opacity-50"
+                      className="flex-1 bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 rounded-xl font-semibold hover:from-orange-600 hover:to-orange-700 transition disabled:opacity-50"
                     >
-                      {loading ? 'Creating Account...' : 'Create Account'}
+                      {loading ? 'Creating account...' : 'Create Account'}
                     </button>
                   </div>
                 </div>
               )}
             </form>
-
-            <div className="mt-6 text-center text-sm text-slate-400">
-              Already have an account?{' '}
-              <Link to="/signin" className="text-orange-400 font-semibold hover:text-orange-300 transition">
-                Sign In
-              </Link>
-            </div>
           </div>
-
-          <p className="mt-6 text-center text-xs text-slate-500">
-            By creating an account, you agree to our Terms of Service and Privacy Policy
-          </p>
         </div>
       </div>
     </div>

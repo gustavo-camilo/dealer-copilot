@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LandingPage from './pages/LandingPage';
@@ -11,12 +11,14 @@ import ManageInventoryPage from './pages/ManageInventoryPage';
 import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage';
 import CompetitorHistoryPage from './pages/CompetitorHistoryPage';
 import UpgradePage from './pages/UpgradePage';
+import UpgradeSuccessPage from './pages/UpgradeSuccessPage';
 import RecommendationsPage from './pages/RecommendationsPage';
 import AdminPage from './pages/AdminPage';
 import SettingsPage from './pages/SettingsPage';
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
-  const { user, loading } = useAuth();
+  const { user, loading, subscription } = useAuth();
+  const location = useLocation();
 
   if (loading) {
     return (
@@ -31,6 +33,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
 
   if (!user) {
     return <Navigate to="/signin" />;
+  }
+
+  const hasActiveSubscription =
+    subscription?.status === 'active' || subscription?.status === 'trialing';
+  const isUpgradePath = location.pathname.startsWith('/upgrade');
+
+  if (!isUpgradePath && user.role !== 'super_admin' && !hasActiveSubscription) {
+    return <Navigate to="/upgrade" replace />;
   }
 
   return <>{children}</>;
@@ -158,6 +168,14 @@ function App() {
             element={
               <ProtectedRoute>
                 <UpgradePage />
+              </ProtectedRoute>
+            }
+          />
+          <Route
+            path="/upgrade/success"
+            element={
+              <ProtectedRoute>
+                <UpgradeSuccessPage />
               </ProtectedRoute>
             }
           />

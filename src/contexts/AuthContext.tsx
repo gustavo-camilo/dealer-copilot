@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { User as SupabaseUser, Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { User, Tenant } from '../types/database';
+import { User, Tenant, Subscription } from '../types/database';
 
 interface AuthContextType {
   session: Session | null;
   user: User | null;
   tenant: Tenant | null;
+  subscription: Subscription | null;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string, tenantData: Partial<Tenant>) => Promise<void>;
@@ -20,6 +21,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [tenant, setTenant] = useState<Tenant | null>(null);
+  const [subscription, setSubscription] = useState<Subscription | null>(null);
   const [loading, setLoading] = useState(true);
 
   const fetchUserProfile = async (userId: string) => {
@@ -55,6 +57,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (tenantData) {
         setTenant(tenantData);
       }
+
+      const { data: subscriptionData, error: subscriptionError } = await supabase
+        .from('subscriptions')
+        .select('*')
+        .eq('tenant_id', userData.tenant_id)
+        .maybeSingle();
+
+      if (subscriptionError) {
+        console.error('Error fetching subscription:', subscriptionError);
+        throw subscriptionError;
+      }
+
+      setSubscription(subscriptionData ?? null);
+    } else {
+      setTenant(null);
+      setSubscription(null);
     }
 
     supabase
@@ -90,6 +108,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } else {
         setUser(null);
         setTenant(null);
+        setSubscription(null);
       }
     });
 
@@ -163,22 +182,36 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       throw new Error(`Failed to create user profile: ${userError.message}`);
     }
 
-    const trialEnd = new Date();
-    trialEnd.setDate(trialEnd.getDate() + 14);
+    const today = new Date().toISOString().split('T')[0];
 
     const { error: subError } = await supabaseWithSession.from('subscriptions').insert({
       tenant_id: newTenant.id,
       plan_type: 'free',
-      status: 'trialing',
+      status: 'unpaid',
       billing_interval: 'monthly',
       amount: 0,
       currency: 'USD',
-      current_period_start: new Date().toISOString().split('T')[0],
-      current_period_end: trialEnd.toISOString().split('T')[0],
-      trial_end: trialEnd.toISOString().split('T')[0],
+      current_period_start: today,
+      current_period_end: today,
+      trial_end: null,
     });
 
     if (subError) throw subError;
+
+    const { error: stripeCustomerError } = await supabaseWithSession.functions.invoke(
+      'create-stripe-customer',
+      {
+        body: {
+          tenantId: newTenant.id,
+          email,
+          name: tenantData.name,
+        },
+      }
+    );
+
+    if (stripeCustomerError) {
+      throw new Error(`Failed to create Stripe customer: ${stripeCustomerError.message}`);
+    }
   };
 
   const signOut = async () => {
@@ -186,6 +219,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) throw error;
     setUser(null);
     setTenant(null);
+    setSubscription(null);
   };
 
   return (
@@ -194,6 +228,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         user,
         tenant,
+        subscription,
         loading,
         signIn,
         signUp,

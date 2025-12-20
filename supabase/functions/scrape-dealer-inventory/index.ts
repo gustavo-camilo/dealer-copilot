@@ -22,6 +22,83 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
+function extractDomain(url: string): string {
+  try {
+    const hasProtocol = /^https?:\/\//i.test(url);
+    const parsed = new URL(hasProtocol ? url : `https://${url}`);
+    return parsed.hostname.replace(/^www\./i, '').toLowerCase();
+  } catch {
+    return url
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/.*$/, '')
+      .toLowerCase();
+  }
+}
+
+function validateVIN(vin: string): boolean {
+  if (!vin || vin.length !== 17) return false;
+  if (/[IOQ]/i.test(vin)) return false;
+  const transliteration = '0123456789X';
+  const weights = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2];
+  const map = '0123456789.ABCDEFGH..JKLMN.P.R..STUVWXYZ';
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    const value = map.indexOf(vin[i].toUpperCase());
+    if (value < 0) return false;
+    sum += value * weights[i];
+  }
+  const checkDigit = transliteration[sum % 11];
+  return checkDigit === vin[8].toUpperCase();
+}
+
+function generatePseudoVINFromVehicle(vehicle: any, listingUrl: string): string {
+  const year = vehicle.year || 'UNKN';
+  const make = (vehicle.make || 'UNKNOWN').replace(/\s+/g, '_').toUpperCase();
+  const model = (vehicle.model || 'UNKNOWN').replace(/\s+/g, '_').toUpperCase();
+
+  if (vehicle.mileage && parseInt(vehicle.mileage) > 0) {
+    const mileage = parseInt(vehicle.mileage);
+    return `noVIN_${year}_${make}_${model}_${mileage}`;
+  }
+
+  if (vehicle.price && parseFloat(vehicle.price) > 0) {
+    const price = Math.round(parseFloat(vehicle.price));
+    return `noVIN_${year}_${make}_${model}_$${price}`;
+  }
+
+  if (listingUrl) {
+    let hash = 0;
+    for (let i = 0; i < listingUrl.length; i++) {
+      hash = ((hash << 5) - hash) + listingUrl.charCodeAt(i);
+      hash = hash & hash;
+    }
+    const urlHash = Math.abs(hash).toString(36).toUpperCase();
+    return `noVIN_${year}_${make}_${model}_${urlHash}`;
+  }
+
+  return `noVIN_${year}_${make}_${model}_NODATA`;
+}
+
+function normalizeVehicleForTracking(vehicle: any): any {
+  const listingUrl = vehicle.listing_url || vehicle.url || '';
+  let vin = vehicle.vin?.trim();
+
+  if (vin && vin.length === 17) {
+    if (!validateVIN(vin)) {
+      vin = generatePseudoVINFromVehicle(vehicle, listingUrl);
+    }
+  } else {
+    vin = generatePseudoVINFromVehicle(vehicle, listingUrl);
+  }
+
+  return {
+    ...vehicle,
+    vin,
+    listing_url: listingUrl || null,
+  };
+}
+
 interface ScrapingResult {
   tenant_id: string;
   tenant_name: string;
@@ -381,6 +458,7 @@ serve(async (req) => {
         break;
       }
 
+      const normalizedSourceUrl = extractDomain(tenant.website_url);
       const tenantStartTime = Date.now();
 
       try {
@@ -406,10 +484,11 @@ serve(async (req) => {
           const { data: updatedSnapshot, error: updateError } = await supabase
             .from('inventory_snapshots_unified')
             .update({
-              source_url: tenant.website_url,
+              source_url: normalizedSourceUrl,
               source_type: 'dealer',
               source_name: tenant.name,
               status: review_mode ? 'pending_review' : 'pending',
+              scanned_at: new Date().toISOString(),
               error_message: null,
               raw_data: null,
             })
@@ -427,10 +506,11 @@ serve(async (req) => {
             .from('inventory_snapshots_unified')
             .insert({
               tenant_id: tenant.id,
-              source_url: tenant.website_url,
+              source_url: normalizedSourceUrl,
               source_type: 'dealer',
               source_name: tenant.name,
               snapshot_date: snapshotDate,
+              scanned_at: new Date().toISOString(),
               status: review_mode ? 'pending_review' : 'pending',
               error_message: null,
             })
@@ -564,9 +644,11 @@ serve(async (req) => {
         const enhancedVehicles = await enhanceVehicleData(vehicles);
         console.log(`Enhanced ${enhancedVehicles.length} vehicles with detailed information`);
 
+        const normalizedVehicles = enhancedVehicles.map(normalizeVehicleForTracking);
+
         // Log enhanced sample
-        if (enhancedVehicles.length > 0) {
-          const sample = enhancedVehicles[0];
+        if (normalizedVehicles.length > 0) {
+          const sample = normalizedVehicles[0];
           console.log(`Enhanced sample: ${sample.year} ${sample.make} ${sample.model} - $${sample.price} - ${sample.mileage}mi - ${sample.url} - ${sample.images?.length || 0} images`);
         }
 
@@ -587,10 +669,11 @@ serve(async (req) => {
           await supabase
             .from('inventory_snapshots_unified')
             .update({
-              vehicle_count: enhancedVehicles.length,
+              vehicle_count: normalizedVehicles.length,
               status: 'pending_review',
               scraping_duration_ms: Date.now() - tenantStartTime,
-              raw_data: { vehicles: enhancedVehicles }, // Store vehicles for approval
+              scanned_at: new Date().toISOString(),
+              raw_data: { vehicles: normalizedVehicles }, // Store vehicles for approval
             })
             .eq('id', snapshot.id);
 
@@ -603,10 +686,10 @@ serve(async (req) => {
             .eq('status', 'active');
 
           const existingVINs = new Set((existingVehicles || []).map(v => v.vin));
-          const scrapedVINs = new Set(enhancedVehicles.map(v => v.vin).filter(Boolean));
+          const scrapedVINs = new Set(normalizedVehicles.map(v => v.vin).filter(Boolean));
 
-          newVehicles = enhancedVehicles.filter(v => !existingVINs.has(v.vin)).length;
-          updatedVehicles = enhancedVehicles.filter(v => existingVINs.has(v.vin)).length;
+          newVehicles = normalizedVehicles.filter(v => !existingVINs.has(v.vin)).length;
+          updatedVehicles = normalizedVehicles.filter(v => existingVINs.has(v.vin)).length;
           soldVehicles = (existingVehicles || []).filter(v => !scrapedVINs.has(v.vin)).length;
 
           console.log(`Preview: ${newVehicles} new, ${updatedVehicles} updated, ${soldVehicles} sold`);
@@ -615,9 +698,9 @@ serve(async (req) => {
           const result = await processVehicles(
             supabase,
             tenant.id,
-            enhancedVehicles,
+            normalizedVehicles,
             sitemapCache,
-            tenant.website_url
+            normalizedSourceUrl
           );
           newVehicles = result.newVehicles;
           updatedVehicles = result.updatedVehicles;
@@ -627,10 +710,11 @@ serve(async (req) => {
           await supabase
             .from('inventory_snapshots_unified')
             .update({
-              vehicle_count: enhancedVehicles.length,
+              vehicle_count: normalizedVehicles.length,
               status: 'success',
               scraping_duration_ms: Date.now() - tenantStartTime,
-              raw_data: { vehicles: enhancedVehicles },
+              scanned_at: new Date().toISOString(),
+              raw_data: { vehicles: normalizedVehicles },
             })
             .eq('id', snapshot.id);
         }
@@ -640,7 +724,7 @@ serve(async (req) => {
           tenant_id: tenant.id,
           snapshot_id: snapshot.id,
           log_level: 'info',
-          message: `Successfully scraped ${enhancedVehicles.length} vehicles`,
+          message: `Successfully scraped ${normalizedVehicles.length} vehicles`,
           details: {
             new: newVehicles,
             updated: updatedVehicles,
@@ -652,7 +736,7 @@ serve(async (req) => {
           tenant_id: tenant.id,
           tenant_name: tenant.name,
           website_url: tenant.website_url,
-          vehicles_found: enhancedVehicles.length,
+          vehicles_found: normalizedVehicles.length,
           new_vehicles: newVehicles,
           updated_vehicles: updatedVehicles,
           sold_vehicles: soldVehicles,
@@ -841,9 +925,12 @@ async function processVehicles(
       // Existing vehicle - Smart update: only update fields that have new data
       console.log(`Updating existing vehicle: ${identifier}`);
 
-      const updates: any = {
-        last_seen_at: new Date().toISOString(),
-      };
+    const updates: any = {
+      last_seen_at: new Date().toISOString(),
+    };
+    if (website_url) {
+      updates.source_url = website_url;
+    }
 
       // Smart update: only update fields if new scrape found data
       if (vehicle.stock_number !== undefined && vehicle.stock_number !== null) {

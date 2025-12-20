@@ -6,6 +6,83 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+function extractDomain(url: string): string {
+  try {
+    const hasProtocol = /^https?:\/\//i.test(url);
+    const parsed = new URL(hasProtocol ? url : `https://${url}`);
+    return parsed.hostname.replace(/^www\./i, '').toLowerCase();
+  } catch {
+    return url
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/.*$/, '')
+      .toLowerCase();
+  }
+}
+
+function validateVIN(vin: string): boolean {
+  if (!vin || vin.length !== 17) return false;
+  if (/[IOQ]/i.test(vin)) return false;
+  const transliteration = '0123456789X';
+  const weights = [8, 7, 6, 5, 4, 3, 2, 10, 0, 9, 8, 7, 6, 5, 4, 3, 2];
+  const map = '0123456789.ABCDEFGH..JKLMN.P.R..STUVWXYZ';
+  let sum = 0;
+  for (let i = 0; i < 17; i++) {
+    const value = map.indexOf(vin[i].toUpperCase());
+    if (value < 0) return false;
+    sum += value * weights[i];
+  }
+  const checkDigit = transliteration[sum % 11];
+  return checkDigit === vin[8].toUpperCase();
+}
+
+function generatePseudoVINFromVehicle(vehicle: any, listingUrl: string): string {
+  const year = vehicle.year || 'UNKN';
+  const make = (vehicle.make || 'UNKNOWN').replace(/\s+/g, '_').toUpperCase();
+  const model = (vehicle.model || 'UNKNOWN').replace(/\s+/g, '_').toUpperCase();
+
+  if (vehicle.mileage && parseInt(vehicle.mileage) > 0) {
+    const mileage = parseInt(vehicle.mileage);
+    return `noVIN_${year}_${make}_${model}_${mileage}`;
+  }
+
+  if (vehicle.price && parseFloat(vehicle.price) > 0) {
+    const price = Math.round(parseFloat(vehicle.price));
+    return `noVIN_${year}_${make}_${model}_$${price}`;
+  }
+
+  if (listingUrl) {
+    let hash = 0;
+    for (let i = 0; i < listingUrl.length; i++) {
+      hash = ((hash << 5) - hash) + listingUrl.charCodeAt(i);
+      hash = hash & hash;
+    }
+    const urlHash = Math.abs(hash).toString(36).toUpperCase();
+    return `noVIN_${year}_${make}_${model}_${urlHash}`;
+  }
+
+  return `noVIN_${year}_${make}_${model}_NODATA`;
+}
+
+function normalizeVehicleForTracking(vehicle: any): any {
+  const listingUrl = vehicle.listing_url || vehicle.url || '';
+  let vin = vehicle.vin?.trim();
+
+  if (vin && vin.length === 17) {
+    if (!validateVIN(vin)) {
+      vin = generatePseudoVINFromVehicle(vehicle, listingUrl);
+    }
+  } else {
+    vin = generatePseudoVINFromVehicle(vehicle, listingUrl);
+  }
+
+  return {
+    ...vehicle,
+    vin,
+    listing_url: listingUrl || null,
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -106,6 +183,19 @@ serve(async (req) => {
       throw new Error('No vehicle data found in snapshot');
     }
 
+    const normalizedSourceUrl = extractDomain(snapshot.source_url || '');
+    const sourceUrlCandidates = [snapshot.source_url, normalizedSourceUrl].filter(Boolean) as string[];
+    const normalizedVehicles = vehiclesData.map(normalizeVehicleForTracking);
+
+    if (snapshot.source_url && snapshot.source_url !== normalizedSourceUrl) {
+      await supabaseClient
+        .from('tracked_vehicles')
+        .update({ source_url: normalizedSourceUrl })
+        .eq('tenant_id', snapshot.tenant_id)
+        .eq('source_type', 'dealer')
+        .eq('source_url', snapshot.source_url);
+    }
+
     let newCount = 0;
     let updatedCount = 0;
     let soldCount = 0;
@@ -115,7 +205,9 @@ serve(async (req) => {
       .from('tracked_vehicles')
       .select('vin, id')
       .eq('tenant_id', snapshot.tenant_id)
-      .eq('status', 'active');
+      .eq('status', 'active')
+      .eq('source_type', 'dealer')
+      .in('source_url', sourceUrlCandidates);
 
     if (existingError) {
       console.error('Error fetching existing vehicles:', existingError);
@@ -125,53 +217,49 @@ serve(async (req) => {
     const scrapedVINs = new Set<string>();
 
     // Process each vehicle
-    for (const vehicle of vehiclesData) {
+    for (const vehicle of normalizedVehicles) {
       if (!vehicle.vin) continue;
 
-      scrapedVINs.add(vehicle.vin);
+      const listingUrl = vehicle.listing_url || vehicle.url || null;
+      const imageUrl = vehicle.image_url || vehicle.image_urls?.[0] || vehicle.images?.[0] || null;
+      const vin = vehicle.vin;
 
-      if (existingVINs.has(vehicle.vin)) {
-        // Update existing vehicle
-        const { error: updateError } = await supabaseClient
-          .from('tracked_vehicles')
-          .update({
-            price: vehicle.price,
-            mileage: vehicle.mileage,
-            last_seen_at: new Date().toISOString(),
-            image_url: vehicle.image_url || vehicle.image_urls?.[0] || null,
-          })
-          .eq('vin', vehicle.vin)
-          .eq('tenant_id', snapshot.tenant_id);
+      scrapedVINs.add(vin);
 
-        if (!updateError) {
-          updatedCount++;
-        }
-      } else {
-        // Insert new vehicle
-        const { error: insertError } = await supabaseClient
-          .from('tracked_vehicles')
-          .insert({
-            tenant_id: snapshot.tenant_id,
-            source_url: snapshot.source_url,
-            source_type: snapshot.source_type || 'dealer',
-            vin: vehicle.vin,
-            year: vehicle.year,
-            make: vehicle.make,
-            model: vehicle.model,
-            price: vehicle.price,
-            mileage: vehicle.mileage,
-            listing_url: vehicle.listing_url,
-            image_url: vehicle.image_url || vehicle.image_urls?.[0] || null,
-            first_seen_at: vehicle.first_seen_at || new Date().toISOString(),
-            last_seen_at: new Date().toISOString(),
-            status: 'active',
-            listing_date_confidence: vehicle.listing_date_confidence || 'medium',
-            listing_date_source: vehicle.listing_date_source || 'automated_scraper',
-          });
+      const vehicleData: any = {
+        tenant_id: snapshot.tenant_id,
+        source_url: normalizedSourceUrl,
+        source_type: snapshot.source_type || 'dealer',
+        vin,
+        stock_number: vehicle.stock_number || null,
+        year: vehicle.year || null,
+        make: vehicle.make || null,
+        model: vehicle.model || null,
+        trim: vehicle.trim || null,
+        price: vehicle.price ?? null,
+        mileage: vehicle.mileage ?? null,
+        exterior_color: vehicle.color || vehicle.exterior_color || null,
+        listing_url: listingUrl,
+        image_url: imageUrl,
+        last_seen_at: new Date().toISOString(),
+        status: 'active',
+        listing_date_confidence: vehicle.listing_date_confidence || 'medium',
+        listing_date_source: vehicle.listing_date_source || 'automated_scraper',
+      };
 
-        if (!insertError) {
-          newCount++;
-        }
+      if (!existingVINs.has(vin)) {
+        vehicleData.first_seen_at = vehicle.first_seen_at || new Date().toISOString();
+      }
+
+      const { error: upsertError } = await supabaseClient
+        .from('tracked_vehicles')
+        .upsert(vehicleData, {
+          onConflict: 'tenant_id,source_url,vin',
+          ignoreDuplicates: false,
+        });
+
+      if (!upsertError) {
+        if (existingVINs.has(vin)) updatedCount++; else newCount++;
       }
     }
 
@@ -197,7 +285,8 @@ serve(async (req) => {
       .from('inventory_snapshots_unified')
       .update({
         status: 'success',
-        vehicle_count: vehiclesData.length,
+        vehicle_count: normalizedVehicles.length,
+        source_url: normalizedSourceUrl,
       })
       .eq('id', snapshot_id);
 

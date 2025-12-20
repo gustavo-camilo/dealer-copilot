@@ -33,10 +33,22 @@ interface PendingReview {
   source_name: string | null;
   source_url: string | null;
   created_at: string;
+  scanned_at: string | null;
   scraping_duration_ms: number | null;
   tenants?: { name: string };
 }
 
+
+interface ScrapeMonitorRow {
+  id: string;
+  source_type: string;
+  tenant_id: string | null;
+  source_name: string | null;
+  source_url: string | null;
+  vehicle_count: number | null;
+  last_scraped_at: string | null;
+  tenants?: { name: string };
+}
 
 
 interface SupportTicket {
@@ -92,6 +104,10 @@ export default function AdminPage() {
   const [selectedSourceForEdit, setSelectedSourceForEdit] = useState<any>(null);
   const [supportTickets, setSupportTickets] = useState<SupportTicket[]>([]);
   const [supportStatusFilter, setSupportStatusFilter] = useState<'all' | 'open' | 'in_progress' | 'resolved'>('all');
+  const [scrapeMonitorRows, setScrapeMonitorRows] = useState<ScrapeMonitorRow[]>([]);
+  const [scrapeMonitorQuery, setScrapeMonitorQuery] = useState('');
+  const [scrapeMonitorLoading, setScrapeMonitorLoading] = useState(false);
+
 
   const confirmAction = (message: string, confirmLabel = 'Confirm') =>
     new Promise<boolean>((resolve) => {
@@ -151,7 +167,10 @@ export default function AdminPage() {
   useEffect(() => {
     if (activeTab === 'scraping-queue') loadScrapingQueue();
     else if (activeTab === 'history') loadUploadHistory();
-    else if (activeTab === 'reviews') loadPendingReviews();
+    else if (activeTab === 'reviews') {
+      loadPendingReviews();
+      loadScrapeMonitor();
+    }
     else if (activeTab === 'support') loadSupportTickets();
   }, [activeTab]);
 
@@ -228,7 +247,7 @@ export default function AdminPage() {
     try {
       const { data, error } = await supabase
         .from('inventory_snapshots_unified')
-        .select('id, tenant_id, snapshot_date, vehicle_count, status, source_name, source_url, created_at, scraping_duration_ms, tenants (name)')
+        .select('id, tenant_id, snapshot_date, vehicle_count, status, source_name, source_url, created_at, scanned_at, scraping_duration_ms, tenants (name)')
         .eq('status', 'pending_review')
         .order('snapshot_date', { ascending: false });
 
@@ -247,6 +266,60 @@ export default function AdminPage() {
       setPendingReviews(mapped);
     } catch (error) {
       console.error('Error loading pending reviews:', error);
+    }
+  };
+
+
+  const loadScrapeMonitor = async () => {
+    setScrapeMonitorLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('inventory_snapshots_unified')
+        .select('id, tenant_id, source_type, source_name, source_url, vehicle_count, created_at, scanned_at, snapshot_date, tenants (name)')
+        .order('created_at', { ascending: false })
+        .limit(500);
+
+      if (error) throw error;
+
+      const snapshots = data || [];
+      const timestampFor = (item: any) => {
+        if (item.scanned_at) return new Date(item.scanned_at).getTime();
+        if (item.created_at) return new Date(item.created_at).getTime();
+        if (item.snapshot_date) return new Date(`${item.snapshot_date}T00:00:00`).getTime();
+        return 0;
+      };
+
+      snapshots.sort((a: any, b: any) => timestampFor(b) - timestampFor(a));
+
+      const seen = new Set();
+      const rows: ScrapeMonitorRow[] = [];
+
+      for (const item of snapshots) {
+        const key = item.tenant_id ? `dealer:${item.tenant_id}` : `competitor:${item.source_url}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+
+        const tenantName = Array.isArray(item.tenants)
+          ? item.tenants[0]?.name
+          : item.tenants?.name;
+
+        rows.push({
+          id: item.id,
+          source_type: item.source_type,
+          tenant_id: item.tenant_id,
+          source_name: item.source_name,
+          source_url: item.source_url,
+          vehicle_count: item.vehicle_count,
+          last_scraped_at: item.scanned_at || item.created_at || null,
+          tenants: { name: tenantName || 'Unknown' },
+        });
+      }
+
+      setScrapeMonitorRows(rows);
+    } catch (error) {
+      console.error('Error loading scrape monitor:', error);
+    } finally {
+      setScrapeMonitorLoading(false);
     }
   };
 
@@ -456,12 +529,14 @@ export default function AdminPage() {
       if (status === 'success') {
         toast.success(`Scraping complete! Found ${vehiclesFound} vehicles. Review pending.`);
         loadPendingReviews();
+        loadScrapeMonitor();
       } else if (status === 'failed') {
         const errorMsg = data.results?.[0]?.error || 'Unknown error';
         toast.error(`Scraping failed: ${errorMsg}`);
       } else {
         toast.success(`Scraping complete! Found ${vehiclesFound} vehicles. Review pending.`);
         loadPendingReviews();
+        loadScrapeMonitor();
       }
     } catch (error: any) {
       console.error('Scraping error:', error);
@@ -484,6 +559,7 @@ export default function AdminPage() {
 
       toast.success(`Approved! ${data.vehicles_new} new, ${data.vehicles_updated} updated, ${data.vehicles_sold} sold`);
       loadPendingReviews();
+      loadScrapeMonitor();
     } catch (error: any) {
       console.error('Approval error:', error);
       toast.error(`Failed to approve: ${error.message}`);
@@ -503,6 +579,7 @@ export default function AdminPage() {
 
       toast.success('Review rejected');
       loadPendingReviews();
+      loadScrapeMonitor();
     } catch (error: any) {
       console.error('Rejection error:', error);
       toast.error(`Failed to reject: ${error.message}`);
@@ -1117,9 +1194,11 @@ export default function AdminPage() {
                   <div className="space-y-4">
                     {pendingReviews.map((review) => {
                       const displayName = review.source_name || review.tenants?.name || 'Unknown';
-                      const timestamp = review.created_at
-                        ? new Date(review.created_at).toLocaleString()
-                        : new Date(`${review.snapshot_date}T00:00:00`).toLocaleDateString();
+                      const timestamp = review.scanned_at
+                        ? new Date(review.scanned_at).toLocaleString()
+                        : review.created_at
+                          ? new Date(review.created_at).toLocaleString()
+                          : new Date(`${review.snapshot_date}T00:00:00`).toLocaleDateString();
                       const vehiclesFound = review.vehicle_count ?? 0;
                       const durationSeconds = review.scraping_duration_ms !== null && review.scraping_duration_ms !== undefined
                         ? Math.round(review.scraping_duration_ms / 1000)
@@ -1161,6 +1240,77 @@ export default function AdminPage() {
                     })}
                   </div>
                 )}
+
+                <div className="mt-10">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-gray-900">Scrape Monitor</h3>
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="text"
+                        value={scrapeMonitorQuery}
+                        onChange={(e) => setScrapeMonitorQuery(e.target.value)}
+                        placeholder="Search by name or URL"
+                        className="w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-600"
+                      />
+                      <button
+                        onClick={loadScrapeMonitor}
+                        className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                      >
+                        Refresh
+                      </button>
+                    </div>
+                  </div>
+
+                  {scrapeMonitorLoading ? (
+                    <div className="text-sm text-gray-500">Loading scrape monitor...</div>
+                  ) : scrapeMonitorRows.length === 0 ? (
+                    <p className="text-gray-500 text-center py-6">No scrape history found</p>
+                  ) : (
+                    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicles</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Scraped</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-100">
+                          {scrapeMonitorRows
+                            .filter((row) => {
+                              const needle = scrapeMonitorQuery.trim().toLowerCase();
+                              if (!needle) return true;
+                              const displayName = row.source_name || row.tenants?.name || row.source_url || '';
+                              const url = row.source_url || '';
+                              return displayName.toLowerCase().includes(needle) || url.toLowerCase().includes(needle);
+                            })
+                            .map((row) => {
+                              const displayName = row.source_name || row.tenants?.name || 'Unknown';
+                              const vehicles = row.vehicle_count ?? 0;
+                              const timestamp = row.last_scraped_at
+                                ? new Date(row.last_scraped_at).toLocaleString()
+                                : 'N/A';
+                              return (
+                                <tr key={row.id}>
+                                  <td className="px-6 py-4 text-sm text-gray-900">{displayName}</td>
+                                  <td className="px-6 py-4 text-sm">
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${row.source_type === 'dealer' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                                      {row.source_type === 'dealer' ? 'Dealer' : 'Competitor'}
+                                    </span>
+                                  </td>
+                                  <td className="px-6 py-4 text-sm text-gray-600">{row.source_url || 'N/A'}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-900">{vehicles}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-500">{timestamp}</td>
+                                </tr>
+                              );
+                            })}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

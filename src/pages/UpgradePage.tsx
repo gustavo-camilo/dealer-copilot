@@ -1,13 +1,18 @@
 import React from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { Target, Check, TrendingUp, Zap, Crown, Menu, X } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { supabase } from '../lib/supabase';
 import NavigationMenu from '../components/NavigationMenu';
 
 export default function UpgradePage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
   const [menuOpen, setMenuOpen] = React.useState(false);
+  const [checkoutLoading, setCheckoutLoading] = React.useState<string | null>(null);
+  const [checkoutError, setCheckoutError] = React.useState<string | null>(null);
+
+  const currentPlan = tenant?.plan_type || 'free';
 
   const handleSignOut = async () => {
     try {
@@ -18,9 +23,43 @@ export default function UpgradePage() {
     }
   };
 
+  const handleCheckout = async (planType: 'pro' | 'enterprise') => {
+    if (!tenant?.id) {
+      setCheckoutError('Unable to start checkout. Please try again.');
+      return;
+    }
+
+    setCheckoutLoading(planType);
+    setCheckoutError(null);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('create-checkout-session', {
+        body: {
+          tenantId: tenant.id,
+          planType,
+        },
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.url) {
+        throw new Error('Checkout session could not be created.');
+      }
+
+      window.location.href = data.url;
+    } catch (err: any) {
+      setCheckoutError(err.message || 'Failed to start checkout.');
+    } finally {
+      setCheckoutLoading(null);
+    }
+  };
+
   const plans = [
     {
       name: 'Starter',
+      planType: 'free',
       icon: Zap,
       price: 'Free',
       period: '',
@@ -31,11 +70,11 @@ export default function UpgradePage() {
         'Up to 3 competitors',
         'Email support',
       ],
-      current: true,
       color: 'gray',
     },
     {
       name: 'Professional',
+      planType: 'pro',
       icon: TrendingUp,
       price: '$99',
       period: '/month',
@@ -47,12 +86,11 @@ export default function UpgradePage() {
         'Priority support',
         'API access',
       ],
-      current: false,
       color: 'blue',
-      comingSoon: true,
     },
     {
       name: 'Enterprise',
+      planType: 'enterprise',
       icon: Crown,
       price: '$299',
       period: '/month',
@@ -66,9 +104,7 @@ export default function UpgradePage() {
         'Dedicated account manager',
         'White-label options',
       ],
-      current: false,
       color: 'purple',
-      comingSoon: true,
     },
   ];
 
@@ -125,29 +161,37 @@ export default function UpgradePage() {
           </p>
         </div>
 
+        {checkoutError && (
+          <div className="max-w-3xl mx-auto mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+            {checkoutError}
+          </div>
+        )}
+
         {/* Pricing Cards */}
         <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
           {plans.map((plan) => {
             const Icon = plan.icon;
+            const isCurrent = currentPlan === plan.planType;
+            const isLoading = checkoutLoading === plan.planType;
+            const isPaidPlan = plan.planType !== 'free';
+            const isDisabled = isCurrent || isLoading || !isPaidPlan;
+
             return (
               <div
                 key={plan.name}
                 className={`relative bg-white rounded-xl shadow-lg border-2 ${
-                  plan.current
+                  isCurrent
                     ? 'border-green-500'
                     : plan.color === 'purple'
                     ? 'border-purple-500'
+                    : plan.color === 'blue'
+                    ? 'border-blue-500'
                     : 'border-gray-200'
                 } overflow-hidden transition-transform hover:scale-105`}
               >
-                {plan.current && (
+                {isCurrent && (
                   <div className="absolute top-0 right-0 bg-green-500 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
                     Current Plan
-                  </div>
-                )}
-                {plan.comingSoon && (
-                  <div className="absolute top-0 right-0 bg-orange-500 text-white px-3 py-1 text-xs font-semibold rounded-bl-lg">
-                    Coming Soon
                   </div>
                 )}
 
@@ -192,22 +236,29 @@ export default function UpgradePage() {
                   </ul>
 
                   <button
-                    disabled={plan.current || plan.comingSoon}
+                    disabled={isDisabled}
+                    onClick={
+                      isPaidPlan && !isCurrent
+                        ? () => handleCheckout(plan.planType as 'pro' | 'enterprise')
+                        : undefined
+                    }
                     className={`w-full py-3 px-6 rounded-lg font-semibold transition ${
-                      plan.current
+                      isCurrent
                         ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                        : plan.comingSoon
-                        ? 'bg-gray-100 text-gray-600 cursor-not-allowed'
+                        : isLoading
+                        ? 'bg-gray-100 text-gray-600 cursor-wait'
                         : plan.color === 'purple'
                         ? 'bg-purple-600 text-white hover:bg-purple-700'
                         : 'bg-blue-600 text-white hover:bg-blue-700'
                     }`}
                   >
-                    {plan.current
+                    {isCurrent
                       ? 'Current Plan'
-                      : plan.comingSoon
-                      ? 'Coming Soon'
-                      : 'Upgrade Now'}
+                      : isLoading
+                      ? 'Redirecting...'
+                      : isPaidPlan
+                      ? 'Upgrade Now'
+                      : 'Starter Plan'}
                   </button>
                 </div>
               </div>
