@@ -98,6 +98,7 @@ export default function AdminPage() {
   const [selectedTenantForScrape, setSelectedTenantForScrape] = useState('');
   const [scraping, setScraping] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [reviewActionId, setReviewActionId] = useState<string | null>(null);
   const [selectedTenantForEdit, setSelectedTenantForEdit] = useState<Tenant | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editSourceModalOpen, setEditSourceModalOpen] = useState(false);
@@ -118,6 +119,8 @@ export default function AdminPage() {
         resolve(result);
       };
 
+      const toastId = 'admin-confirm-action';
+      toast.dismiss(toastId);
       toast.custom(
         (t) => (
           <div className="max-w-sm w-full bg-white shadow-lg rounded-lg border border-gray-200 p-4">
@@ -144,7 +147,7 @@ export default function AdminPage() {
             </div>
           </div>
         ),
-        { duration: Infinity }
+        { duration: Infinity, id: toastId }
       );
     });
 
@@ -551,6 +554,7 @@ export default function AdminPage() {
     if (!confirmed) return;
 
     try {
+      setReviewActionId(snapshotId);
       const { data, error } = await supabase.functions.invoke('approve-scraping-results', {
         body: { snapshot_id: snapshotId, action: 'approve' },
       });
@@ -563,6 +567,8 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error('Approval error:', error);
       toast.error(`Failed to approve: ${error.message}`);
+    } finally {
+      setReviewActionId(null);
     }
   };
 
@@ -571,6 +577,7 @@ export default function AdminPage() {
     if (!confirmed) return;
 
     try {
+      setReviewActionId(snapshotId);
       const { error } = await supabase.functions.invoke('approve-scraping-results', {
         body: { snapshot_id: snapshotId, action: 'reject' },
       });
@@ -583,6 +590,8 @@ export default function AdminPage() {
     } catch (error: any) {
       console.error('Rejection error:', error);
       toast.error(`Failed to reject: ${error.message}`);
+    } finally {
+      setReviewActionId(null);
     }
   };
 
@@ -662,7 +671,7 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50" aria-busy={scraping}>
       <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
@@ -1223,15 +1232,17 @@ export default function AdminPage() {
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleApproveReview(review.id)}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition"
+                                disabled={reviewActionId === review.id}
+                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
                               >
-                                Approve
+                                {reviewActionId === review.id ? 'Approving...' : 'Approve'}
                               </button>
                               <button
                                 onClick={() => handleRejectReview(review.id)}
-                                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition"
+                                disabled={reviewActionId === review.id}
+                                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
                               >
-                                Reject
+                                {reviewActionId === review.id ? 'Rejecting...' : 'Reject'}
                               </button>
                             </div>
                           </div>
@@ -1387,6 +1398,25 @@ export default function AdminPage() {
           </div>
         )}
       </div>
+      {scraping && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm px-4">
+          <div
+            role="status"
+            aria-live="polite"
+            className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-gray-200 px-5 py-4"
+          >
+            <div className="flex items-center gap-3">
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              </span>
+              <div>
+                <p className="text-sm font-semibold text-gray-900">Scraper running</p>
+                <p className="text-xs text-gray-500">Fetching inventory updates. This can take a minute.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 }

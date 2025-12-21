@@ -58,6 +58,20 @@ function toTitleCase(str: string): string {
   }).join('');
 }
 
+function extractDomain(url: string): string {
+  try {
+    const hasProtocol = /^https?:\/\//i.test(url);
+    const parsed = new URL(hasProtocol ? url : `https://${url}`);
+    return parsed.hostname.replace(/^www\./i, '').toLowerCase();
+  } catch {
+    return url
+      .replace(/^https?:\/\//i, '')
+      .replace(/^www\./i, '')
+      .replace(/\/.*$/, '')
+      .toLowerCase();
+  }
+}
+
 async function enrichVehicleWithVIN(vehicle: ParsedVehicle): Promise<ParsedVehicle> {
   if (!vehicle.vin || vehicle.vin.length !== 17) return vehicle;
   if (vehicle.year && vehicle.make && vehicle.model) return vehicle;
@@ -152,6 +166,7 @@ serve(async (req) => {
 
     // Normalize URL: add https:// if protocol is missing
     const normalizedUrl = url.match(/^https?:\/\//) ? url : `https://${url}`;
+    const cleanDomain = extractDomain(normalizedUrl);
 
     const startTime = Date.now();
     console.log(`🔍 Scanning competitor: ${normalizedUrl} for tenant: ${tenantId}`);
@@ -198,9 +213,9 @@ serve(async (req) => {
         .upsert(
           {
             tenant_id: null, // Global competitor data
-            source_url: normalizedUrl,
+            source_url: cleanDomain,
             source_type: 'competitor',
-            source_name: name || new URL(normalizedUrl).hostname,
+            source_name: name || cleanDomain,
             snapshot_date: new Date().toISOString().split('T')[0],
             scanned_at: new Date().toISOString(),
             vehicle_count: stats.vehicle_count,
@@ -223,11 +238,29 @@ serve(async (req) => {
       if (upsertError) {
         console.error('Failed to update snapshot:', upsertError);
       } else {
-        console.log(`✅ Updated unified snapshot for competitor: ${normalizedUrl}`);
+        console.log(`✅ Updated unified snapshot for competitor: ${cleanDomain}`);
       }
     } catch (snapshotError) {
       console.error('Failed to update snapshot:', snapshotError);
       // Continue even if snapshot update fails
+    }
+
+    // Clear refresh request flags and mark as scraped
+    const { error: registryError } = await supabase
+      .from('source_registry')
+      .update({
+        last_scraped_at: new Date().toISOString(),
+        is_refresh_pending: false,
+        refresh_requested_at: null,
+        refresh_requested_by: null,
+        status: 'active',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('source_url', cleanDomain)
+      .eq('source_type', 'competitor');
+
+    if (registryError) {
+      console.error('Failed to update source_registry:', registryError);
     }
 
     // Previous separate snapshot update removed as it is now handled by the unified upsert above
