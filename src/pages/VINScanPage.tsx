@@ -74,6 +74,7 @@ export default function VINScanPage() {
 
   const handleCancelNavigation = () => {
     if (blocker.state === 'blocked') {
+      setIsEditingCosts(false);
       blocker.reset?.();
     }
   };
@@ -354,14 +355,21 @@ export default function VINScanPage() {
           isOpen={blocker.state === 'blocked'}
           onConfirm={handleConfirmNavigation}
           onCancel={handleCancelNavigation}
+          confirmLabel="Leave & Discard"
+          cancelLabel="Save and Stay"
         />
 
         {/* Discard Changes Warning Dialog (for clicks and resets) */}
         <ConfirmationDialog
           isOpen={pendingReset}
           onConfirm={resetScan}
-          onCancel={() => setPendingReset(false)}
-          message="You have unsaved changes. Any progress will be lost. Do you want to continue?"
+          onCancel={() => {
+            setIsEditingCosts(false);
+            setPendingReset(false);
+          }}
+          confirmLabel="Discard & Scan Another"
+          cancelLabel="Save and Stay"
+          message="You have unsaved changes in the profit calculator. How would you like to proceed?"
         />
       </div>
     );

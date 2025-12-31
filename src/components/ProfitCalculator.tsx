@@ -23,6 +23,7 @@ export interface ProfitCalculatorProps {
   onEditStatusChange?: (isEditing: boolean) => void;
   onOutsideClick?: () => void;
   isSaving?: boolean;
+  isEditing?: boolean;
 }
 
 export default function ProfitCalculator({
@@ -35,14 +36,22 @@ export default function ProfitCalculator({
   onEditStatusChange,
   onOutsideClick,
   isSaving = false,
+  isEditing: isEditingProp,
 }: ProfitCalculatorProps) {
   const [maxBid, setMaxBid] = useState(maxBidSuggestion);
   const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(null);
   const [reconCost, setReconCost] = useState(defaultRecon);
   const [transportCost, setTransportCost] = useState(defaultTransport);
   const [marketPrice, setMarketPrice] = useState(defaultMarketPrice);
-  const [isEditing, setIsEditing] = useState(false);
+  const [isEditing, setIsEditing] = useState(isEditingProp || false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  // Sync isEditing with prop
+  useEffect(() => {
+    if (isEditingProp !== undefined) {
+      setIsEditing(isEditingProp);
+    }
+  }, [isEditingProp]);
 
   // Notify parent of isEditing change
   useEffect(() => {

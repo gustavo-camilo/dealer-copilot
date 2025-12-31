@@ -6,6 +6,8 @@ interface ConfirmationDialogProps {
     onCancel: () => void;
     title?: string;
     message?: string;
+    confirmLabel?: string;
+    cancelLabel?: string;
 }
 
 export default function ConfirmationDialog({
@@ -14,6 +16,8 @@ export default function ConfirmationDialog({
     onCancel,
     title = 'Unsaved Changes',
     message = 'You have unsaved changes in the profit calculator. Are you sure you want to leave?',
+    confirmLabel = 'Leave & Discard',
+    cancelLabel = 'Stay on Page',
 }: ConfirmationDialogProps) {
     if (!isOpen) return null;
 
@@ -35,13 +39,13 @@ export default function ConfirmationDialog({
                             onClick={onCancel}
                             className="px-4 py-2 text-sm font-semibold text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition"
                         >
-                            Stay on Page
+                            {cancelLabel}
                         </button>
                         <button
                             onClick={onConfirm}
                             className="px-4 py-2 text-sm font-semibold text-white bg-blue-900 rounded-lg hover:bg-blue-800 transition"
                         >
-                            Leave & Discard
+                            {confirmLabel}
                         </button>
                     </div>
                 </div>

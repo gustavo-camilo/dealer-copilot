@@ -521,8 +521,13 @@ export default function RecommendationsPage() {
         <ConfirmationDialog
           isOpen={showConfirmDialog}
           onConfirm={confirmCloseModal}
-          onCancel={() => setShowConfirmDialog(false)}
-          message="You have unsaved changes in the profit calculator. Are you sure you want to leave?"
+          onCancel={() => {
+            setIsEditingCosts(false);
+            setShowConfirmDialog(false);
+          }}
+          confirmLabel="Discard & Leave"
+          cancelLabel="Save and Stay"
+          message="You have unsaved changes in the profit calculator. How would you like to proceed?"
         />
       </div>
     </div>

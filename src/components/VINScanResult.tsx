@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
 import { VehicleCommentSection } from './VehicleCommentSection';
@@ -186,26 +186,27 @@ export default function VINScanResult({
                                 {currentRecommendation === 'pass' && '🔴 Pass'}
                             </div>
 
-                            {/* Manual Override Controls */}
-                            <div className="flex gap-1">
-                                <button
-                                    onClick={() => handleUpdateRecommendation('buy')}
-                                    className={`text-[10px] px-2 py-1 rounded border transition ${currentRecommendation === 'buy' ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                            {/* Manual Override Dropdown */}
+                            <div className="relative inline-block w-32">
+                                <select
+                                    value={currentRecommendation || ''}
+                                    onChange={(e) => handleUpdateRecommendation(e.target.value as 'buy' | 'caution' | 'pass')}
+                                    disabled={isSaving}
+                                    className={`appearance-none w-full text-[11px] px-3 py-1.5 rounded-lg border shadow-sm transition-all focus:ring-2 focus:ring-blue-500 cursor-pointer pr-8 font-medium
+                                        ${currentRecommendation === 'buy' ? 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100' :
+                                            currentRecommendation === 'caution' ? 'bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100' :
+                                                'bg-red-50 border-red-200 text-red-800 hover:bg-red-100'}`}
                                 >
-                                    Buy
-                                </button>
-                                <button
-                                    onClick={() => handleUpdateRecommendation('caution')}
-                                    className={`text-[10px] px-2 py-1 rounded border transition ${currentRecommendation === 'caution' ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                                >
-                                    Caution
-                                </button>
-                                <button
-                                    onClick={() => handleUpdateRecommendation('pass')}
-                                    className={`text-[10px] px-2 py-1 rounded border transition ${currentRecommendation === 'pass' ? 'bg-red-600 border-red-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
-                                >
-                                    Pass
-                                </button>
+                                    <option value="buy" className="bg-white text-green-800 font-medium">Buy</option>
+                                    <option value="caution" className="bg-white text-yellow-800 font-medium">Caution</option>
+                                    <option value="pass" className="bg-white text-red-800 font-medium">Pass</option>
+                                </select>
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
+                                    <ChevronDownIcon className={`h-3 w-3 ${currentRecommendation === 'buy' ? 'text-green-600' :
+                                            currentRecommendation === 'caution' ? 'text-yellow-600' :
+                                                'text-red-600'
+                                        }`} />
+                                </div>
                             </div>
                         </div>
                     </div>
