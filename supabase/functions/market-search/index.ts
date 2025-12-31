@@ -13,6 +13,7 @@ serve(async (req) => {
 
     try {
         const { year, make, model, zip, radius, mileage, start, rows } = await req.json()
+        console.log(`Market Search Request: ${year} ${make} ${model} in ${zip} with radius ${radius}`)
 
         const API_KEY = Deno.env.get('MARKETCHECK_API_KEY')
         if (!API_KEY) {
@@ -25,7 +26,7 @@ serve(async (req) => {
 
         const params = new URLSearchParams({
             api_key: API_KEY,
-            year: year ? `${year - 1}-${year + 1}` : '',
+            year: year ? `${year - 2}-${year + 2}` : '',
             make: make || '',
             model: model || '',
             radius: (radius || 100).toString(),
@@ -37,11 +38,12 @@ serve(async (req) => {
 
         // Add mileage range if provided (+/- 10k miles)
         if (mileage) {
-            const minMiles = Math.max(0, mileage - 10000)
-            const maxMiles = mileage + 10000
+            const minMiles = Math.max(0, mileage - 25000)
+            const maxMiles = mileage + 25000
             params.append('miles_range', `${minMiles}-${maxMiles}`)
         }
 
+        console.log(`Calling Marketcheck API with params: ${params.toString()}`)
         const response = await fetch(`https://api.marketcheck.com/v2/search/car/active?${params.toString()}`)
 
         if (!response.ok) {

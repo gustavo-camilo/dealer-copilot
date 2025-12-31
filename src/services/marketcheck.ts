@@ -73,7 +73,17 @@ export function processMarketcheckData(
     const listings = data.listings.filter(l => l.price > 0); // Filter out zero price
 
     if (listings.length === 0) {
-        throw new Error('No valid listings found');
+        return {
+            averagePrice: 0,
+            minPrice: 0,
+            maxPrice: 0,
+            medianPrice: 0,
+            listingsCount: 0,
+            listings: [],
+            confidence: 0,
+            dataSource: 'marketcheck',
+            radius: data.radius
+        };
     }
 
     const prices = listings.map(l => l.price);

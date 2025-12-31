@@ -3,11 +3,13 @@ import { Link, useNavigate, useBlocker } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Target, Loader2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { decodeVIN, enrichDecodedData } from '../services/vinDecoder';
 import { getMarketPricing, calculateMaxBid } from '../services/marketPricing';
 import { generateRecommendation } from '../services/recommendationEngine';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import { SalesRecord, TenantCostSettings } from '../types/database';
 
 // Default cost settings if tenant hasn't configured them
@@ -34,6 +36,17 @@ export default function VINScanPage() {
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditingCosts, setIsEditingCosts] = useState(false);
+  const [pendingReset, setPendingReset] = useState(false);
+
+  const resetScan = () => {
+    setResult(null);
+    setVin('');
+    setMileage('');
+    setError(null);
+    setMenuOpen(false);
+    setIsEditingCosts(false);
+    setPendingReset(false);
+  };
 
   // Handle browser refresh/close
   useEffect(() => {
@@ -53,18 +66,17 @@ export default function VINScanPage() {
       isEditingCosts && currentLocation.pathname !== nextLocation.pathname
   );
 
-  useEffect(() => {
+  const handleConfirmNavigation = () => {
     if (blocker.state === 'blocked') {
-      const proceed = window.confirm(
-        'You have unsaved changes in the profit calculator. Are you sure you want to leave?'
-      );
-      if (proceed) {
-        blocker.proceed?.();
-      } else {
-        blocker.reset?.();
-      }
+      blocker.proceed?.();
     }
-  }, [blocker]);
+  };
+
+  const handleCancelNavigation = () => {
+    if (blocker.state === 'blocked') {
+      blocker.reset?.();
+    }
+  };
 
   const costSettings = tenant?.cost_settings || DEFAULT_COST_SETTINGS;
 
@@ -244,6 +256,19 @@ export default function VINScanPage() {
         costSettings.target_margin_percent
       );
 
+      // If expansion returns NO results but we ALREADY HAD results, 
+      // something probably went wrong with the wider search (API limit or error).
+      // We should keep the previous results instead of showing nothing.
+      if ((!marketData || marketData.listingsCount === 0) && result.market_data?.listingsCount > 0) {
+        toast.error(`No additional vehicles found within ${radius} miles. Keeping previous results.`);
+        setResult({
+          ...result,
+          radius: radius, // Mark as expanded so we don't ask again
+        });
+        setLoading(false);
+        return;
+      }
+
       // Update result with new market data
       setResult({
         ...result,
@@ -290,15 +315,10 @@ export default function VINScanPage() {
           setMenuOpen={setMenuOpen}
           onScanVinClick={() => {
             if (isEditingCosts) {
-              const proceed = window.confirm('You have unsaved changes. Are you sure you want to restart the scan?');
-              if (!proceed) return;
+              setPendingReset(true);
+            } else {
+              resetScan();
             }
-            setResult(null);
-            setVin('');
-            setMileage('');
-            setError(null);
-            setMenuOpen(false);
-            setIsEditingCosts(false);
           }}
         />
 
@@ -326,6 +346,22 @@ export default function VINScanPage() {
             setIsEditingCosts(false);
           }}
           onEditStatusChange={setIsEditingCosts}
+          onOutsideClick={() => setPendingReset(true)}
+        />
+
+        {/* Navigation Warning Dialog */}
+        <ConfirmationDialog
+          isOpen={blocker.state === 'blocked'}
+          onConfirm={handleConfirmNavigation}
+          onCancel={handleCancelNavigation}
+        />
+
+        {/* Discard Changes Warning Dialog (for clicks and resets) */}
+        <ConfirmationDialog
+          isOpen={pendingReset}
+          onConfirm={resetScan}
+          onCancel={() => setPendingReset(false)}
+          message="You have unsaved changes. Any progress will be lost. Do you want to continue?"
         />
       </div>
     );
@@ -342,15 +378,10 @@ export default function VINScanPage() {
         setMenuOpen={setMenuOpen}
         onScanVinClick={() => {
           if (isEditingCosts) {
-            const proceed = window.confirm('You have unsaved changes. Are you sure you want to restart the scan?');
-            if (!proceed) return;
+            setPendingReset(true);
+          } else {
+            resetScan();
           }
-          setResult(null);
-          setVin('');
-          setMileage('');
-          setError(null);
-          setMenuOpen(false);
-          setIsEditingCosts(false);
         }}
       />
 

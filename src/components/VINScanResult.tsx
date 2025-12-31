@@ -52,6 +52,7 @@ interface VINScanResultProps {
     tenantZipCode?: string | null;
     onRescan?: (radius: number) => Promise<void>; // NEW: Handler for expanding search
     onEditStatusChange?: (isEditing: boolean) => void;
+    onOutsideClick?: () => void;
 }
 
 export default function VINScanResult({
@@ -63,6 +64,7 @@ export default function VINScanResult({
     tenantZipCode,
     onRescan,
     onEditStatusChange,
+    onOutsideClick,
 }: VINScanResultProps) {
     const { user } = useAuth();
     const [reportLoading, setReportLoading] = useState(false);
@@ -352,6 +354,7 @@ export default function VINScanResult({
                         }
                     }}
                     onEditStatusChange={onEditStatusChange}
+                    onOutsideClick={onOutsideClick}
                 />
 
                 {/* Match Reasoning - Moved to bottom with collapsible */}

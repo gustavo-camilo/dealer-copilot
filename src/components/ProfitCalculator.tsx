@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
 import { Edit2 } from 'lucide-react';
-import toast from 'react-hot-toast';
 
 import { AuctionFeeThreshold } from '../types/database';
 import { calculateAuctionFee } from '../services/marketPricing';
@@ -22,6 +21,7 @@ export interface ProfitCalculatorProps {
     costsEdited: boolean;
   }) => void;
   onEditStatusChange?: (isEditing: boolean) => void;
+  onOutsideClick?: () => void;
 }
 
 export default function ProfitCalculator({
@@ -32,6 +32,7 @@ export default function ProfitCalculator({
   defaultTransport,
   onCostsChange,
   onEditStatusChange,
+  onOutsideClick,
 }: ProfitCalculatorProps) {
   const [maxBid, setMaxBid] = useState(maxBidSuggestion);
   const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(null);
@@ -52,10 +53,9 @@ export default function ProfitCalculator({
   useEffect(() => {
     const handleClickAway = (event: MouseEvent) => {
       if (isEditing && containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        toast('Please save your edits before continuing.', {
-          icon: '⚠️',
-          id: 'unsaved-costs-warning',
-        });
+        if (onOutsideClick) {
+          onOutsideClick();
+        }
       }
     };
 
@@ -155,21 +155,19 @@ export default function ProfitCalculator({
 
         {/* Auction Fee */}
         <div className="flex justify-between items-center text-sm">
-          <div className="flex items-center gap-2">
-            <span className="text-gray-600">+ Auction Fee</span>
-            {isEditing && (
-              <input
-                type="number"
-                value={customAuctionFee !== null ? customAuctionFee : calculatedAuctionFee}
-                onChange={(e) => setCustomAuctionFee(Number(e.target.value))}
-                className="w-24 px-2 py-1 border border-gray-300 rounded text-right text-xs"
-                placeholder="Custom Fee"
-              />
-            )}
-          </div>
-          {!isEditing && <span className="font-medium">${auctionFee.toLocaleString()}</span>}
+          <span className="text-gray-600">+ Auction Fee</span>
+          {isEditing ? (
+            <input
+              type="number"
+              value={customAuctionFee !== null ? customAuctionFee : calculatedAuctionFee}
+              onChange={(e) => setCustomAuctionFee(Number(e.target.value))}
+              className="w-24 px-3 py-1 border border-gray-300 rounded text-right"
+              placeholder="Custom Fee"
+            />
+          ) : (
+            <span className="font-medium">${auctionFee.toLocaleString()}</span>
+          )}
         </div>
-
         {/* Recon Cost */}
         <div className="flex justify-between items-center text-sm">
           <span className="text-gray-600">+ Recon/Detail</span>
