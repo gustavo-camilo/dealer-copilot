@@ -86,12 +86,35 @@ export default function DashboardPage() {
     if (!user?.tenant_id) return;
 
     try {
-      // Load vehicles from tracked_vehicles
-      const { data: vehicles } = await supabase
-        .from('tracked_vehicles')
-        .select('*')
+      // Load vehicles: First get sources, then get vehicles (Centralized Model)
+      const { data: sources } = await supabase
+        .from('tenant_sources')
+        .select('source_id')
         .eq('tenant_id', user.tenant_id)
-        .eq('status', 'active');
+        .eq('relationship_type', 'owner');
+
+      const sourceIds = sources?.map(s => s.source_id) || [];
+
+      let vehicles: any[] = [];
+
+      if (sourceIds.length > 0) {
+        const { data: sourcedVehicles } = await supabase
+          .from('tracked_vehicles')
+          .select('*')
+          .in('source_id', sourceIds)
+          .eq('status', 'active');
+
+        vehicles = sourcedVehicles || [];
+      } else {
+        // Fallback for legacy/unmigrated data (Empty sources but might have direct tenant_id rows)
+        const { data: legacyVehicles } = await supabase
+          .from('tracked_vehicles')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .eq('status', 'active');
+
+        vehicles = legacyVehicles || [];
+      }
 
       // Load recent sales
       const { data: recentSales } = await supabase

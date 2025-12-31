@@ -466,6 +466,61 @@ serve(async (req) => {
 
         // Create or update today's snapshot without relying on a unique constraint
         const snapshotDate = new Date().toISOString().split('T')[0];
+
+        // RESOLVE SOURCE ID (Migration Logic)
+        let source_id: string | null = null;
+
+        // Check if we have a linked source for this tenant (owner)
+        const { data: tenantSourceLink } = await supabase
+          .from('tenant_sources')
+          .select('source_id')
+          .eq('tenant_id', tenant.id)
+          .eq('relationship_type', 'owner')
+          .maybeSingle();
+
+        if (tenantSourceLink) {
+          source_id = tenantSourceLink.source_id;
+        } else {
+          // Fallback: Check source registry directly by URL
+          const { data: sourceRegistryEntry } = await supabase
+            .from('source_registry')
+            .select('id')
+            .eq('source_url', normalizedSourceUrl)
+            .maybeSingle();
+
+          if (sourceRegistryEntry) {
+            source_id = sourceRegistryEntry.id;
+            // Auto-link if missed (Identity Adoption)
+            await supabase.from('tenant_sources').insert({
+              tenant_id: tenant.id,
+              source_id: source_id,
+              relationship_type: 'owner'
+            }).maybeSingle();
+          } else {
+            // Create new source registry entry if it doesn't exist
+            const { data: newSource } = await supabase
+              .from('source_registry')
+              .insert({
+                source_url: normalizedSourceUrl,
+                source_type: 'dealer',
+                source_name: tenant.name,
+                scraping_enabled: true
+              })
+              .select('id')
+              .single();
+
+            if (newSource) {
+              source_id = newSource.id;
+              // Link tenant
+              await supabase.from('tenant_sources').insert({
+                tenant_id: tenant.id,
+                source_id: source_id,
+                relationship_type: 'owner'
+              }).maybeSingle();
+            }
+          }
+        }
+
         const { data: existingSnapshot, error: existingSnapshotError } = await supabase
           .from('inventory_snapshots_unified')
           .select('id')
@@ -484,6 +539,7 @@ serve(async (req) => {
           const { data: updatedSnapshot, error: updateError } = await supabase
             .from('inventory_snapshots_unified')
             .update({
+              source_id: source_id, // NEW
               source_url: normalizedSourceUrl,
               source_type: 'dealer',
               source_name: tenant.name,
@@ -506,6 +562,7 @@ serve(async (req) => {
             .from('inventory_snapshots_unified')
             .insert({
               tenant_id: tenant.id,
+              source_id: source_id, // NEW
               source_url: normalizedSourceUrl,
               source_type: 'dealer',
               source_name: tenant.name,
@@ -695,12 +752,14 @@ serve(async (req) => {
           console.log(`Preview: ${newVehicles} new, ${updatedVehicles} updated, ${soldVehicles} sold`);
         } else {
           // Normal mode - process vehicles and update database immediately
+          // Normal mode - process vehicles and update database immediately
           const result = await processVehicles(
             supabase,
             tenant.id,
             normalizedVehicles,
             sitemapCache,
-            normalizedSourceUrl
+            normalizedSourceUrl,
+            source_id // NEW
           );
           newVehicles = result.newVehicles;
           updatedVehicles = result.updatedVehicles;
@@ -821,7 +880,8 @@ async function processVehicles(
   tenant_id: string,
   vehicles: any[],
   sitemapCache: SitemapCache = {},
-  website_url: string
+  website_url: string,
+  source_id: string | null = null // NEW
 ): Promise<{ newVehicles: number; updatedVehicles: number; soldVehicles: number }> {
   let newVehicles = 0;
   let updatedVehicles = 0;
@@ -872,15 +932,22 @@ async function processVehicles(
       }
     }
 
-    // Check if vehicle exists in history (by VIN or generated identifier)
-    const { data: existing } = await supabase
+    // Check if vehicle exists in history (by source_id OR tenant_id for backward compat)
+    // We prioritize source_id lookup
+    let query = supabase
       .from('tracked_vehicles')
       .select('*')
-      .eq('tenant_id', tenant_id)
       .eq('source_type', 'dealer')
       .eq('vin', identifier)
-      .eq('status', 'active')
-      .single();
+      .eq('status', 'active');
+
+    if (source_id) {
+      query = query.eq('source_id', source_id);
+    } else {
+      query = query.eq('tenant_id', tenant_id);
+    }
+
+    const { data: existing } = await query.maybeSingle();
 
     if (!existing) {
       // New vehicle - Try to get actual listing date
@@ -898,7 +965,8 @@ async function processVehicles(
 
       // Insert new vehicle with extracted listing date
       await supabase.from('tracked_vehicles').insert({
-        tenant_id,
+        tenant_id: tenant_id, // Keep for now for backward compat (or null if fully migrated)
+        source_id: source_id, // NEW
         source_url: website_url,
         source_type: 'dealer',
         vin: identifier, // Use identifier (real VIN or generated)
@@ -1008,13 +1076,20 @@ async function processVehicles(
   const twoDaysAgo = new Date();
   twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
 
-  const { data: potentiallySold } = await supabase
+  let soldQuery = supabase
     .from('tracked_vehicles')
     .select('*')
-    .eq('tenant_id', tenant_id)
     .eq('source_type', 'dealer')
     .eq('status', 'active')
     .lt('last_seen_at', twoDaysAgo.toISOString());
+
+  if (source_id) {
+    soldQuery = soldQuery.eq('source_id', source_id);
+  } else {
+    soldQuery = soldQuery.eq('tenant_id', tenant_id);
+  }
+
+  const { data: potentiallySold } = await soldQuery;
 
   let soldVehicles = 0;
 

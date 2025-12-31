@@ -125,33 +125,76 @@ export default function ManageInventoryPage() {
     try {
       setLoading(true);
 
-      // Check if inventory is still being processed
-      if (tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing') {
-        setLoading(false);
-        return; // Don't try to load vehicles
+      // Load vehicles: First get sources, then get vehicles (Centralized Model)
+      const { data: sources } = await supabase
+        .from('tenant_sources')
+        .select('source_id')
+        .eq('tenant_id', user.tenant_id)
+        .eq('relationship_type', 'owner');
+
+      const sourceIds = sources?.map(s => s.source_id) || [];
+
+      let data: any[] = [];
+
+      if (sourceIds.length > 0) {
+        const { data: sourcedVehicles, error } = await supabase
+          .from('tracked_vehicles')
+          .select('*')
+          .in('source_id', sourceIds)
+          .order('last_seen_at', { ascending: false });
+
+        if (error) throw error;
+        data = sourcedVehicles || [];
+      } else {
+        // Fallback for legacy/unmigrated data
+        const { data: legacyVehicles, error } = await supabase
+          .from('tracked_vehicles')
+          .select('*')
+          .eq('tenant_id', user.tenant_id)
+          .order('last_seen_at', { ascending: false });
+
+        if (error) throw error;
+        data = legacyVehicles || [];
       }
 
-      const { data, error } = await supabase
-        .from('vehicle_history')
+      // 2. Fetch Overrides (Private Data)
+      const { data: overrides } = await supabase
+        .from('tenant_vehicle_overrides')
         .select('*')
-        .eq('tenant_id', user.tenant_id)
-        .order('last_seen_at', { ascending: false });
+        .eq('tenant_id', user.tenant_id);
 
-      if (error) throw error;
+      // Map overrides by vehicle_id for easy lookup
+      const overrideMap = new Map((overrides || []).map(o => [o.vehicle_id, o]));
 
       if (data) {
-        setVehicles(data);
+        // Merge overrides and filter out deleted/hidden vehicles
+        const mergedVehicles = data
+          .map(v => {
+            const override = overrideMap.get(v.id);
+            if (override?.floor_plan_status === 'deleted') return null; // Filter out
+
+            return {
+              ...v,
+              // Check if we need to apply overrides (e.g. custom price)
+              price: override?.custom_price || v.price,
+              // Add other override fields if needed
+              notes: override?.notes
+            };
+          })
+          .filter(Boolean) as Vehicle[]; // Remove nulls
+
+        setVehicles(mergedVehicles);
 
         // Calculate stats
-        const active = data.filter((v) => v.status === 'active').length;
-        const sold = data.filter((v) => v.status === 'sold').length;
-        const totalValue = data
-          .filter((v) => v.status === 'active')
-          .reduce((sum, v) => sum + v.price, 0);
+        const active = mergedVehicles.filter((v: Vehicle) => v.status === 'active').length;
+        const sold = mergedVehicles.filter((v: Vehicle) => v.status === 'sold').length;
+        const totalValue = mergedVehicles
+          .filter((v: Vehicle) => v.status === 'active')
+          .reduce((sum: number, v: Vehicle) => sum + v.price, 0);
         const avgPrice = active > 0 ? totalValue / active : 0;
 
         setStats({
-          total: data.length,
+          total: mergedVehicles.length,
           active,
           sold,
           avgPrice,
@@ -203,28 +246,27 @@ export default function ManageInventoryPage() {
 
     const updatePromise = new Promise(async (resolve, reject) => {
       try {
-        // Update tenant inventory_status to 'pending'
-        const { error: tenantError } = await supabase
+        // 1. Get linked source
+        const { data: sourceLink } = await supabase
+          .from('tenant_sources')
+          .select('source_id')
+          .eq('tenant_id', user.tenant_id)
+          .eq('relationship_type', 'owner')
+          .single();
+
+        if (!sourceLink) throw new Error('No linked website found.');
+
+        // 2. Trigger Scrape via RPC (Secure)
+        const { error: rpcError } = await supabase
+          .rpc('request_source_scan', { p_source_id: sourceLink.source_id });
+
+        if (rpcError) throw rpcError;
+
+        // 3. Update tenant status for UI feedback
+        await supabase
           .from('tenants')
           .update({ inventory_status: 'pending' })
           .eq('id', user.tenant_id);
-
-        if (tenantError) throw tenantError;
-
-        // Insert or update scraping_waiting_list entry
-        const { error: waitingListError } = await supabase
-          .from('scraping_waiting_list')
-          .upsert({
-            tenant_id: user.tenant_id,
-            website_url: tenant.website_url || '',
-            status: 'pending',
-            priority: 1,
-            requested_at: new Date().toISOString(),
-          }, {
-            onConflict: 'tenant_id'
-          });
-
-        if (waitingListError) throw waitingListError;
 
         resolve('Update requested');
       } catch (error) {
@@ -237,7 +279,7 @@ export default function ManageInventoryPage() {
       updatePromise,
       {
         loading: 'Requesting inventory update...',
-        success: 'Inventory update requested! Your inventory will be refreshed within 2-4 hours.',
+        success: 'Inventory update requested! Your inventory will be refreshed shortly.',
         error: (err) => `Failed to request update: ${err.message || 'Unknown error'}`,
       }
     );
@@ -252,11 +294,16 @@ export default function ManageInventoryPage() {
       }
 
       try {
+        // Soft Delete via Overrides (Centralized Model)
         const { error } = await supabase
-          .from('vehicle_history')
-          .delete()
-          .eq('id', vehicleId)
-          .eq('tenant_id', user.tenant_id);
+          .from('tenant_vehicle_overrides')
+          .upsert({
+            tenant_id: user.tenant_id,
+            vehicle_id: vehicleId,
+            floor_plan_status: 'deleted' // Using this field as a hide flag for now
+          }, {
+            onConflict: 'tenant_id,vehicle_id'
+          });
 
         if (error) throw error;
 

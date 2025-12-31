@@ -47,10 +47,18 @@ serve(async (req) => {
         const assignee = url.searchParams.get('assignee');
 
         let query = supabaseClient
-            .from('scraping_queue_view')
-            .select('*')
+            .from('source_registry')
+            .select(`
+                *,
+                tenant_sources (
+                    tenant_id,
+                    tenants (
+                        name
+                    )
+                )
+            `)
             .order('priority', { ascending: false })
-            .order('requested_at', { ascending: true });
+            .order('next_scheduled_scrape', { ascending: true });
 
         if (status && status !== 'all') {
             query = query.eq('status', status);
@@ -72,8 +80,23 @@ serve(async (req) => {
 
         if (error) throw error;
 
+        // Map response to match frontend expectations (Adapter Pattern)
+        const queue = (data || []).map((item: any) => {
+            // Extract tenant name from the nested relationship
+            const tenantName = item.tenant_sources && item.tenant_sources.length > 0
+                ? item.tenant_sources[0].tenants?.name
+                : 'System';
+
+            return {
+                ...item,
+                tenant_name: tenantName,
+                website_url: item.source_url, // Alias for backward compatibility
+                requested_at: item.created_at, // Use created_at as requested_at
+            };
+        });
+
         return new Response(
-            JSON.stringify({ success: true, queue: data }),
+            JSON.stringify({ success: true, queue }),
             { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
 
