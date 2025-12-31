@@ -45,6 +45,10 @@ interface VINScanResultProps {
         max_bid_suggestion: number | null;
         estimated_days_to_sale?: number | null;
         radius?: number; // The radius used for the search
+        custom_recon_cost?: number | null;
+        custom_transport_cost?: number | null;
+        custom_max_bid?: number | null;
+        custom_market_price?: number | null;
     };
     onClose?: () => void;
     onScanAnother?: () => void;
@@ -54,6 +58,7 @@ interface VINScanResultProps {
     onRescan?: (radius: number) => Promise<void>; // NEW: Handler for expanding search
     onEditStatusChange?: (isEditing: boolean) => void;
     onOutsideClick?: () => void;
+    isEditing?: boolean;
 }
 
 const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(({
@@ -66,6 +71,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     onRescan,
     onEditStatusChange,
     onOutsideClick,
+    isEditing = false,
 }, ref) => {
     const { user } = useAuth();
     const calculatorRef = useRef<{ save: () => void }>(null);
@@ -214,7 +220,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                             currentRecommendation === 'caution' ? 'bg-yellow-100 border-yellow-200 text-yellow-800 hover:bg-yellow-200' :
                                                 'bg-red-100 border-red-200 text-red-800 hover:bg-red-200'}`}
                                 >
-                                    <option value="buy" className="bg-white text-green-800">🟢 Strong Buy</option>
+                                    <option value="buy" className="bg-white text-green-800">🟢 Buy</option>
                                     <option value="caution" className="bg-white text-yellow-800">🟡 Caution</option>
                                     <option value="pass" className="bg-white text-red-800">🔴 Pass</option>
                                 </select>
@@ -271,8 +277,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                             <h4 className="font-semibold text-blue-900 mb-2">📊 Market Context</h4>
                             <div className="text-sm text-blue-800 space-y-1">
                                 <p>
-                                    • Average Market Price: ${scanData.market_data.averagePrice.toLocaleString()} (
-                                    {scanData.market_data.dataSource === 'estimated' ? 'estimated' : 'from real listings'})
+                                    • Average Market Price: ${scanData.market_data.averagePrice.toLocaleString()} {scanData.market_data.dataSource === 'estimated' ? '(estimated)' : ''}
                                 </p>
                                 <p>
                                     • Price Range: ${scanData.market_data.minPrice.toLocaleString()} - $
@@ -408,6 +413,10 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     ref={calculatorRef}
                     maxBidSuggestion={scanData.max_bid_suggestion || 0}
                     marketPrice={scanData.market_data?.averagePrice || 0}
+                    initialMaxBid={scanData.custom_max_bid || undefined}
+                    initialRecon={scanData.custom_recon_cost || undefined}
+                    initialTransport={scanData.custom_transport_cost || undefined}
+                    initialMarketPrice={scanData.custom_market_price || undefined}
                     auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
                     defaultRecon={defaultCostSettings.reconditioning_cost}
                     defaultTransport={defaultCostSettings.transport_cost}
@@ -418,6 +427,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     onEditStatusChange={onEditStatusChange}
                     onOutsideClick={onOutsideClick}
                     isSaving={isSaving}
+                    isEditing={isEditing}
                 />
 
                 {/* Match Reasoning - Moved to bottom with collapsible */}

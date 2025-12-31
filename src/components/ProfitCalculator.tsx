@@ -7,10 +7,14 @@ import { calculateAuctionFee } from '../services/marketPricing';
 export interface ProfitCalculatorProps {
   maxBidSuggestion: number;
   marketPrice: number;
+  initialMaxBid?: number;
+  initialRecon?: number;
+  initialTransport?: number;
+  initialMarketPrice?: number;
   auctionFeeThresholds: AuctionFeeThreshold[];
   defaultRecon: number;
   defaultTransport: number;
-  onCostsChange?: (costs: {
+  onCostsChange: (costs: {
     auctionFee: number;
     recon: number;
     transport: number;
@@ -33,8 +37,12 @@ export interface ProfitCalculatorProps {
 }
 
 const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>(({
-  maxBidSuggestion,
+  maxBidSuggestion: defaultMaxBid,
   marketPrice: defaultMarketPrice,
+  initialMaxBid,
+  initialRecon,
+  initialTransport,
+  initialMarketPrice,
   auctionFeeThresholds,
   defaultRecon,
   defaultTransport,
@@ -45,11 +53,11 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
   isSaving = false,
   isEditing: isEditingProp,
 }, ref) => {
-  const [maxBid, setMaxBid] = useState(maxBidSuggestion);
+  const [maxBid, setMaxBid] = useState(initialMaxBid !== undefined ? initialMaxBid : defaultMaxBid);
   const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(null);
-  const [reconCost, setReconCost] = useState(defaultRecon);
-  const [transportCost, setTransportCost] = useState(defaultTransport);
-  const [marketPrice, setMarketPrice] = useState(defaultMarketPrice);
+  const [reconCost, setReconCost] = useState(initialRecon !== undefined ? initialRecon : defaultRecon);
+  const [transportCost, setTransportCost] = useState(initialTransport !== undefined ? initialTransport : defaultTransport);
+  const [marketPrice, setMarketPrice] = useState(initialMarketPrice !== undefined ? initialMarketPrice : defaultMarketPrice);
   const [isEditing, setIsEditing] = useState(isEditingProp || false);
   const containerRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +71,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
           marketPrice
         });
       }
+      setIsEditing(false); // Reset to view mode after save
     }
   }), [onSave, reconCost, transportCost, maxBid, marketPrice]);
 
@@ -102,7 +111,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
 
   // Track if any costs were edited
   const costsEdited =
-    maxBid !== maxBidSuggestion ||
+    maxBid !== defaultMaxBid ||
     customAuctionFee !== null ||
     reconCost !== defaultRecon ||
     transportCost !== defaultTransport ||
@@ -115,7 +124,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
 
   // Reset to defaults
   const resetToDefaults = () => {
-    setMaxBid(maxBidSuggestion);
+    setMaxBid(defaultMaxBid);
     setCustomAuctionFee(null);
     setReconCost(defaultRecon);
     setTransportCost(defaultTransport);

@@ -514,6 +514,10 @@ export default function DashboardPage() {
                   match_reasoning: selectedScan.match_reasoning,
                   estimated_profit: selectedScan.estimated_profit,
                   max_bid_suggestion: selectedScan.max_bid_suggestion,
+                  custom_recon_cost: selectedScan.custom_recon_cost,
+                  custom_transport_cost: selectedScan.custom_transport_cost,
+                  custom_max_bid: selectedScan.custom_max_bid,
+                  custom_market_price: selectedScan.custom_market_price,
                 }}
                 isModal={true}
                 tenantZipCode={tenant?.zip_code}
@@ -521,6 +525,7 @@ export default function DashboardPage() {
                 onEditStatusChange={setIsEditingCosts}
                 onOutsideClick={() => setShowConfirmDialog(true)}
                 ref={scanResultRef}
+                isEditing={isEditingCosts}
               />
             </div>
           </div>

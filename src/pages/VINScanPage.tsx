@@ -337,6 +337,10 @@ export default function VINScanPage() {
             max_bid_suggestion: result.max_bid_suggestion,
             estimated_days_to_sale: result.estimated_days_to_sale,
             radius: result.radius,
+            custom_recon_cost: result.custom_recon_cost,
+            custom_transport_cost: result.custom_transport_cost,
+            custom_max_bid: result.custom_max_bid,
+            custom_market_price: result.custom_market_price,
           }}
           costSettings={costSettings}
           tenantZipCode={tenant?.zip_code}
@@ -351,6 +355,7 @@ export default function VINScanPage() {
           onEditStatusChange={setIsEditingCosts}
           onOutsideClick={() => setPendingReset(true)}
           ref={scanResultRef}
+          isEditing={isEditingCosts}
         />
 
         {/* Navigation Warning Dialog */}

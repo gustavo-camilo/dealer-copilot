@@ -154,6 +154,11 @@ export interface VINScan {
   max_bid_suggestion: number | null;
   scan_location: string | null;
   saved_to_bid_list: boolean;
+  costs_edited: boolean;
+  custom_recon_cost: number | null;
+  custom_transport_cost: number | null;
+  custom_max_bid: number | null;
+  custom_market_price: number | null;
   created_at: string;
 }
 

@@ -38,6 +38,10 @@ interface Recommendation {
     type: 'positive' | 'negative' | 'neutral';
     message: string;
   }>;
+  custom_recon_cost: number | null;
+  custom_transport_cost: number | null;
+  custom_max_bid: number | null;
+  custom_market_price: number | null;
 }
 
 const PAGE_SIZE = 25;
@@ -508,6 +512,10 @@ export default function RecommendationsPage() {
                   match_reasoning: selectedRec.match_reasoning,
                   estimated_profit: selectedRec.estimated_profit,
                   max_bid_suggestion: selectedRec.max_bid_suggestion,
+                  custom_recon_cost: selectedRec.custom_recon_cost,
+                  custom_transport_cost: selectedRec.custom_transport_cost,
+                  custom_max_bid: selectedRec.custom_max_bid,
+                  custom_market_price: selectedRec.custom_market_price,
                 }}
                 isModal={true}
                 tenantZipCode={tenant?.zip_code}
@@ -515,6 +523,7 @@ export default function RecommendationsPage() {
                 onEditStatusChange={setIsEditingCosts}
                 onOutsideClick={() => setShowConfirmDialog(true)}
                 ref={scanResultRef}
+                isEditing={isEditingCosts}
               />
             </div>
           </div>
