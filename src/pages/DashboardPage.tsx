@@ -6,6 +6,7 @@ import { VINScan } from '../types/database';
 import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Globe, ChevronRight, Package, Eye, RefreshCw, X } from 'lucide-react';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 export default function DashboardPage() {
   const { user, tenant, signOut } = useAuth();
@@ -22,6 +23,23 @@ export default function DashboardPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedScan, setSelectedScan] = useState<VINScan | null>(null);
   const [hasRequestedInventory, setHasRequestedInventory] = useState(false);
+  const [isEditingCosts, setIsEditingCosts] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  const handleCloseModal = () => {
+    if (isEditingCosts) {
+      setShowConfirmDialog(true);
+    } else {
+      setSelectedScan(null);
+      setIsEditingCosts(false);
+    }
+  };
+
+  const confirmCloseModal = () => {
+    setSelectedScan(null);
+    setIsEditingCosts(false);
+    setShowConfirmDialog(false);
+  };
 
   const handleSignOut = async () => {
     try {
@@ -468,7 +486,7 @@ export default function DashboardPage() {
         {selectedScan && (
           <div
             className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-            onClick={() => setSelectedScan(null)}
+            onClick={handleCloseModal}
           >
             <div
               className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
@@ -478,7 +496,7 @@ export default function DashboardPage() {
               <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
                 <button
-                  onClick={() => setSelectedScan(null)}
+                  onClick={handleCloseModal}
                   className="p-2 hover:bg-gray-100 rounded-lg transition"
                 >
                   <X className="w-6 h-6" />
@@ -498,11 +516,20 @@ export default function DashboardPage() {
                 }}
                 isModal={true}
                 tenantZipCode={tenant?.zip_code}
-                onClose={() => setSelectedScan(null)}
+                onClose={handleCloseModal}
+                onEditStatusChange={setIsEditingCosts}
+                onOutsideClick={() => setShowConfirmDialog(true)}
               />
             </div>
           </div>
         )}
+
+        <ConfirmationDialog
+          isOpen={showConfirmDialog}
+          onConfirm={confirmCloseModal}
+          onCancel={() => setShowConfirmDialog(false)}
+          message="You have unsaved changes in the profit calculator. Are you sure you want to leave?"
+        />
       </div>
     </div>
   );

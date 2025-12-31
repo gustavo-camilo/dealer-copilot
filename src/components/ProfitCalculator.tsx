@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Edit2 } from 'lucide-react';
+import { Edit2, Loader2 } from 'lucide-react';
 
 import { AuctionFeeThreshold } from '../types/database';
 import { calculateAuctionFee } from '../services/marketPricing';
@@ -22,6 +22,7 @@ export interface ProfitCalculatorProps {
   }) => void;
   onEditStatusChange?: (isEditing: boolean) => void;
   onOutsideClick?: () => void;
+  isSaving?: boolean;
 }
 
 export default function ProfitCalculator({
@@ -33,6 +34,7 @@ export default function ProfitCalculator({
   onCostsChange,
   onEditStatusChange,
   onOutsideClick,
+  isSaving = false,
 }: ProfitCalculatorProps) {
   const [maxBid, setMaxBid] = useState(maxBidSuggestion);
   const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(null);
@@ -118,7 +120,13 @@ export default function ProfitCalculator({
             </span>
           )}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-3">
+          {isSaving && (
+            <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-[10px] items-center">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Saving...</span>
+            </div>
+          )}
           {costsEdited && (
             <button
               onClick={resetToDefaults}

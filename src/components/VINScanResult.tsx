@@ -1,9 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
 import { VehicleCommentSection } from './VehicleCommentSection';
 import { useAuth } from '../contexts/AuthContext';
+import toast from 'react-hot-toast';
 
 // Helper function to simplify body types to Sedan, SUV, Pickup, or hide if not matching
 function getSimplifiedBodyType(bodyType: string | undefined): string {
@@ -72,6 +73,34 @@ export default function VINScanResult({
     const [error, setError] = useState<string | null>(null);
     const [reasoningExpanded, setReasoningExpanded] = useState(false);
     const [isExpandingSearch, setIsExpandingSearch] = useState(false);
+    const [isSaving, setIsSaving] = useState(false);
+    const [currentRecommendation, setCurrentRecommendation] = useState(scanData.recommendation);
+
+    useEffect(() => {
+        setCurrentRecommendation(scanData.recommendation);
+    }, [scanData.recommendation]);
+
+    const handleUpdateRecommendation = async (newRec: 'buy' | 'caution' | 'pass') => {
+        if (!scanData.id) return;
+
+        setIsSaving(true);
+        try {
+            setCurrentRecommendation(newRec);
+            const { error: updateError } = await supabase
+                .from('vin_scans')
+                .update({ recommendation: newRec })
+                .eq('id', scanData.id);
+
+            if (updateError) throw updateError;
+            toast.success(`Recommendation changed to ${newRec.toUpperCase()}`);
+        } catch (err: any) {
+            console.error('Error updating recommendation:', err);
+            toast.error('Failed to update recommendation');
+            setCurrentRecommendation(scanData.recommendation);
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     const handleReportMissingData = async () => {
         if (!scanData?.decoded_data) return;
@@ -142,17 +171,42 @@ export default function VINScanResult({
                             {/* If VIN is available in decoded_data, show it. Otherwise it might be in the parent object but we didn't pass it explicitly in the interface above except inside decoded_data potentially */}
                             {/* We can assume decoded_data has what we need or pass vin separately if needed. For now, let's rely on what's there. */}
                         </div>
-                        <div
-                            className={`px-4 py-2 rounded-lg font-semibold ${scanData.recommendation === 'buy'
-                                ? 'bg-green-100 text-green-800'
-                                : scanData.recommendation === 'caution'
-                                    ? 'bg-yellow-100 text-yellow-800'
-                                    : 'bg-red-100 text-red-800'
-                                }`}
-                        >
-                            {scanData.recommendation === 'buy' && '🟢 Strong Buy'}
-                            {scanData.recommendation === 'caution' && '🟡 Caution'}
-                            {scanData.recommendation === 'pass' && '🔴 Pass'}
+                        <div className="flex flex-col items-end gap-2">
+                            <div
+                                className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 ${currentRecommendation === 'buy'
+                                    ? 'bg-green-100 text-green-800'
+                                    : currentRecommendation === 'caution'
+                                        ? 'bg-yellow-100 text-yellow-800'
+                                        : 'bg-red-100 text-red-800'
+                                    }`}
+                            >
+                                {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
+                                {currentRecommendation === 'buy' && '🟢 Strong Buy'}
+                                {currentRecommendation === 'caution' && '🟡 Caution'}
+                                {currentRecommendation === 'pass' && '🔴 Pass'}
+                            </div>
+
+                            {/* Manual Override Controls */}
+                            <div className="flex gap-1">
+                                <button
+                                    onClick={() => handleUpdateRecommendation('buy')}
+                                    className={`text-[10px] px-2 py-1 rounded border transition ${currentRecommendation === 'buy' ? 'bg-green-600 border-green-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    Buy
+                                </button>
+                                <button
+                                    onClick={() => handleUpdateRecommendation('caution')}
+                                    className={`text-[10px] px-2 py-1 rounded border transition ${currentRecommendation === 'caution' ? 'bg-yellow-500 border-yellow-500 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    Caution
+                                </button>
+                                <button
+                                    onClick={() => handleUpdateRecommendation('pass')}
+                                    className={`text-[10px] px-2 py-1 rounded border transition ${currentRecommendation === 'pass' ? 'bg-red-600 border-red-600 text-white' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    Pass
+                                </button>
+                            </div>
                         </div>
                     </div>
 
@@ -337,8 +391,9 @@ export default function VINScanResult({
                     onCostsChange={async (costs) => {
                         // Save custom costs to database if scan_id exists and costs were edited
                         if (scanData.id && costs.costsEdited) {
+                            setIsSaving(true);
                             try {
-                                await supabase
+                                const { error: saveError } = await supabase
                                     .from('vin_scans')
                                     .update({
                                         custom_recon_cost: costs.recon,
@@ -348,13 +403,19 @@ export default function VINScanResult({
                                         costs_edited: true,
                                     })
                                     .eq('id', scanData.id);
+
+                                if (saveError) throw saveError;
                             } catch (error) {
                                 console.error('Error saving custom costs:', error);
+                                toast.error('Failed to save costs');
+                            } finally {
+                                setIsSaving(false);
                             }
                         }
                     }}
                     onEditStatusChange={onEditStatusChange}
                     onOutsideClick={onOutsideClick}
+                    isSaving={isSaving}
                 />
 
                 {/* Match Reasoning - Moved to bottom with collapsible */}

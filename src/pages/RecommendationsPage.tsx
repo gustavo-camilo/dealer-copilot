@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -8,7 +8,6 @@ import {
   Search,
   DollarSign,
   Target,
-  Menu,
   X,
   ChevronRight,
   Trash2,
@@ -16,9 +15,9 @@ import {
   TrendingDown,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import NavigationMenu from '../components/NavigationMenu';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 
 interface Recommendation {
   id: string;
@@ -46,7 +45,6 @@ const PAGE_SIZE = 25;
 export default function RecommendationsPage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [filteredRecommendations, setFilteredRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,6 +53,24 @@ export default function RecommendationsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditingCosts, setIsEditingCosts] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+
+  const handleCloseModal = () => {
+    if (isEditingCosts) {
+      setShowConfirmDialog(true);
+    } else {
+      setSelectedRec(null);
+      setIsEditingCosts(false);
+    }
+  };
+
+  const confirmCloseModal = () => {
+    setSelectedRec(null);
+    setIsEditingCosts(false);
+    setShowConfirmDialog(false);
+  };
+
   const observerTarget = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState({
     buy: 0,
@@ -70,8 +86,8 @@ export default function RecommendationsPage() {
       if (!user?.tenant_id) return;
 
       try {
-        const from = pageNum * PAGE_SIZE;
-        const to = from + PAGE_SIZE - 1;
+        const fromRow = pageNum * PAGE_SIZE;
+        const toRow = fromRow + PAGE_SIZE - 1;
 
         const { data, error } = await supabase
           .from('vin_scans')
@@ -79,7 +95,7 @@ export default function RecommendationsPage() {
           .eq('tenant_id', user.tenant_id)
           .not('recommendation', 'is', null)
           .order('created_at', { ascending: false })
-          .range(from, to);
+          .range(fromRow, toRow);
 
         if (error) throw error;
 
@@ -464,7 +480,7 @@ export default function RecommendationsPage() {
         {selectedRec && (
           <div
             className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-            onClick={() => setSelectedRec(null)}
+            onClick={handleCloseModal}
           >
             <div
               className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
@@ -474,7 +490,7 @@ export default function RecommendationsPage() {
               <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
                 <button
-                  onClick={() => setSelectedRec(null)}
+                  onClick={handleCloseModal}
                   className="p-2 hover:bg-gray-100 rounded-lg transition"
                 >
                   <X className="w-6 h-6" />
@@ -494,11 +510,20 @@ export default function RecommendationsPage() {
                 }}
                 isModal={true}
                 tenantZipCode={tenant?.zip_code}
-                onClose={() => setSelectedRec(null)}
+                onClose={handleCloseModal}
+                onEditStatusChange={setIsEditingCosts}
+                onOutsideClick={() => setShowConfirmDialog(true)}
               />
             </div>
           </div>
         )}
+
+        <ConfirmationDialog
+          isOpen={showConfirmDialog}
+          onConfirm={confirmCloseModal}
+          onCancel={() => setShowConfirmDialog(false)}
+          message="You have unsaved changes in the profit calculator. Are you sure you want to leave?"
+        />
       </div>
     </div>
   );
