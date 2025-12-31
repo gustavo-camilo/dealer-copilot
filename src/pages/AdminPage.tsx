@@ -935,10 +935,15 @@ export default function AdminPage() {
                                   {item.source_type === 'dealer' ? 'DEALER' : 'COMPETITOR'}
                                 </span>
                                 <h4 className="text-lg font-medium text-blue-600 truncate">
-                                  <a href={item.source_url || '#'} target="_blank" rel="noopener noreferrer" className="hover:underline">
+                                  <a
+                                    href={item.source_url?.startsWith('http') ? item.source_url : `https://${item.source_url}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hover:underline"
+                                  >
                                     {item.source_name || (() => {
                                       try {
-                                        return new URL(item.source_url).hostname;
+                                        return new URL(item.source_url?.startsWith('http') ? item.source_url : `https://${item.source_url}`).hostname;
                                       } catch {
                                         return item.source_url || 'Unknown';
                                       }
@@ -1220,7 +1225,16 @@ export default function AdminPage() {
                               <h4 className="font-medium text-gray-900">{displayName}</h4>
                               <p className="text-sm text-gray-500">{timestamp}</p>
                               {review.source_url && (
-                                <p className="text-xs text-gray-500 mt-1">Source: {review.source_url}</p>
+                                <p className="text-xs text-blue-600 mt-1">
+                                  Source: <a
+                                    href={review.source_url.startsWith('http') ? review.source_url : `https://${review.source_url}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="hover:underline"
+                                  >
+                                    {review.source_url}
+                                  </a>
+                                </p>
                               )}
                               <p className="text-sm text-gray-600 mt-1">
                                 {vehiclesFound} vehicles found

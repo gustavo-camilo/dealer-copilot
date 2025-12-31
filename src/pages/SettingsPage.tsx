@@ -5,7 +5,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { Target, Menu, X, Trash2, Plus } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 import Header from '../components/Header';
-
+import { normalizeDomain } from '../utils/url';
 import { TenantCostSettings, AuctionFeeThreshold, AuctionSource } from '../types/database';
 
 const DEFAULT_COST_SETTINGS: TenantCostSettings = {
@@ -274,7 +274,7 @@ export default function SettingsPage() {
       const { error } = await supabase
         .from('tenants')
         .update({
-          website_url: websiteUrl,
+          website_url: normalizeDomain(websiteUrl),
           location,
           zip_code: zipCode || null, // Save ZIP to separate field as well
           contact_phone: contactPhone,
@@ -349,7 +349,8 @@ export default function SettingsPage() {
                 type="url"
                 value={websiteUrl}
                 onChange={(e) => setWebsiteUrl(e.target.value)}
-                placeholder="https://yourdealership.com"
+                onBlur={(e) => setWebsiteUrl(normalizeDomain(e.target.value))}
+                placeholder="yourdealership.com"
                 className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
               />
               <p className="text-xs text-gray-500 mt-1">Changing this will trigger a new scan of your website's inventory.</p>

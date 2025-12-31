@@ -61,36 +61,54 @@ export default function OnboardingPage() {
     setErrorMessage('');
 
     try {
-      // Normalize URL: ensure it has https:// protocol
-      let normalizedUrl = websiteUrl.trim();
-      if (!normalizedUrl.startsWith('http://') && !normalizedUrl.startsWith('https://')) {
-        normalizedUrl = `https://${normalizedUrl}`;
-      }
+      // Normalize URL: Strip protocol and www (Domain Only Standard)
+      let cleanUrl = websiteUrl.trim()
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
+
+      if (!cleanUrl) throw new Error('Please enter a valid website URL.');
 
       // Update tenant website URL and set inventory status to 'pending'
-      await supabase
+      const { error: tenantUpdateError } = await supabase
         .from('tenants')
         .update({
-          website_url: normalizedUrl,
+          website_url: cleanUrl,
           inventory_status: 'pending'
         })
         .eq('id', user.tenant_id);
 
+      if (tenantUpdateError) throw tenantUpdateError;
+
       setAnalysisProgress(50);
 
-      // Add to waiting list (trigger will handle Slack notification)
-      const { error: waitingListError } = await supabase
-        .from('scraping_waiting_list')
-        .insert({
-          tenant_id: user.tenant_id,
-          website_url: normalizedUrl,
-          status: 'pending',
-          priority: 1,
-        });
+      // 2. Resolve or Create Source Registry Entry
+      const { data: sourceData, error: sourceError } = await supabase
+        .from('source_registry')
+        .upsert({
+          source_url: cleanUrl,
+          source_type: 'dealer',
+          source_name: tenant?.name || cleanUrl,
+          scraping_enabled: true
+        }, {
+          onConflict: 'source_url'
+        })
+        .select('id')
+        .single();
 
-      if (waitingListError && !waitingListError.message.includes('duplicate')) {
-        throw waitingListError;
-      }
+      if (sourceError) throw sourceError;
+
+      // 3. Ensure Tenant-Source Link exists
+      await supabase
+        .from('tenant_sources')
+        .upsert({
+          tenant_id: user.tenant_id,
+          source_id: sourceData.id,
+          relationship_type: 'owner'
+        }, {
+          onConflict: 'tenant_id,source_id'
+        });
 
       setAnalysisProgress(100);
 
@@ -99,7 +117,7 @@ export default function OnboardingPage() {
       setScrapingResult({
         tenant_id: user.tenant_id,
         tenant_name: tenant?.name || '',
-        website_url: normalizedUrl,
+        website_url: cleanUrl,
         vehicles_found: 0,
         new_vehicles: 0,
         updated_vehicles: 0,

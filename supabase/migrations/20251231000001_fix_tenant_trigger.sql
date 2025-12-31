@@ -5,4 +5,4 @@
 DROP TRIGGER IF EXISTS on_inventory_status_change ON tenants;
 
 -- 2. Drop the function
-DROP FUNCTION IF EXISTS remove_from_waiting_list_when_ready();
+DROP FUNCTION IF EXISTS remove_from_waiting_list_when_ready() CASCADE;

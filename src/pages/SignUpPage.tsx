@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Target, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { normalizeDomain } from '../utils/url';
 
 export default function SignUpPage() {
   const navigate = useNavigate();
@@ -80,7 +81,7 @@ export default function SignUpPage() {
         formData.fullName,
         {
           name: formData.dealershipName,
-          website_url: formData.websiteUrl || null,
+          website_url: normalizeDomain(formData.websiteUrl) || null,
           location: null,
           contact_phone: formData.contactPhone || null,
         }
@@ -126,17 +127,14 @@ export default function SignUpPage() {
           <div className="bg-slate-900/50 backdrop-blur border border-slate-800 rounded-2xl p-8 shadow-2xl">
             <div className="mb-6">
               <div className="flex items-center">
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
-                  step >= 1 ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 text-slate-500'
-                }`}>
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${step >= 1 ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 text-slate-500'
+                  }`}>
                   1
                 </div>
-                <div className={`flex-1 h-1 mx-3 rounded-full transition-all ${
-                  step >= 2 ? 'bg-gradient-to-r from-orange-500 to-orange-600' : 'bg-slate-800'
-                }`} />
-                <div className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${
-                  step >= 2 ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 text-slate-500'
-                }`}>
+                <div className={`flex-1 h-1 mx-3 rounded-full transition-all ${step >= 2 ? 'bg-gradient-to-r from-orange-500 to-orange-600' : 'bg-slate-800'
+                  }`} />
+                <div className={`flex items-center justify-center w-10 h-10 rounded-full transition-all ${step >= 2 ? 'bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30' : 'bg-slate-800 text-slate-500'
+                  }`}>
                   2
                 </div>
               </div>

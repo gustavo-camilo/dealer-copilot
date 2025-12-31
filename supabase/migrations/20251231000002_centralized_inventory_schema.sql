@@ -48,7 +48,7 @@ ALTER TABLE inventory_snapshots_unified ADD COLUMN IF NOT EXISTS source_id UUID 
 DO $$
 DECLARE
     t_record RECORD;
-    source_rec RECORD;
+    v_source_id UUID; -- Use a scalar variable instead of record
 BEGIN
     -- A. Migrate Existing Tenants (Owners)
     FOR t_record IN SELECT * FROM tenants WHERE website_url IS NOT NULL LOOP
@@ -56,11 +56,11 @@ BEGIN
         INSERT INTO source_registry (source_url, source_type, source_name)
         VALUES (t_record.website_url, 'dealer', t_record.name)
         ON CONFLICT (source_url) DO UPDATE SET source_name = EXCLUDED.source_name
-        RETURNING id INTO source_rec.id;
+        RETURNING id INTO v_source_id;
 
         -- Link tenant to source as OWNER
         INSERT INTO tenant_sources (tenant_id, source_id, relationship_type)
-        VALUES (t_record.id, source_rec.id, 'owner')
+        VALUES (t_record.id, v_source_id, 'owner')
         ON CONFLICT DO NOTHING;
     END LOOP;
 

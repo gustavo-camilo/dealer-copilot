@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 import toast, { Toaster } from 'react-hot-toast';
+import { normalizeDomain, ensureHttps } from '../utils/url';
 
 interface CompetitorSnapshot {
   id: string;
@@ -271,22 +272,7 @@ export default function CompetitorAnalysisPage() {
       setAddingToQueue(true);
       setError(null);
 
-      // Extract domain from URL
-      const extractDomain = (url: string) => {
-        try {
-          const hasProtocol = /^https?:\/\//i.test(url);
-          const parsed = new URL(hasProtocol ? url : `https://${url}`);
-          return parsed.hostname.replace(/^www\./i, '').toLowerCase();
-        } catch {
-          return url
-            .replace(/^https?:\/\//i, '')
-            .replace(/^www\./i, '')
-            .replace(/\/.*$/, '')
-            .toLowerCase();
-        }
-      };
-
-      const cleanDomain = extractDomain(newCompetitorUrl.trim());
+      const cleanDomain = normalizeDomain(newCompetitorUrl);
 
       // Check if source already exists
       const { data: existingSource } = await supabase
@@ -343,22 +329,7 @@ export default function CompetitorAnalysisPage() {
       setScanning(true);
       setError(null);
 
-      // Extract domain from URL
-      const extractDomain = (url: string) => {
-        try {
-          const hasProtocol = /^https?:\/\//i.test(url);
-          const parsed = new URL(hasProtocol ? url : `https://${url}`);
-          return parsed.hostname.replace(/^www\./i, '').toLowerCase();
-        } catch {
-          return url
-            .replace(/^https?:\/\//i, '')
-            .replace(/^www\./i, '')
-            .replace(/\/.*$/, '')
-            .toLowerCase();
-        }
-      };
-
-      const cleanDomain = extractDomain(competitorUrl.trim());
+      const cleanDomain = normalizeDomain(competitorUrl);
 
       // Check if source exists in source_registry
       const { data: existingSource, error: checkError } = await supabase
@@ -704,7 +675,7 @@ export default function CompetitorAnalysisPage() {
                         </h3>
                         {item.url && (
                           <a
-                            href={item.url.startsWith('http') ? item.url : `https://${item.url}`}
+                            href={ensureHttps(item.url)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className="text-sm text-blue-600 hover:underline break-all"
