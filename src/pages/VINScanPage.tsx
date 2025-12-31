@@ -1,13 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate, useLocation, useBlocker } from 'react-router-dom';
+import { Link, useNavigate, useBlocker } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Target, Menu, X, Loader2 } from 'lucide-react';
+import { Target, Loader2 } from 'lucide-react';
 import { decodeVIN, enrichDecodedData } from '../services/vinDecoder';
 import { getMarketPricing, calculateMaxBid } from '../services/marketPricing';
 import { generateRecommendation } from '../services/recommendationEngine';
 import VINScanResult from '../components/VINScanResult';
-import NavigationMenu from '../components/NavigationMenu';
 import Header from '../components/Header';
 import { SalesRecord, TenantCostSettings } from '../types/database';
 
@@ -27,7 +26,6 @@ const DEFAULT_COST_SETTINGS: TenantCostSettings = {
 
 export default function VINScanPage() {
   const navigate = useNavigate();
-  const location = useLocation();
   const { user, tenant, signOut } = useAuth();
   const [vin, setVin] = useState('');
   const [mileage, setMileage] = useState('');

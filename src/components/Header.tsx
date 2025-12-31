@@ -1,4 +1,3 @@
-import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Target, Menu, X } from 'lucide-react';
 import NavigationMenu from './NavigationMenu';
@@ -22,7 +21,7 @@ export default function Header({
 }: HeaderProps) {
     const location = useLocation();
 
-    const handleLogoClick = (e: React.MouseEvent) => {
+    const handleLogoClick = () => {
         // If we are already on dashboard, we might want to refresh data, 
         // but the requirement is just "back to homepage".
     };

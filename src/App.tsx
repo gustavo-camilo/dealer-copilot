@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
+import { createBrowserRouter, RouterProvider, Navigate, useLocation } from 'react-router-dom';
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import LandingPage from './pages/LandingPage';
@@ -68,144 +68,147 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+const router = createBrowserRouter([
+  {
+    path: '/',
+    element: <LandingPage />,
+  },
+  {
+    path: '/signup',
+    element: (
+      <PublicRoute>
+        <SignUpPage />
+      </PublicRoute>
+    ),
+  },
+  {
+    path: '/signin',
+    element: (
+      <PublicRoute>
+        <SignInPage />
+      </PublicRoute>
+    ),
+  },
+  {
+    path: '/dashboard',
+    element: (
+      <ProtectedRoute>
+        <DashboardPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/onboarding',
+    element: (
+      <ProtectedRoute>
+        <OnboardingPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/scan',
+    element: (
+      <ProtectedRoute>
+        <VINScanPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/inventory',
+    element: (
+      <ProtectedRoute>
+        <ManageInventoryPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/competitors',
+    element: (
+      <ProtectedRoute>
+        <CompetitorAnalysisPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/competitor-history/:competitorId',
+    element: (
+      <ProtectedRoute>
+        <CompetitorHistoryPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/upgrade',
+    element: (
+      <ProtectedRoute>
+        <UpgradePage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/upgrade/success',
+    element: (
+      <ProtectedRoute>
+        <UpgradeSuccessPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/recommendations',
+    element: (
+      <ProtectedRoute>
+        <RecommendationsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/admin',
+    element: (
+      <ProtectedRoute>
+        <AdminPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/settings',
+    element: (
+      <ProtectedRoute>
+        <SettingsPage />
+      </ProtectedRoute>
+    ),
+  },
+]);
+
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            style: {
-              background: '#fff',
-              color: '#363636',
-              padding: '16px',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+    <AuthProvider>
+      <Toaster
+        position="top-right"
+        toastOptions={{
+          duration: 4000,
+          style: {
+            background: '#fff',
+            color: '#363636',
+            padding: '16px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
+          },
+          success: {
+            iconTheme: {
+              primary: '#10b981',
+              secondary: '#fff',
             },
-            success: {
-              iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
-              },
+          },
+          error: {
+            iconTheme: {
+              primary: '#ef4444',
+              secondary: '#fff',
             },
-            error: {
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
-          }}
-        />
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route
-            path="/signup"
-            element={
-              <PublicRoute>
-                <SignUpPage />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/signin"
-            element={
-              <PublicRoute>
-                <SignInPage />
-              </PublicRoute>
-            }
-          />
-          <Route
-            path="/dashboard"
-            element={
-              <ProtectedRoute>
-                <DashboardPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/onboarding"
-            element={
-              <ProtectedRoute>
-                <OnboardingPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/scan"
-            element={
-              <ProtectedRoute>
-                <VINScanPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/inventory"
-            element={
-              <ProtectedRoute>
-                <ManageInventoryPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/competitors"
-            element={
-              <ProtectedRoute>
-                <CompetitorAnalysisPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/competitor-history/:competitorId"
-            element={
-              <ProtectedRoute>
-                <CompetitorHistoryPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/upgrade"
-            element={
-              <ProtectedRoute>
-                <UpgradePage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/upgrade/success"
-            element={
-              <ProtectedRoute>
-                <UpgradeSuccessPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/recommendations"
-            element={
-              <ProtectedRoute>
-                <RecommendationsPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/admin"
-            element={
-              <ProtectedRoute>
-                <AdminPage />
-              </ProtectedRoute>
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <ProtectedRoute>
-                <SettingsPage />
-              </ProtectedRoute>
-            }
-          />
-        </Routes>
-      </AuthProvider>
-    </BrowserRouter>
+          },
+        }}
+      />
+      <RouterProvider router={router} />
+    </AuthProvider>
   );
 }
 
