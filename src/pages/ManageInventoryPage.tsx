@@ -141,6 +141,7 @@ export default function ManageInventoryPage() {
           .from('tracked_vehicles')
           .select('*')
           .in('source_id', sourceIds)
+          .eq('tenant_id', user.tenant_id)
           .order('last_seen_at', { ascending: false });
 
         if (error) throw error;

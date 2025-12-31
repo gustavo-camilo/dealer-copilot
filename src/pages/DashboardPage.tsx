@@ -102,11 +102,11 @@ export default function DashboardPage() {
           .from('tracked_vehicles')
           .select('*')
           .in('source_id', sourceIds)
+          .eq('tenant_id', user.tenant_id)
           .eq('status', 'active');
 
         vehicles = sourcedVehicles || [];
       } else {
-        // Fallback for legacy/unmigrated data (Empty sources but might have direct tenant_id rows)
         const { data: legacyVehicles } = await supabase
           .from('tracked_vehicles')
           .select('*')
