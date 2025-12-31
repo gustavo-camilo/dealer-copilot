@@ -7,6 +7,7 @@ import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Globe, ChevronRight, P
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import GlassCard from '../components/ui/GlassCard';
 
 export default function DashboardPage() {
   const { user, tenant, signOut } = useAuth();
@@ -62,19 +63,16 @@ export default function DashboardPage() {
 
   const getRecommendationBadge = (recommendation: string) => {
     const badges = {
-      buy: 'bg-green-100 text-green-800',
-      caution: 'bg-yellow-100 text-yellow-800',
-      pass: 'bg-red-100 text-red-800',
+      buy: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400',
+      caution: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400',
+      pass: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400',
     };
     return badges[recommendation as keyof typeof badges];
   };
 
   const formatVehicleName = (name: string) => {
     if (!name) return '';
-    // Special case for BMW
     if (name.toUpperCase() === 'BMW') return 'BMW';
-
-    // Capitalize first letter of each word
     return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   };
 
@@ -86,7 +84,6 @@ export default function DashboardPage() {
     if (!user?.tenant_id) return;
 
     try {
-      // Load vehicles: First get sources, then get vehicles (Centralized Model)
       const { data: sources } = await supabase
         .from('tenant_sources')
         .select('source_id')
@@ -116,7 +113,6 @@ export default function DashboardPage() {
         vehicles = legacyVehicles || [];
       }
 
-      // Load recent sales
       const { data: recentSales } = await supabase
         .from('sales_records')
         .select('*')
@@ -124,7 +120,6 @@ export default function DashboardPage() {
         .gte('sale_date', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0])
         .order('sale_date', { ascending: false });
 
-      // Load recent VIN scans (limit 5)
       const { data: scans } = await supabase
         .from('vin_scans')
         .select('*')
@@ -132,7 +127,6 @@ export default function DashboardPage() {
         .order('created_at', { ascending: false })
         .limit(5);
 
-      // Load recommendations (vehicles with "buy" recommendation)
       const { data: recs } = await supabase
         .from('vin_scans')
         .select('*')
@@ -142,7 +136,6 @@ export default function DashboardPage() {
         .order('confidence_score', { ascending: false })
         .limit(5);
 
-      // Check if inventory has been requested/submitted (any status means they've submitted)
       const hasInventoryBeenRequested = tenant?.inventory_status !== null && tenant?.inventory_status !== undefined;
       setHasRequestedInventory(hasInventoryBeenRequested);
 
@@ -176,18 +169,17 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center transition-colors">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading dashboard...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-500 mx-auto"></div>
+          <p className="mt-4 text-slate-600 dark:text-slate-400">Loading dashboard...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors duration-300">
       <Header
         user={user}
         tenant={tenant}
@@ -196,319 +188,226 @@ export default function DashboardPage() {
         setMenuOpen={setMenuOpen}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Message - Only show if inventory hasn't been requested yet */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10">
         {!hasRequestedInventory && (
-          <div className="mb-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-blue-900 mb-2">
+          <GlassCard className="mb-10 p-8 border-primary-500/20 bg-primary-500/5">
+            <h3 className="text-xl font-bold text-slate-900 dark:text-white mb-2">
               Welcome to Dealer Co-Pilot!
             </h3>
-            <p className="text-blue-800 mb-4">
-              Get started by analyzing your website inventory or manually adding vehicles.
+            <p className="text-slate-600 dark:text-slate-400 mb-6 max-w-2xl">
+              Get started by analyzing your website inventory or manually adding vehicles to get real-time market insights.
             </p>
             <Link
               to="/onboarding"
-              className="inline-block bg-blue-900 text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition"
+              className="inline-flex items-center bg-primary-500 text-white px-8 py-3 rounded-xl hover:bg-primary-600 transition shadow-lg shadow-primary-500/25 font-bold"
             >
               Analyze My Website
+              <ChevronRight className="ml-2 h-5 w-5" />
             </Link>
-          </div>
+          </GlassCard>
         )}
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">Dashboard</h1>
-          <p className="text-gray-600 mt-1">{tenant?.location}</p>
-        </div>
-
-        {/* Quick Actions - Button Cards */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-gray-900 mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <Link
-              to="/scan"
-              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-orange-600 hover:shadow-md transition text-center"
-            >
-              <Scan className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 text-sm">Scan VIN</h3>
-            </Link>
-
-            <Link
-              to="/inventory"
-              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-blue-900 hover:shadow-md transition text-center"
-            >
-              <Car className="h-8 w-8 text-blue-900 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 text-sm">Inventory</h3>
-            </Link>
-
-            <Link
-              to="/competitors"
-              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-purple-600 hover:shadow-md transition text-center"
-            >
-              <Eye className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 text-sm">Competitor Intel</h3>
-            </Link>
-
-            <Link
-              to="/recommendations"
-              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-blue-900 hover:shadow-md transition text-center"
-            >
-              <Target className="h-8 w-8 text-blue-900 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 text-sm">Recommendations</h3>
-            </Link>
-
-            <Link
-              to="/onboarding"
-              className="bg-white p-4 rounded-lg shadow-sm border-2 border-gray-200 hover:border-blue-900 hover:shadow-md transition text-center"
-            >
-              <Globe className="h-8 w-8 text-blue-900 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 text-sm">Scan Website</h3>
-            </Link>
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Total Vehicles</h3>
-              <Car className="h-5 w-5 text-blue-900" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{stats.totalVehicles}</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Portfolio Value</h3>
-              <BarChart3 className="h-5 w-5 text-blue-900" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">
-              ${stats.portfolioValue.toLocaleString()}
+        <div className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-4">
+          <div>
+            <h1 className="text-4xl font-extrabold text-slate-900 dark:text-white tracking-tight">Dashboard</h1>
+            <p className="text-slate-500 dark:text-slate-400 mt-2 font-medium flex items-center">
+              <span className="w-2 h-2 bg-secondary-500 rounded-full mr-2 shadow-glow-secondary animate-pulse" />
+              {tenant?.location}
             </p>
           </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">Avg Days on Lot</h3>
-              <Clock className="h-5 w-5 text-blue-900" />
+          <div className="flex items-center gap-3">
+            <div className="text-right hidden sm:block">
+              <p className="text-xs text-slate-500 uppercase tracking-widest font-bold">Today's Refresh</p>
+              <p className="text-sm font-bold text-slate-900 dark:text-white">{new Date().toLocaleDateString()}</p>
             </div>
-            <p className="text-3xl font-bold text-gray-900">{stats.avgDaysInInventory}</p>
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600">This Week's Sales</h3>
-              <TrendingUp className="h-5 w-5 text-orange-600" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900">{stats.weekSales}</p>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Buy Recommendations */}
-          {recommendations.length > 0 && (
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Recommended to Buy</h2>
-                <Link
-                  to="/recommendations"
-                  className="text-sm text-blue-900 hover:text-blue-800 font-semibold flex items-center"
-                >
-                  View All
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Link>
-              </div>
-              <div className="space-y-3">
-                {recommendations.map((rec) => (
-                  <div key={rec.id} className="p-3 border border-green-200 bg-green-50 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center">
-                          <span className="font-semibold text-gray-900">
-                            {rec.decoded_data.year} {rec.decoded_data.make} {rec.decoded_data.model}
-                          </span>
-                          <span className="ml-2 px-2 py-0.5 rounded text-xs font-semibold bg-green-100 text-green-800">
-                            BUY
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 mt-1">
-                          Max Bid: ${rec.max_bid_suggestion?.toLocaleString() || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-green-700">
-                          {rec.confidence_score}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
+        {/* Quick Actions */}
+        <div className="mb-12">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+            {[
+              { to: '/scan', icon: Scan, label: 'Scan VIN', color: 'text-primary-500', shadow: 'shadow-primary-500/10' },
+              { to: '/inventory', icon: Car, label: 'Inventory', color: 'text-primary-500', shadow: 'shadow-primary-500/10' },
+              { to: '/competitors', icon: Eye, label: 'Competitor Intel', color: 'text-secondary-500', shadow: 'shadow-secondary-500/10' },
+              { to: '/recommendations', icon: Target, label: 'VIN Scans', color: 'text-primary-400', shadow: 'shadow-primary-400/10' },
+              { to: '/onboarding', icon: Globe, label: 'Scan Website', color: 'text-primary-500', shadow: 'shadow-primary-500/10' },
+            ].map((action, idx) => (
+              <Link
+                key={idx}
+                to={action.to}
+                className={`group relative p-6 bg-white dark:bg-slate-900/40 backdrop-blur-xl border border-slate-200 dark:border-white/5 rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 text-center overflow-hidden`}
+              >
+                <div className={`absolute inset-0 bg-gradient-to-br from-transparent to-slate-100 dark:to-white/5 opacity-0 group-hover:opacity-100 transition-opacity`} />
+                <action.icon className={`h-10 w-10 ${action.color} mx-auto mb-4 group-hover:scale-110 transition-transform`} />
+                <h3 className="font-bold text-slate-900 dark:text-white text-sm relative z-10">{action.label}</h3>
+              </Link>
+            ))}
+          </div>
+        </div>
 
-          {/* Recent VIN Scans */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Recent VIN Scans</h2>
-              {recentScans.length > 0 && (
-                <Link
-                  to="/recommendations"
-                  className="text-sm text-blue-900 hover:text-blue-800 font-semibold flex items-center"
-                >
-                  View All
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Link>
+        {/* Hero Section - Stats Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
+          {[
+            { label: 'Total Vehicles', value: stats.totalVehicles, icon: Car, trend: '+2 this week' },
+            { label: 'Portfolio Value', value: stats.portfolioValue, icon: BarChart3, isCurrency: true },
+            { label: 'Avg Days on Lot', value: stats.avgDaysInInventory, icon: Clock, suffix: ' days' },
+            { label: 'This Week Sales', value: stats.weekSales, icon: TrendingUp, color: 'text-secondary-500' },
+          ].map((stat, idx) => (
+            <GlassCard key={idx} className="p-6 group relative overflow-hidden">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-xs uppercase tracking-widest font-bold text-slate-500 dark:text-slate-400">{stat.label}</span>
+                <stat.icon className={`h-5 w-5 ${stat.color || 'text-primary-500'}`} />
+              </div>
+              <div className="flex items-baseline gap-2">
+                <p className="text-3xl font-black text-slate-900 dark:text-white">
+                  {stat.isCurrency ? `$${stat.value.toLocaleString()}` : stat.value}{stat.suffix}
+                </p>
+              </div>
+              {stat.trend && (
+                <p className="mt-2 text-xs font-semibold text-secondary-500 flex items-center">
+                  <TrendingUp className="h-3 w-3 mr-1" />
+                  {stat.trend}
+                </p>
               )}
+            </GlassCard>
+          ))}
+        </div>
+
+        {/* Main Content Areas */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
+          {/* Recent Scans */}
+          <GlassCard className="p-8">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Recent Scans</h2>
+              <Link to="/recommendations" className="text-sm font-bold text-primary-500 hover:text-primary-600 flex items-center group">
+                View All Scans
+                <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
+              </Link>
             </div>
             {recentScans.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <Scan className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p>No scans yet</p>
-                <Link
-                  to="/scan"
-                  className="text-blue-900 hover:text-blue-800 font-semibold text-sm mt-2 inline-block"
-                >
-                  Scan your first VIN
-                </Link>
+              <div className="text-center py-12">
+                <div className="w-16 h-16 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <Scan className="h-8 w-8 text-slate-400" />
+                </div>
+                <p className="text-slate-500 dark:text-slate-400 font-medium">No recent activity detected.</p>
+                <Link to="/scan" className="mt-4 inline-block text-primary-500 font-bold hover:underline">Scan your first VIN</Link>
               </div>
             ) : (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {recentScans.map((scan) => (
                   <div
                     key={scan.id}
                     onClick={() => setSelectedScan(scan)}
-                    className="p-3 border border-gray-200 rounded-lg hover:bg-gray-50 hover:shadow-md transition cursor-pointer"
+                    className="group flex items-center gap-4 p-4 rounded-2xl border border-slate-100 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-white/5 transition-all cursor-pointer"
                   >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-gray-900 truncate">
-                            {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
-                          </h3>
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
-                            {scan.recommendation.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600">
-                          <span>Max Bid: {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}</span>
-                          <span className={`font-medium ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                            Profit: {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
-                          </span>
-                        </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 mb-1">
+                        <h3 className="font-bold text-slate-900 dark:text-white truncate">
+                          {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
+                        </h3>
+                        <span className={`px-2 py-0.5 rounded-full text-[10px] font-black tracking-tighter uppercase ${getRecommendationBadge(scan.recommendation)}`}>
+                          {scan.recommendation}
+                        </span>
                       </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedScan(scan);
-                        }}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0"
-                        title="View Details"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
+                      <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-slate-400">
+                        <span className="flex items-center">
+                          <Target className="h-3 w-3 mr-1" />
+                          Bid: {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}
+                        </span>
+                        <span className={`font-bold ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-secondary-500' : ''}`}>
+                          Profit: {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
+                        </span>
+                      </div>
                     </div>
+                    <ChevronRight className="h-5 w-5 text-slate-300 group-hover:text-primary-500 transition-colors" />
                   </div>
                 ))}
               </div>
             )}
-          </div>
+          </GlassCard>
 
-          {/* Inventory Analysis Section */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900">Inventory Analysis</h2>
-              <Link
-                to="/inventory"
-                className="text-sm text-blue-900 hover:text-blue-800 font-semibold flex items-center"
-              >
-                View Inventory
-                <ChevronRight className="h-4 w-4 ml-1" />
+          {/* Inventory Analysis */}
+          <GlassCard className="p-8">
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Inventory Health</h2>
+              <Link to="/inventory" className="text-sm font-bold text-primary-500 hover:text-primary-600 flex items-center group">
+                Manage Stock
+                <ChevronRight className="h-4 w-4 ml-1 group-hover:translate-x-1 transition-transform" />
               </Link>
             </div>
 
-            {tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing' || tenant?.inventory_status === 'pending_review' ? (
-              <div className="text-center py-6">
-                <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
-                  <RefreshCw className="h-6 w-6 text-blue-600 animate-spin" />
-                </div>
-                <h3 className="text-lg font-bold text-gray-900 mb-2">Your inventory is being processed</h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  We're currently scanning your website. This usually takes a few minutes, but can take up to 2-4 hours.
+            {tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing' ? (
+              <div className="py-10 text-center">
+                <RefreshCw className="h-12 w-12 text-primary-500 animate-spin mx-auto mb-6" />
+                <h3 className="text-lg font-bold text-slate-900 dark:text-white mb-2">Refreshing Inventory</h3>
+                <p className="text-slate-500 dark:text-slate-400 max-w-xs mx-auto text-sm">
+                  We're currently syncing with your website to update market values.
                 </p>
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-center">
-                  <p className="text-xs text-blue-800 font-medium">You'll be notified via email when ready.</p>
-                </div>
               </div>
-            ) : tenant?.inventory_status === 'ready' && stats.totalVehicles > 0 ? (
-              <div className="space-y-4">
+            ) : stats.totalVehicles > 0 ? (
+              <div className="space-y-6">
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="p-4 bg-blue-50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <Car className="w-4 h-4 text-blue-600" />
-                      <span className="text-sm text-gray-600">Total Vehicles</span>
+                  <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5">
+                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Stock Level</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{stats.totalVehicles}</p>
+                    <div className="mt-3 w-full bg-slate-200 dark:bg-slate-700 h-1.5 rounded-full overflow-hidden">
+                      <div className="bg-primary-500 h-full w-[70%]" />
                     </div>
-                    <p className="text-2xl font-bold text-gray-900">{stats.totalVehicles}</p>
                   </div>
-                  <div className="p-4 bg-green-50 rounded-lg">
-                    <div className="flex items-center gap-2 mb-1">
-                      <BarChart3 className="w-4 h-4 text-green-600" />
-                      <span className="text-sm text-gray-600">Portfolio Value</span>
-                    </div>
-                    <p className="text-2xl font-bold text-gray-900">
-                      {formatCurrency(stats.portfolioValue)}
-                    </p>
+                  <div className="p-5 bg-slate-50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5">
+                    <p className="text-xs font-bold text-slate-500 uppercase mb-2">Age Avg</p>
+                    <p className="text-2xl font-black text-slate-900 dark:text-white">{stats.avgDaysInInventory}d</p>
+                    <p className="mt-2 text-[10px] text-secondary-500 font-bold">Optimized Range</p>
                   </div>
                 </div>
-                <div className="p-4 bg-gray-50 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-600">Avg Days on Lot</span>
-                    <Clock className="w-4 h-4 text-gray-600" />
+
+                <div className="p-5 border border-slate-100 dark:border-white/5 rounded-2xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-2">
+                      <Car className="h-4 w-4 text-primary-500" />
+                      <span className="text-sm font-bold text-slate-900 dark:text-white">Active Recommendations</span>
+                    </div>
+                    <span className="text-xs font-bold text-secondary-500">2 Actions Required</span>
                   </div>
-                  <p className="text-xl font-bold text-gray-900">{stats.avgDaysInInventory} days</p>
+                  {recommendations.slice(0, 2).map((rec, i) => (
+                    <div key={i} className="flex items-center justify-between text-xs mb-3 last:mb-0">
+                      <span className="text-slate-600 dark:text-slate-400 font-medium">
+                        {rec.decoded_data.year} {rec.decoded_data.make}
+                      </span>
+                      <span className="text-slate-900 dark:text-white font-black">Buy Suggestion</span>
+                    </div>
+                  ))}
                 </div>
-                {tenant?.inventory_ready_at && (
-                  <p className="text-xs text-gray-500 text-center">
-                    Last updated: {new Date(tenant.inventory_ready_at).toLocaleDateString()}
-                  </p>
-                )}
               </div>
             ) : (
-              <div className="text-center py-8 text-gray-500">
-                <Package className="h-12 w-12 mx-auto mb-3 text-gray-300" />
-                <p className="mb-2">No inventory analyzed yet</p>
-                <Link
-                  to="/onboarding"
-                  className="text-blue-900 hover:text-blue-800 font-semibold text-sm inline-block"
-                >
-                  Analyze Your Inventory
-                </Link>
+              <div className="py-12 text-center text-slate-500 border-2 border-dashed border-slate-200 dark:border-white/5 rounded-2xl">
+                <Package className="h-10 w-10 mx-auto mb-4 opacity-50" />
+                <p className="text-sm font-medium">Your inventory data will appear here.</p>
+                <Link to="/onboarding" className="mt-4 inline-block text-primary-500 font-bold text-sm">Analyze Inventory Now</Link>
               </div>
             )}
-          </div>
-        </div >
+          </GlassCard>
+        </div>
 
-        {/* Details Modal */}
-        {
-          selectedScan && (
-            <div
-              className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-              onClick={handleCloseModal}
+        {/* Modal for Details */}
+        {selectedScan && (
+          <div
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            onClick={handleCloseModal}
+          >
+            <GlassCard
+              className="w-full max-w-4xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in duration-200"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div
-                className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Modal Header */}
-                <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
-                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
-                  <button
-                    onClick={handleCloseModal}
-                    className="p-2 hover:bg-gray-100 rounded-lg transition"
-                  >
-                    <X className="w-6 h-6" />
-                  </button>
-                </div>
+              <div className="sticky top-0 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-100 dark:border-white/10 p-6 flex items-center justify-between z-10">
+                <h2 className="text-2xl font-bold text-slate-900 dark:text-white">Scan Analysis</h2>
+                <button onClick={handleCloseModal} className="p-2 hover:bg-slate-100 dark:hover:bg-white/10 rounded-xl transition text-slate-500">
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
 
+              <div className="p-6">
                 <VINScanResult
                   scanData={{
                     id: selectedScan.id,
@@ -533,9 +432,9 @@ export default function DashboardPage() {
                   isEditing={isEditingCosts}
                 />
               </div>
-            </div>
-          )
-        }
+            </GlassCard>
+          </div>
+        )}
 
         <ConfirmationDialog
           isOpen={showConfirmDialog}
@@ -549,7 +448,7 @@ export default function DashboardPage() {
           cancelLabel="Save and Stay"
           message="You have unsaved changes in the profit calculator. How would you like to proceed?"
         />
-      </div >
-    </div >
+      </div>
+    </div>
   );
 }
