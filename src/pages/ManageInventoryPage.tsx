@@ -334,7 +334,7 @@ export default function ManageInventoryPage() {
         </div>
 
         {/* Processing Status Message */}
-        {(tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing') && (
+        {(tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing' || tenant?.inventory_status === 'pending_review') && (
           <div className="flex items-center justify-center px-4 py-8">
             <div className="max-w-2xl w-full bg-white rounded-lg shadow-sm p-8">
               <div className="text-center mb-6">
@@ -346,25 +346,7 @@ export default function ManageInventoryPage() {
               </div>
 
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
-                <p className="text-blue-800 font-medium">You'll be notified when it is ready for you to review.</p>
-              </div>
-
-              <div className="bg-gray-50 rounded-lg p-6 mb-6">
-                <h3 className="font-bold text-gray-900 mb-3">While you wait, you can:</h3>
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li className="flex items-center">
-                    <span className="text-green-600 mr-2">✓</span>
-                    <span>Scan VINs to get instant purchase recommendations</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-green-600 mr-2">✓</span>
-                    <span>Set up your default cost settings in Settings</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-green-600 mr-2">✓</span>
-                    <span>Explore the dashboard and familiarize yourself with the features</span>
-                  </li>
-                </ul>
+                <p className="text-blue-800 font-medium">You'll be notified via email when it is ready for you to review.</p>
               </div>
 
               <div className="space-y-3">
@@ -373,13 +355,6 @@ export default function ManageInventoryPage() {
                   className="w-full bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 transition"
                 >
                   Go to Dashboard
-                </button>
-                <button
-                  onClick={() => navigate('/scan')}
-                  className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
-                >
-                  <Target className="w-4 h-4" />
-                  VIN Scan
                 </button>
               </div>
 

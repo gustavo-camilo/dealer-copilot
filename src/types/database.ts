@@ -27,7 +27,7 @@ export interface TenantCostSettings {
   target_days_to_sale: number;
 }
 
-export type InventoryStatus = 'pending' | 'processing' | 'ready' | 'failed';
+export type InventoryStatus = 'pending' | 'processing' | 'ready' | 'failed' | 'pending_review';
 
 export interface Tenant {
   id: string;
@@ -303,9 +303,34 @@ export type SourceType = 'dealer' | 'competitor';
 export type TrackedVehicleStatus = 'active' | 'sold' | 'removed';
 export type ListingDateConfidence = 'high' | 'medium' | 'low' | 'estimated';
 
+// ... existing types ...
+
+export interface TenantSource {
+  id: string;
+  tenant_id: string;
+  source_id: string;
+  relationship_type: 'owner' | 'competitor' | 'watchlist';
+  config: Record<string, any>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TenantVehicleOverride {
+  tenant_id: string;
+  vehicle_id: string;
+  custom_price: number | null;
+  notes: string | null;
+  floor_plan_status: string | null;
+  is_starred: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+// Updated TrackedVehicle with source_id
 export interface TrackedVehicle {
   id: string;
-  tenant_id: string | null; // NULL for competitor vehicles
+  tenant_id: string | null; // Deprecated: Moving to source_id based model
+  source_id: string | null; // New Centralized ID
   source_url: string;
   source_type: SourceType;
   vin: string | null;
@@ -330,9 +355,11 @@ export interface TrackedVehicle {
   updated_at: string;
 }
 
+// Updated InventorySnapshotUnified with source_id
 export interface InventorySnapshotUnified {
   id: string;
-  tenant_id: string | null;
+  tenant_id: string | null; // Deprecated
+  source_id: string | null; // New Centralized ID
   source_url: string;
   source_type: SourceType;
   source_name: string | null;
@@ -352,7 +379,7 @@ export interface InventorySnapshotUnified {
   model_distribution: Record<string, number> | null; // JSONB
   price_distribution: Record<string, number> | null; // JSONB
   scraping_duration_ms: number | null;
-  status: 'pending' | 'success' | 'partial' | 'failed';
+  status: 'pending' | 'success' | 'partial' | 'failed' | 'pending_review';
   error_message: string | null;
   raw_data: any | null; // JSONB
   created_at: string;
@@ -363,7 +390,7 @@ export interface SourceRegistry {
   source_url: string;
   source_type: SourceType;
   source_name: string | null;
-  tenant_id: string | null;
+  tenant_id: string | null; // Deprecated
   scraping_enabled: boolean;
   last_scraped_at: string | null;
   next_scheduled_scrape: string | null;
@@ -373,3 +400,4 @@ export interface SourceRegistry {
   migrated_from_competitor_at: string | null;
   original_competitor_url: string | null;
 }
+

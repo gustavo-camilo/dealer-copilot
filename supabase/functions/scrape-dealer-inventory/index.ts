@@ -925,12 +925,12 @@ async function processVehicles(
       // Existing vehicle - Smart update: only update fields that have new data
       console.log(`Updating existing vehicle: ${identifier}`);
 
-    const updates: any = {
-      last_seen_at: new Date().toISOString(),
-    };
-    if (website_url) {
-      updates.source_url = website_url;
-    }
+      const updates: any = {
+        last_seen_at: new Date().toISOString(),
+      };
+      if (website_url) {
+        updates.source_url = website_url;
+      }
 
       // Smart update: only update fields if new scrape found data
       if (vehicle.stock_number !== undefined && vehicle.stock_number !== null) {

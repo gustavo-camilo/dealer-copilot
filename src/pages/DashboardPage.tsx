@@ -403,37 +403,18 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            {tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing' ? (
+            {tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing' || tenant?.inventory_status === 'pending_review' ? (
               <div className="text-center py-6">
                 <div className="bg-blue-100 w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-3">
                   <RefreshCw className="h-6 w-6 text-blue-600 animate-spin" />
                 </div>
                 <h3 className="text-lg font-bold text-gray-900 mb-2">Your inventory is being processed</h3>
-                <p className="text-sm text-gray-600 mb-3">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
-
+                <p className="text-sm text-gray-600 mb-3">
+                  We're currently scanning your website. This usually takes a few minutes, but can take up to 2-4 hours.
+                </p>
                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3 text-center">
-                  <p className="text-xs text-blue-800 font-medium">You'll be notified when it is ready for you to review.</p>
+                  <p className="text-xs text-blue-800 font-medium">You'll be notified via email when ready.</p>
                 </div>
-
-                <div className="bg-gray-50 rounded-lg p-3 mb-3">
-                  <h4 className="text-xs font-bold text-gray-900 mb-2">While you wait, you can:</h4>
-                  <ul className="space-y-1 text-xs text-gray-700">
-                    <li className="flex items-center justify-center">
-                      <span className="text-green-600 mr-1 text-xs">✓</span>
-                      <span>Scan VINs to get instant purchase recommendations</span>
-                    </li>
-                    <li className="flex items-center justify-center">
-                      <span className="text-green-600 mr-1 text-xs">✓</span>
-                      <span>Set up your default cost settings in Settings</span>
-                    </li>
-                  </ul>
-                </div>
-
-                {tenant?.inventory_ready_at && (
-                  <p className="text-xs text-blue-600 mt-3">
-                    Last updated: {new Date(tenant.inventory_ready_at).toLocaleString()}
-                  </p>
-                )}
               </div>
             ) : tenant?.inventory_status === 'ready' && stats.totalVehicles > 0 ? (
               <div className="space-y-4">
@@ -481,55 +462,57 @@ export default function DashboardPage() {
               </div>
             )}
           </div>
-        </div>
+        </div >
 
         {/* Details Modal */}
-        {selectedScan && (
-          <div
-            className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-            onClick={handleCloseModal}
-          >
+        {
+          selectedScan && (
             <div
-              className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+              className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
+              onClick={handleCloseModal}
             >
-              {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
+              <div
+                className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                {/* Modal Header */}
+                <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
+                  <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
+                  <button
+                    onClick={handleCloseModal}
+                    className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  >
+                    <X className="w-6 h-6" />
+                  </button>
+                </div>
 
-              <VINScanResult
-                scanData={{
-                  id: selectedScan.id,
-                  decoded_data: selectedScan.decoded_data,
-                  market_data: selectedScan.market_data,
-                  recommendation: selectedScan.recommendation,
-                  confidence_score: selectedScan.confidence_score,
-                  match_reasoning: selectedScan.match_reasoning,
-                  estimated_profit: selectedScan.estimated_profit,
-                  max_bid_suggestion: selectedScan.max_bid_suggestion,
-                  custom_recon_cost: selectedScan.custom_recon_cost,
-                  custom_transport_cost: selectedScan.custom_transport_cost,
-                  custom_max_bid: selectedScan.custom_max_bid,
-                  custom_market_price: selectedScan.custom_market_price,
-                }}
-                isModal={true}
-                tenantZipCode={tenant?.zip_code}
-                onClose={handleCloseModal}
-                onEditStatusChange={setIsEditingCosts}
-                onOutsideClick={() => setShowConfirmDialog(true)}
-                ref={scanResultRef}
-                isEditing={isEditingCosts}
-              />
+                <VINScanResult
+                  scanData={{
+                    id: selectedScan.id,
+                    decoded_data: selectedScan.decoded_data,
+                    market_data: selectedScan.market_data,
+                    recommendation: selectedScan.recommendation,
+                    confidence_score: selectedScan.confidence_score,
+                    match_reasoning: selectedScan.match_reasoning,
+                    estimated_profit: selectedScan.estimated_profit,
+                    max_bid_suggestion: selectedScan.max_bid_suggestion,
+                    custom_recon_cost: selectedScan.custom_recon_cost,
+                    custom_transport_cost: selectedScan.custom_transport_cost,
+                    custom_max_bid: selectedScan.custom_max_bid,
+                    custom_market_price: selectedScan.custom_market_price,
+                  }}
+                  isModal={true}
+                  tenantZipCode={tenant?.zip_code}
+                  onClose={handleCloseModal}
+                  onEditStatusChange={setIsEditingCosts}
+                  onOutsideClick={() => setShowConfirmDialog(true)}
+                  ref={scanResultRef}
+                  isEditing={isEditingCosts}
+                />
+              </div>
             </div>
-          </div>
-        )}
+          )
+        }
 
         <ConfirmationDialog
           isOpen={showConfirmDialog}
@@ -543,7 +526,7 @@ export default function DashboardPage() {
           cancelLabel="Save and Stay"
           message="You have unsaved changes in the profit calculator. How would you like to proceed?"
         />
-      </div>
-    </div>
+      </div >
+    </div >
   );
 }
