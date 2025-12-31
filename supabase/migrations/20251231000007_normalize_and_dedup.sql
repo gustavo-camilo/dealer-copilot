@@ -13,9 +13,7 @@ DECLARE
 BEGIN
     RAISE NOTICE 'Starting Normalization...';
 
-    -- 1. Normalize Source Registry (Strip Protocol & WWW)
-    -- We want 'https://www.rpm-motors.us/' -> 'rpm-motors.us'
-    -- Note: We loop to handle potential conflicts (if both 'rpm-motors.us' and 'www.rpm-motors.us' exist)
+    -- 1. Normalize Source Registry (Slightly improved to be more robust)
     FOR r IN SELECT * FROM source_registry WHERE source_url ~ '^https?://|www\.' LOOP
         DECLARE
             clean_url TEXT;
@@ -23,12 +21,9 @@ BEGIN
         BEGIN
             clean_url := regexp_replace(regexp_replace(r.source_url, '^https?://(www\.)?', '', 'i'), '/+$', '');
             
-            -- Check if clean version already exists (different ID)
             SELECT id INTO existing_id FROM source_registry WHERE source_url = clean_url AND id != r.id;
             
             IF existing_id IS NOT NULL THEN
-                -- MERGE: Handle tenant_sources links (avoid unique constraint violation)
-                -- 1. Delete links to 'r.id' where a link to 'existing_id' already exists for same tenant
                 DELETE FROM tenant_sources ts1
                 WHERE ts1.source_id = r.id
                 AND EXISTS (
@@ -37,40 +32,30 @@ BEGIN
                     AND ts2.tenant_id = ts1.tenant_id
                 );
                 
-                -- 2. Update remaining links
                 UPDATE tenant_sources SET source_id = existing_id WHERE source_id = r.id;
-                
-                -- Move vehicles and snapshots
                 UPDATE tracked_vehicles SET source_id = existing_id WHERE source_id = r.id;
                 UPDATE inventory_snapshots_unified SET source_id = existing_id WHERE source_id = r.id;
                 
-                -- Delete the redundant source
                 DELETE FROM source_registry WHERE id = r.id;
-                RAISE NOTICE 'Merged Source % (%) into % (%)', r.source_url, r.id, clean_url, existing_id;
+                RAISE NOTICE 'Merged Source % into %', r.source_url, clean_url;
             ELSE
-                -- UPDATE: just clean the string
                 UPDATE source_registry SET source_url = clean_url WHERE id = r.id;
-                RAISE NOTICE 'Normalized Source: % -> %', r.source_url, clean_url;
             END IF;
         END;
     END LOOP;
 
-    -- 2. Normalize Tracked Vehicles (for historical matching)
-    UPDATE tracked_vehicles
-    SET source_url = regexp_replace(regexp_replace(source_url, '^https?://(www\.)?', '', 'i'), '/+$', '')
-    WHERE source_url ~ '^https?://|www\.';
-
-    -- 3. Link Orphans
-    -- Now that everything is normalized, simple matching works
+    -- 2. Link ALL vehicles to their canonical source_id using logic that matches the new standard
+    -- We do this BEFORE normalizing source_url to identify duplicates
     UPDATE tracked_vehicles tv
     SET source_id = sr.id
     FROM source_registry sr
-    WHERE tv.source_id IS NULL 
-    AND tv.source_url = sr.source_url;
+    WHERE sr.source_url = regexp_replace(regexp_replace(tv.source_url, '^https?://(www\.)?', '', 'i'), '/+$', '')
+    AND (tv.source_id IS NULL OR tv.source_id != sr.id);
 
-    RAISE NOTICE 'Orphans Linked. Starting Deduplication...';
+    RAISE NOTICE 'Links synchronized. Starting Deduplication...';
 
-    -- 4. Intelligent Deduplication (Same Logic as before)
+    -- 3. Intelligent Deduplication (Group by source_id and vin)
+    -- This removes records that WOULD conflict when we normalize source_url
     FOR r IN 
         SELECT source_id, vin, array_agg(id ORDER BY first_seen_at ASC) as ids
         FROM tracked_vehicles
@@ -78,10 +63,9 @@ BEGIN
         GROUP BY source_id, vin
         HAVING count(*) > 1
     LOOP
-        keep_id := r.ids[1]; -- Oldest
+        keep_id := r.ids[1];
         del_ids := r.ids[2:array_length(r.ids, 1)];
 
-        -- Grab image from duplicates if main is missing
         SELECT image_url INTO merged_image 
         FROM tracked_vehicles 
         WHERE id = ANY(del_ids) 
@@ -95,8 +79,14 @@ BEGIN
         WHERE id = keep_id;
 
         DELETE FROM tracked_vehicles WHERE id = ANY(del_ids);
-        
-        RAISE NOTICE 'Deduplicated VIN %', r.vin;
+        RAISE NOTICE 'Deduplicated VIN % for source %', r.vin, r.source_id;
     END LOOP;
 
+    -- 4. NOW it is safe to normalize source_url in tracked_vehicles
+    -- because duplicates that would have caused a unique constraint violation are gone
+    UPDATE tracked_vehicles
+    SET source_url = regexp_replace(regexp_replace(source_url, '^https?://(www\.)?', '', 'i'), '/+$', '')
+    WHERE source_url ~ '^https?://|www\.';
+
+    RAISE NOTICE 'Normalization and Deduplication complete.';
 END $$;
