@@ -3,14 +3,13 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Vehicle, SalesRecord, VINScan } from '../types/database';
-import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Menu, X, Globe, ChevronRight, Package, Eye, RefreshCw } from 'lucide-react';
-import NavigationMenu from '../components/NavigationMenu';
+import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Globe, ChevronRight, Package, Eye, RefreshCw, X } from 'lucide-react';
 import VINScanResult from '../components/VINScanResult';
+import Header from '../components/Header';
 
 export default function DashboardPage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
-  const location = useLocation();
   const [stats, setStats] = useState({
     totalVehicles: 0,
     portfolioValue: 0,
@@ -147,45 +146,13 @@ export default function DashboardPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Target className="h-8 w-8 text-blue-900" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
-            </div>
-            <div className="flex items-center space-x-4 relative">
-              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
-              <Link
-                to="/scan"
-                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
-              >
-                Scan VIN
-              </Link>
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition"
-                  aria-label="Menu"
-                >
-                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </button>
-
-                {/* Navigation Menu */}
-                {menuOpen && (
-                  <NavigationMenu
-                    currentPath={location.pathname}
-                    onClose={() => setMenuOpen(false)}
-                    onSignOut={handleSignOut}
-                    user={user}
-                    tenantName={tenant?.name}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Header
+        user={user}
+        tenant={tenant}
+        signOut={handleSignOut}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Welcome Message - Only show if inventory hasn't been requested yet */}

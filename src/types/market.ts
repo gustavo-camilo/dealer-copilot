@@ -20,4 +20,5 @@ export interface MarketPricingData {
     listings: MarketListing[];
     confidence: number; // 0-100
     dataSource: 'estimated' | 'marketcheck' | 'autodev';
+    radius?: number;
 }

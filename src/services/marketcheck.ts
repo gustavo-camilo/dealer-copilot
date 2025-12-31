@@ -34,7 +34,7 @@ export async function searchActiveListings(
     make: string,
     model: string,
     zip: string,
-    radius: number = 50,
+    radius: number = 100,
     mileage?: number
 ): Promise<MarketcheckSearchResponse | null> {
     try {
@@ -48,6 +48,10 @@ export async function searchActiveListings(
                 mileage
             }
         });
+
+        if (data) {
+            data.radius = radius;
+        }
 
         if (error) {
             throw new Error(`Marketcheck API error: ${error.message}`);
@@ -64,7 +68,7 @@ export async function searchActiveListings(
  * Convert Marketcheck response to our internal MarketPricingData format
  */
 export function processMarketcheckData(
-    data: MarketcheckSearchResponse
+    data: MarketcheckSearchResponse & { radius?: number }
 ): MarketPricingData {
     const listings = data.listings.filter(l => l.price > 0); // Filter out zero price
 
@@ -103,6 +107,7 @@ export function processMarketcheckData(
             state: l.seller_state
         })),
         confidence: listings.length > 10 ? 90 : listings.length > 5 ? 70 : 50,
-        dataSource: 'marketcheck'
+        dataSource: 'marketcheck',
+        radius: data.radius
     };
 }

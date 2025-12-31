@@ -28,7 +28,7 @@ serve(async (req) => {
             year: year ? `${year - 1}-${year + 1}` : '',
             make: make || '',
             model: model || '',
-            radius: (radius || 50).toString(),
+            radius: (radius || 100).toString(),
             zip: zip || '',
             car_type: 'used',
             start: (start || 0).toString(),

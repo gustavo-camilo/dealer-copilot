@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Edit2 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 import { AuctionFeeThreshold } from '../types/database';
 import { calculateAuctionFee } from '../services/marketPricing';
@@ -20,6 +21,7 @@ export interface ProfitCalculatorProps {
     estimatedProfit: number;
     costsEdited: boolean;
   }) => void;
+  onEditStatusChange?: (isEditing: boolean) => void;
 }
 
 export default function ProfitCalculator({
@@ -29,6 +31,7 @@ export default function ProfitCalculator({
   defaultRecon,
   defaultTransport,
   onCostsChange,
+  onEditStatusChange,
 }: ProfitCalculatorProps) {
   const [maxBid, setMaxBid] = useState(maxBidSuggestion);
   const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(null);
@@ -36,6 +39,31 @@ export default function ProfitCalculator({
   const [transportCost, setTransportCost] = useState(defaultTransport);
   const [marketPrice, setMarketPrice] = useState(defaultMarketPrice);
   const [isEditing, setIsEditing] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Notify parent of isEditing change
+  useEffect(() => {
+    if (onEditStatusChange) {
+      onEditStatusChange(isEditing);
+    }
+  }, [isEditing, onEditStatusChange]);
+
+  // Handle click away
+  useEffect(() => {
+    const handleClickAway = (event: MouseEvent) => {
+      if (isEditing && containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        toast('Please save your edits before continuing.', {
+          icon: '⚠️',
+          id: 'unsaved-costs-warning',
+        });
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickAway);
+    return () => {
+      document.removeEventListener('mousedown', handleClickAway);
+    };
+  }, [isEditing]);
 
   // Calculate auction fee (use custom if set, otherwise calculate from thresholds based on current maxBid)
   const calculatedAuctionFee = calculateAuctionFee(maxBid, auctionFeeThresholds);
@@ -80,7 +108,7 @@ export default function ProfitCalculator({
   }, [maxBid, auctionFee, reconCost, transportCost, marketPrice, totalCost, estimatedProfit, costsEdited, onCostsChange]);
 
   return (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div ref={containerRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <h3 className="font-bold text-gray-900">💰 Profit Calculator</h3>

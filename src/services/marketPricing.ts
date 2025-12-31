@@ -11,7 +11,7 @@ export type { MarketPricingData, MarketListing } from '../types/market';
 export async function getMarketPricing(
   vehicleData: DecodedVehicleData,
   zipCode: string = '90210', // Default to Beverly Hills if no zip provided (TODO: Get from tenant settings)
-  radius: number = 50 // Default to 50 miles, can be expanded to 500
+  radius: number = 100 // Default to 100 miles, can be expanded to 500
 ): Promise<MarketPricingData | null> {
   // Try to get real market data from Marketcheck
   try {

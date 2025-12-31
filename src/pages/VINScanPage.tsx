@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate, useLocation } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { Link, useNavigate, useLocation, useBlocker } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Target, Menu, X, Loader2 } from 'lucide-react';
@@ -8,6 +8,7 @@ import { getMarketPricing, calculateMaxBid } from '../services/marketPricing';
 import { generateRecommendation } from '../services/recommendationEngine';
 import VINScanResult from '../components/VINScanResult';
 import NavigationMenu from '../components/NavigationMenu';
+import Header from '../components/Header';
 import { SalesRecord, TenantCostSettings } from '../types/database';
 
 // Default cost settings if tenant hasn't configured them
@@ -34,6 +35,38 @@ export default function VINScanPage() {
   const [result, setResult] = useState<any>(null);
   const [error, setError] = useState<React.ReactNode | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [isEditingCosts, setIsEditingCosts] = useState(false);
+
+  // Handle browser refresh/close
+  useEffect(() => {
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      if (isEditingCosts) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, [isEditingCosts]);
+
+  // Handle in-app navigation
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isEditingCosts && currentLocation.pathname !== nextLocation.pathname
+  );
+
+  useEffect(() => {
+    if (blocker.state === 'blocked') {
+      const proceed = window.confirm(
+        'You have unsaved changes in the profit calculator. Are you sure you want to leave?'
+      );
+      if (proceed) {
+        blocker.proceed?.();
+      } else {
+        blocker.reset?.();
+      }
+    }
+  }, [blocker]);
 
   const costSettings = tenant?.cost_settings || DEFAULT_COST_SETTINGS;
 
@@ -85,7 +118,7 @@ export default function VINScanPage() {
         return;
       }
 
-      const marketData = await getMarketPricing(enrichedData, tenant.zip_code, customRadius || 50);
+      const marketData = await getMarketPricing(enrichedData, tenant.zip_code, customRadius || 100);
 
       // If no market data, we still proceed but with limited info
       if (!marketData) {
@@ -166,6 +199,7 @@ export default function VINScanPage() {
         estimated_days_to_sale: recommendation.estimatedDaysToSale,
         market_data: marketData,
         scan_id: scanData?.id,
+        radius: customRadius || 100,
       });
     } catch (error) {
       console.error('Error scanning VIN:', error);
@@ -222,6 +256,7 @@ export default function VINScanPage() {
         confidence_score: recommendation.confidenceScore,
         match_reasoning: recommendation.matchReasons,
         estimated_days_to_sale: recommendation.estimatedDaysToSale,
+        radius: radius,
       });
 
       // Update database with new market data if scan_id exists
@@ -249,45 +284,25 @@ export default function VINScanPage() {
     return (
       <div className="min-h-screen bg-gray-50">
         {/* Header */}
-        <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            <div className="flex justify-between items-center h-16">
-              <div className="flex items-center">
-                <Target className="h-8 w-8 text-blue-900" />
-                <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
-              </div>
-              <div className="flex items-center space-x-4 relative">
-                <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
-                <Link
-                  to="/scan"
-                  className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
-                >
-                  Scan VIN
-                </Link>
-                <div className="relative">
-                  <button
-                    onClick={() => setMenuOpen(!menuOpen)}
-                    className="p-2 rounded-lg hover:bg-gray-100 transition"
-                    aria-label="Menu"
-                  >
-                    {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                  </button>
-
-                  {/* Navigation Menu */}
-                  {menuOpen && (
-                    <NavigationMenu
-                      currentPath={location.pathname}
-                      onClose={() => setMenuOpen(false)}
-                      onSignOut={handleSignOut}
-                      user={user}
-                      tenantName={tenant?.name}
-                    />
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <Header
+          user={user}
+          tenant={tenant}
+          signOut={handleSignOut}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          onScanVinClick={() => {
+            if (isEditingCosts) {
+              const proceed = window.confirm('You have unsaved changes. Are you sure you want to restart the scan?');
+              if (!proceed) return;
+            }
+            setResult(null);
+            setVin('');
+            setMileage('');
+            setError(null);
+            setMenuOpen(false);
+            setIsEditingCosts(false);
+          }}
+        />
 
         <VINScanResult
           scanData={{
@@ -300,6 +315,7 @@ export default function VINScanPage() {
             estimated_profit: result.estimated_profit,
             max_bid_suggestion: result.max_bid_suggestion,
             estimated_days_to_sale: result.estimated_days_to_sale,
+            radius: result.radius,
           }}
           costSettings={costSettings}
           tenantZipCode={tenant?.zip_code}
@@ -309,7 +325,9 @@ export default function VINScanPage() {
             setVin('');
             setMileage('');
             setError(null);
+            setIsEditingCosts(false);
           }}
+          onEditStatusChange={setIsEditingCosts}
         />
       </div>
     );
@@ -318,45 +336,25 @@ export default function VINScanPage() {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <Target className="h-8 w-8 text-blue-900" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
-            </div>
-            <div className="flex items-center space-x-4 relative">
-              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
-              <Link
-                to="/scan"
-                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
-              >
-                Scan VIN
-              </Link>
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition"
-                  aria-label="Menu"
-                >
-                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </button>
-
-                {/* Navigation Menu */}
-                {menuOpen && (
-                  <NavigationMenu
-                    currentPath={location.pathname}
-                    onClose={() => setMenuOpen(false)}
-                    onSignOut={handleSignOut}
-                    user={user}
-                    tenantName={tenant?.name}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Header
+        user={user}
+        tenant={tenant}
+        signOut={handleSignOut}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        onScanVinClick={() => {
+          if (isEditingCosts) {
+            const proceed = window.confirm('You have unsaved changes. Are you sure you want to restart the scan?');
+            if (!proceed) return;
+          }
+          setResult(null);
+          setVin('');
+          setMileage('');
+          setError(null);
+          setMenuOpen(false);
+          setIsEditingCosts(false);
+        }}
+      />
 
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="max-w-md w-full">

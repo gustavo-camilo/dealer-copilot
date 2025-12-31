@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
@@ -43,6 +43,7 @@ interface VINScanResultProps {
         estimated_profit: number | null;
         max_bid_suggestion: number | null;
         estimated_days_to_sale?: number | null;
+        radius?: number; // The radius used for the search
     };
     onClose?: () => void;
     onScanAnother?: () => void;
@@ -50,6 +51,7 @@ interface VINScanResultProps {
     costSettings?: any; // Pass cost settings if available
     tenantZipCode?: string | null;
     onRescan?: (radius: number) => Promise<void>; // NEW: Handler for expanding search
+    onEditStatusChange?: (isEditing: boolean) => void;
 }
 
 export default function VINScanResult({
@@ -60,6 +62,7 @@ export default function VINScanResult({
     costSettings,
     tenantZipCode,
     onRescan,
+    onEditStatusChange,
 }: VINScanResultProps) {
     const { user } = useAuth();
     const [reportLoading, setReportLoading] = useState(false);
@@ -198,19 +201,19 @@ export default function VINScanResult({
                                     {scanData.market_data.maxPrice.toLocaleString()}
                                 </p>
                                 <p>
-                                    • Cheapest Listing: ${scanData.market_data.minPrice.toLocaleString()} (Within 50 Miles)
+                                    • Cheapest Listing: ${scanData.market_data.minPrice.toLocaleString()} (Within {scanData.market_data.radius || 100} Miles)
                                 </p>
                             </div>
                         </div>
 
                         {/* Show warning and expand button if limited data */}
-                        {scanData.market_data.listingsCount < 5 && onRescan && (
+                        {scanData.market_data.listingsCount < 5 && onRescan && (scanData.market_data.radius || scanData.radius || 0) < 500 && (
                             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
                                 <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1">
                                         <h4 className="font-semibold text-yellow-900 mb-1">⚠️ Limited Market Data</h4>
                                         <p className="text-sm text-yellow-800">
-                                            Found only {scanData.market_data.listingsCount} listing(s) within 50 miles.
+                                            Found only {scanData.market_data.listingsCount} listing(s) within {scanData.market_data.radius || scanData.radius || 100} miles.
                                             Expand to 500 miles for more results?
                                         </p>
                                     </div>
@@ -278,7 +281,7 @@ export default function VINScanResult({
                                 </p>
 
                                 {/* Show expand button if onRescan available and not already expanded */}
-                                {onRescan && !isExpandingSearch && (
+                                {onRescan && !isExpandingSearch && (scanData.market_data?.radius || scanData.radius || 0) < 500 && (
                                     <button
                                         onClick={handleExpandSearch}
                                         className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto mb-4"
@@ -300,14 +303,17 @@ export default function VINScanResult({
                                         Report submitted successfully! Our team will investigate.
                                     </div>
                                 ) : (
-                                    <button
-                                        onClick={handleReportMissingData}
-                                        disabled={reportLoading}
-                                        className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto"
-                                    >
-                                        {reportLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
-                                        Report Missing Data to Support
-                                    </button>
+                                    // Only show report button if search was already expanded to 500 miles OR if onRescan is not available
+                                    ((scanData.market_data?.radius || scanData.radius || 0) >= 500 || !onRescan) && (
+                                        <button
+                                            onClick={handleReportMissingData}
+                                            disabled={reportLoading}
+                                            className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto"
+                                        >
+                                            {reportLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
+                                            Report Missing Data to Support
+                                        </button>
+                                    )
                                 )}
                                 {error && (
                                     <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
@@ -345,6 +351,7 @@ export default function VINScanResult({
                             }
                         }
                     }}
+                    onEditStatusChange={onEditStatusChange}
                 />
 
                 {/* Match Reasoning - Moved to bottom with collapsible */}
@@ -352,13 +359,12 @@ export default function VINScanResult({
                     <div className="mt-6">
                         <button
                             onClick={() => setReasoningExpanded(!reasoningExpanded)}
-                            className={`w-full rounded-lg p-4 text-left transition-colors ${
-                                scanData.recommendation === 'buy'
-                                    ? 'bg-green-50 border border-green-200 hover:bg-green-100'
-                                    : scanData.recommendation === 'caution'
-                                        ? 'bg-yellow-50 border border-yellow-200 hover:bg-yellow-100'
-                                        : 'bg-red-50 border border-red-200 hover:bg-red-100'
-                            }`}
+                            className={`w-full rounded-lg p-4 text-left transition-colors ${scanData.recommendation === 'buy'
+                                ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                                : scanData.recommendation === 'caution'
+                                    ? 'bg-yellow-50 border border-yellow-200 hover:bg-yellow-100'
+                                    : 'bg-red-50 border border-red-200 hover:bg-red-100'
+                                }`}
                         >
                             <div className="flex items-center justify-between">
                                 <h3 className="font-bold text-gray-900">
@@ -375,13 +381,12 @@ export default function VINScanResult({
                         </button>
                         {reasoningExpanded && (
                             <div
-                                className={`rounded-b-lg p-4 border-x border-b ${
-                                    scanData.recommendation === 'buy'
-                                        ? 'bg-green-50 border-green-200'
-                                        : scanData.recommendation === 'caution'
-                                            ? 'bg-yellow-50 border-yellow-200'
-                                            : 'bg-red-50 border-red-200'
-                                }`}
+                                className={`rounded-b-lg p-4 border-x border-b ${scanData.recommendation === 'buy'
+                                    ? 'bg-green-50 border-green-200'
+                                    : scanData.recommendation === 'caution'
+                                        ? 'bg-yellow-50 border-yellow-200'
+                                        : 'bg-red-50 border-red-200'
+                                    }`}
                             >
                                 <div className="space-y-2">
                                     {scanData.match_reasoning.map((reason: any, index: number) => (
