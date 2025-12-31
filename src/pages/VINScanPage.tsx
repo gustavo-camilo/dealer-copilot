@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useBlocker } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -37,6 +37,7 @@ export default function VINScanPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditingCosts, setIsEditingCosts] = useState(false);
   const [pendingReset, setPendingReset] = useState(false);
+  const scanResultRef = useRef<{ saveCosts: () => void }>(null);
 
   const resetScan = () => {
     setResult(null);
@@ -74,6 +75,7 @@ export default function VINScanPage() {
 
   const handleCancelNavigation = () => {
     if (blocker.state === 'blocked') {
+      scanResultRef.current?.saveCosts();
       setIsEditingCosts(false);
       blocker.reset?.();
     }
@@ -348,6 +350,7 @@ export default function VINScanPage() {
           }}
           onEditStatusChange={setIsEditingCosts}
           onOutsideClick={() => setPendingReset(true)}
+          ref={scanResultRef}
         />
 
         {/* Navigation Warning Dialog */}
@@ -364,6 +367,7 @@ export default function VINScanPage() {
           isOpen={pendingReset}
           onConfirm={resetScan}
           onCancel={() => {
+            scanResultRef.current?.saveCosts();
             setIsEditingCosts(false);
             setPendingReset(false);
           }}

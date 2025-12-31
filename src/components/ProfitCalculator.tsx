@@ -1,5 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { Edit2, Loader2 } from 'lucide-react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Edit2, Loader2, RotateCcw, Save } from 'lucide-react';
 
 import { AuctionFeeThreshold } from '../types/database';
 import { calculateAuctionFee } from '../services/marketPricing';
@@ -20,24 +20,31 @@ export interface ProfitCalculatorProps {
     estimatedProfit: number;
     costsEdited: boolean;
   }) => void;
+  onSave?: (costs: {
+    recon: number;
+    transport: number;
+    maxBid: number;
+    marketPrice: number;
+  }) => void;
   onEditStatusChange?: (isEditing: boolean) => void;
   onOutsideClick?: () => void;
   isSaving?: boolean;
   isEditing?: boolean;
 }
 
-export default function ProfitCalculator({
+const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>(({
   maxBidSuggestion,
   marketPrice: defaultMarketPrice,
   auctionFeeThresholds,
   defaultRecon,
   defaultTransport,
   onCostsChange,
+  onSave,
   onEditStatusChange,
   onOutsideClick,
   isSaving = false,
   isEditing: isEditingProp,
-}: ProfitCalculatorProps) {
+}, ref) => {
   const [maxBid, setMaxBid] = useState(maxBidSuggestion);
   const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(null);
   const [reconCost, setReconCost] = useState(defaultRecon);
@@ -45,6 +52,19 @@ export default function ProfitCalculator({
   const [marketPrice, setMarketPrice] = useState(defaultMarketPrice);
   const [isEditing, setIsEditing] = useState(isEditingProp || false);
   const containerRef = useRef<HTMLDivElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    save: () => {
+      if (onSave) {
+        onSave({
+          recon: reconCost,
+          transport: transportCost,
+          maxBid,
+          marketPrice
+        });
+      }
+    }
+  }), [onSave, reconCost, transportCost, maxBid, marketPrice]);
 
   // Sync isEditing with prop
   useEffect(() => {
@@ -139,17 +159,35 @@ export default function ProfitCalculator({
           {costsEdited && (
             <button
               onClick={resetToDefaults}
-              className="text-xs text-gray-600 hover:text-gray-900 underline"
+              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+              title="Reset to Defaults"
             >
-              Use Defaults
+              <RotateCcw className="h-4 w-4" />
             </button>
           )}
           <button
-            onClick={() => setIsEditing(!isEditing)}
-            className="text-sm text-blue-900 hover:text-blue-700 flex items-center gap-1 p-1 hover:bg-blue-50 rounded"
-            title={isEditing ? 'Done' : 'Edit Costs'}
+            onClick={() => {
+              if (isEditing && onSave) {
+                onSave({
+                  recon: reconCost,
+                  transport: transportCost,
+                  maxBid,
+                  marketPrice
+                });
+              }
+              setIsEditing(!isEditing);
+            }}
+            className={`text-sm flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${isEditing
+              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+              : 'text-blue-900 hover:text-blue-700 hover:bg-blue-50'
+              }`}
           >
-            <Edit2 className="h-4 w-4" />
+            {isEditing ? (
+              <Save className="h-4 w-4" />
+            ) : (
+              <Edit2 className="h-4 w-4" />
+            )}
+            <span className="font-semibold">{isEditing ? 'Save' : 'Edit'}</span>
           </button>
         </div>
       </div>
@@ -272,4 +310,6 @@ export default function ProfitCalculator({
       )}
     </div>
   );
-}
+});
+
+export default ProfitCalculator;

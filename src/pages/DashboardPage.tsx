@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
@@ -25,6 +25,7 @@ export default function DashboardPage() {
   const [hasRequestedInventory, setHasRequestedInventory] = useState(false);
   const [isEditingCosts, setIsEditingCosts] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const scanResultRef = useRef<{ saveCosts: () => void }>(null);
 
   const handleCloseModal = () => {
     if (isEditingCosts) {
@@ -519,6 +520,7 @@ export default function DashboardPage() {
                 onClose={handleCloseModal}
                 onEditStatusChange={setIsEditingCosts}
                 onOutsideClick={() => setShowConfirmDialog(true)}
+                ref={scanResultRef}
               />
             </div>
           </div>
@@ -528,6 +530,7 @@ export default function DashboardPage() {
           isOpen={showConfirmDialog}
           onConfirm={confirmCloseModal}
           onCancel={() => {
+            scanResultRef.current?.saveCosts();
             setIsEditingCosts(false);
             setShowConfirmDialog(false);
           }}

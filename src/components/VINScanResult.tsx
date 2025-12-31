@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
@@ -56,7 +56,7 @@ interface VINScanResultProps {
     onOutsideClick?: () => void;
 }
 
-export default function VINScanResult({
+const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(({
     scanData,
     onClose,
     onScanAnother,
@@ -66,8 +66,15 @@ export default function VINScanResult({
     onRescan,
     onEditStatusChange,
     onOutsideClick,
-}: VINScanResultProps) {
+}, ref) => {
     const { user } = useAuth();
+    const calculatorRef = useRef<{ save: () => void }>(null);
+
+    useImperativeHandle(ref, () => ({
+        saveCosts: () => {
+            calculatorRef.current?.save();
+        }
+    }));
     const [reportLoading, setReportLoading] = useState(false);
     const [reportSuccess, setReportSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -75,6 +82,31 @@ export default function VINScanResult({
     const [isExpandingSearch, setIsExpandingSearch] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [currentRecommendation, setCurrentRecommendation] = useState(scanData.recommendation);
+    const handleSaveCosts = async (costs: { recon: number; transport: number; maxBid: number; marketPrice: number }) => {
+        if (!scanData.id) return;
+
+        setIsSaving(true);
+        try {
+            const { error: saveError } = await supabase
+                .from('vin_scans')
+                .update({
+                    custom_recon_cost: costs.recon,
+                    custom_transport_cost: costs.transport,
+                    custom_max_bid: costs.maxBid,
+                    custom_market_price: costs.marketPrice,
+                    costs_edited: true,
+                })
+                .eq('id', scanData.id);
+
+            if (saveError) throw saveError;
+            toast.success('Costs saved successfully');
+        } catch (error) {
+            console.error('Error saving custom costs:', error);
+            toast.error('Failed to save costs');
+        } finally {
+            setIsSaving(false);
+        }
+    };
 
     useEffect(() => {
         setCurrentRecommendation(scanData.recommendation);
@@ -171,41 +203,30 @@ export default function VINScanResult({
                             {/* If VIN is available in decoded_data, show it. Otherwise it might be in the parent object but we didn't pass it explicitly in the interface above except inside decoded_data potentially */}
                             {/* We can assume decoded_data has what we need or pass vin separately if needed. For now, let's rely on what's there. */}
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                            <div
-                                className={`px-4 py-2 rounded-lg font-semibold flex items-center gap-2 ${currentRecommendation === 'buy'
-                                    ? 'bg-green-100 text-green-800'
-                                    : currentRecommendation === 'caution'
-                                        ? 'bg-yellow-100 text-yellow-800'
-                                        : 'bg-red-100 text-red-800'
-                                    }`}
-                            >
-                                {isSaving && <Loader2 className="h-4 w-4 animate-spin" />}
-                                {currentRecommendation === 'buy' && '🟢 Strong Buy'}
-                                {currentRecommendation === 'caution' && '🟡 Caution'}
-                                {currentRecommendation === 'pass' && '🔴 Pass'}
-                            </div>
-
-                            {/* Manual Override Dropdown */}
-                            <div className="relative inline-block w-32">
+                        <div className="flex flex-col items-end">
+                            <div className="relative group">
                                 <select
                                     value={currentRecommendation || ''}
                                     onChange={(e) => handleUpdateRecommendation(e.target.value as 'buy' | 'caution' | 'pass')}
                                     disabled={isSaving}
-                                    className={`appearance-none w-full text-[11px] px-3 py-1.5 rounded-lg border shadow-sm transition-all focus:ring-2 focus:ring-blue-500 cursor-pointer pr-8 font-medium
-                                        ${currentRecommendation === 'buy' ? 'bg-green-50 border-green-200 text-green-800 hover:bg-green-100' :
-                                            currentRecommendation === 'caution' ? 'bg-yellow-50 border-yellow-200 text-yellow-800 hover:bg-yellow-100' :
-                                                'bg-red-50 border-red-200 text-red-800 hover:bg-red-100'}`}
+                                    className={`appearance-none px-4 py-2.5 pr-10 rounded-xl font-bold transition-all focus:ring-2 focus:ring-indigo-500 cursor-pointer border-2
+                                        ${currentRecommendation === 'buy' ? 'bg-green-100 border-green-200 text-green-800 hover:bg-green-200' :
+                                            currentRecommendation === 'caution' ? 'bg-yellow-100 border-yellow-200 text-yellow-800 hover:bg-yellow-200' :
+                                                'bg-red-100 border-red-200 text-red-800 hover:bg-red-200'}`}
                                 >
-                                    <option value="buy" className="bg-white text-green-800 font-medium">Buy</option>
-                                    <option value="caution" className="bg-white text-yellow-800 font-medium">Caution</option>
-                                    <option value="pass" className="bg-white text-red-800 font-medium">Pass</option>
+                                    <option value="buy" className="bg-white text-green-800">🟢 Strong Buy</option>
+                                    <option value="caution" className="bg-white text-yellow-800">🟡 Caution</option>
+                                    <option value="pass" className="bg-white text-red-800">🔴 Pass</option>
                                 </select>
-                                <div className="absolute inset-y-0 right-0 flex items-center pr-2 pointer-events-none">
-                                    <ChevronDownIcon className={`h-3 w-3 ${currentRecommendation === 'buy' ? 'text-green-600' :
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                    {isSaving ? (
+                                        <Loader2 className="h-4 w-4 animate-spin opacity-50" />
+                                    ) : (
+                                        <ChevronDownIcon className={`h-5 w-5 ${currentRecommendation === 'buy' ? 'text-green-600' :
                                             currentRecommendation === 'caution' ? 'text-yellow-600' :
                                                 'text-red-600'
-                                        }`} />
+                                            }`} />
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -384,36 +405,16 @@ export default function VINScanResult({
 
                 {/* Profit Calculator */}
                 <ProfitCalculator
+                    ref={calculatorRef}
                     maxBidSuggestion={scanData.max_bid_suggestion || 0}
                     marketPrice={scanData.market_data?.averagePrice || 0}
                     auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
                     defaultRecon={defaultCostSettings.reconditioning_cost}
                     defaultTransport={defaultCostSettings.transport_cost}
-                    onCostsChange={async (costs) => {
-                        // Save custom costs to database if scan_id exists and costs were edited
-                        if (scanData.id && costs.costsEdited) {
-                            setIsSaving(true);
-                            try {
-                                const { error: saveError } = await supabase
-                                    .from('vin_scans')
-                                    .update({
-                                        custom_recon_cost: costs.recon,
-                                        custom_transport_cost: costs.transport,
-                                        custom_max_bid: costs.maxBid,
-                                        custom_market_price: costs.marketPrice,
-                                        costs_edited: true,
-                                    })
-                                    .eq('id', scanData.id);
-
-                                if (saveError) throw saveError;
-                            } catch (error) {
-                                console.error('Error saving custom costs:', error);
-                                toast.error('Failed to save costs');
-                            } finally {
-                                setIsSaving(false);
-                            }
-                        }
+                    onCostsChange={() => {
+                        // We no longer auto-save here
                     }}
+                    onSave={handleSaveCosts}
                     onEditStatusChange={onEditStatusChange}
                     onOutsideClick={onOutsideClick}
                     isSaving={isSaving}
@@ -513,4 +514,6 @@ export default function VINScanResult({
             </div>
         </div>
     );
-}
+});
+
+export default VINScanResult;

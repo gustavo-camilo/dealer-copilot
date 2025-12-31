@@ -55,6 +55,7 @@ export default function RecommendationsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditingCosts, setIsEditingCosts] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const scanResultRef = useRef<{ saveCosts: () => void }>(null);
 
   const handleCloseModal = () => {
     if (isEditingCosts) {
@@ -513,6 +514,7 @@ export default function RecommendationsPage() {
                 onClose={handleCloseModal}
                 onEditStatusChange={setIsEditingCosts}
                 onOutsideClick={() => setShowConfirmDialog(true)}
+                ref={scanResultRef}
               />
             </div>
           </div>
@@ -522,6 +524,7 @@ export default function RecommendationsPage() {
           isOpen={showConfirmDialog}
           onConfirm={confirmCloseModal}
           onCancel={() => {
+            scanResultRef.current?.saveCosts();
             setIsEditingCosts(false);
             setShowConfirmDialog(false);
           }}
