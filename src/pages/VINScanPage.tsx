@@ -464,7 +464,7 @@ export default function VINScanPage() {
               <ul className="space-y-1">
                 <li>✓ Complete vehicle decode and specifications</li>
                 <li>✓ Market pricing analysis</li>
-                <li>✓ Buy/Caution/Pass recommendation</li>
+                <li>✓ Buy/Maybe/Pass recommendation</li>
                 <li>✓ Profit calculator with your costs</li>
                 <li>✓ AI-powered confidence score</li>
               </ul>

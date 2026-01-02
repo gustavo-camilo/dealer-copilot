@@ -5,7 +5,7 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Navy blue dark mode palette
+        // Navy blue dark mode palette - darker shades
         navy: {
           50: '#f0f4f8',
           100: '#d9e2ec',
@@ -14,10 +14,10 @@ export default {
           400: '#829ab1',
           500: '#627d98',
           600: '#486581',
-          700: '#334e68',
-          800: '#243b53',
-          900: '#102a43',  // Primary dark background
-          950: '#0a1929',  // Darker sections/cards
+          700: '#1e293b',  // Darker
+          800: '#0f172a',  // Much darker
+          900: '#020617',  // Almost black - primary dark background
+          950: '#000000',  // Pure black - darker sections/cards
         },
       },
     },

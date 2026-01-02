@@ -38,7 +38,7 @@ interface VINScanResultProps {
         id?: string; // scan_id
         decoded_data: any;
         market_data: any;
-        recommendation: 'buy' | 'caution' | 'pass';
+        recommendation: 'buy' | 'maybe' | 'pass';
         confidence_score: number;
         match_reasoning: any[];
         estimated_profit: number | null;
@@ -59,6 +59,16 @@ interface VINScanResultProps {
     onEditStatusChange?: (isEditing: boolean) => void;
     onOutsideClick?: () => void;
     isEditing?: boolean;
+    onUpdate?: (updatedData: {
+        id: string;
+        recommendation?: 'buy' | 'maybe' | 'pass';
+        estimated_profit?: number | null;
+        max_bid_suggestion?: number | null;
+        custom_recon_cost?: number | null;
+        custom_transport_cost?: number | null;
+        custom_max_bid?: number | null;
+        custom_market_price?: number | null;
+    }) => void;
 }
 
 const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(({
@@ -72,6 +82,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     onEditStatusChange,
     onOutsideClick,
     isEditing = false,
+    onUpdate,
 }, ref) => {
     const { user } = useAuth();
     const calculatorRef = useRef<{ save: () => void }>(null);
@@ -106,6 +117,17 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
 
             if (saveError) throw saveError;
             toast.success('Costs saved successfully');
+
+            // Notify parent of update
+            if (onUpdate) {
+                onUpdate({
+                    id: scanData.id,
+                    custom_recon_cost: costs.recon,
+                    custom_transport_cost: costs.transport,
+                    custom_max_bid: costs.maxBid,
+                    custom_market_price: costs.marketPrice,
+                });
+            }
         } catch (error) {
             console.error('Error saving custom costs:', error);
             toast.error('Failed to save costs');
@@ -118,7 +140,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
         setCurrentRecommendation(scanData.recommendation);
     }, [scanData.recommendation]);
 
-    const handleUpdateRecommendation = async (newRec: 'buy' | 'caution' | 'pass') => {
+    const handleUpdateRecommendation = async (newRec: 'buy' | 'maybe' | 'pass') => {
         if (!scanData.id) return;
 
         setIsSaving(true);
@@ -131,6 +153,14 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
 
             if (updateError) throw updateError;
             toast.success(`Recommendation changed to ${newRec.toUpperCase()}`);
+
+            // Notify parent of update
+            if (onUpdate) {
+                onUpdate({
+                    id: scanData.id,
+                    recommendation: newRec,
+                });
+            }
         } catch (err: any) {
             console.error('Error updating recommendation:', err);
             toast.error('Failed to update recommendation');
@@ -213,15 +243,15 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                             <div className="relative group">
                                 <select
                                     value={currentRecommendation || ''}
-                                    onChange={(e) => handleUpdateRecommendation(e.target.value as 'buy' | 'caution' | 'pass')}
+                                    onChange={(e) => handleUpdateRecommendation(e.target.value as 'buy' | 'maybe' | 'pass')}
                                     disabled={isSaving}
                                     className={`appearance-none px-4 py-2.5 pr-10 rounded-xl font-bold transition-all focus:ring-2 focus:ring-indigo-500 cursor-pointer border-2
                                         ${currentRecommendation === 'buy' ? 'bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-700 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800' :
-                                            currentRecommendation === 'caution' ? 'bg-yellow-100 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800' :
+                                            currentRecommendation === 'maybe' ? 'bg-yellow-100 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800' :
                                                 'bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'}`}
                                 >
                                     <option value="buy" className="bg-white dark:bg-gray-800 text-green-800 dark:text-green-200">🟢 Buy</option>
-                                    <option value="caution" className="bg-white dark:bg-gray-800 text-yellow-800 dark:text-yellow-200">🟡 Caution</option>
+                                    <option value="maybe" className="bg-white dark:bg-gray-800 text-yellow-800 dark:text-yellow-200">🟡 Maybe</option>
                                     <option value="pass" className="bg-white dark:bg-gray-800 text-red-800 dark:text-red-200">🔴 Pass</option>
                                 </select>
                                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
@@ -229,7 +259,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                         <Loader2 className="h-4 w-4 animate-spin opacity-50" />
                                     ) : (
                                         <ChevronDownIcon className={`h-5 w-5 ${currentRecommendation === 'buy' ? 'text-green-600 dark:text-green-400' :
-                                            currentRecommendation === 'caution' ? 'text-yellow-600 dark:text-yellow-400' :
+                                            currentRecommendation === 'maybe' ? 'text-yellow-600 dark:text-yellow-400' :
                                                 'text-red-600 dark:text-red-400'
                                             }`} />
                                     )}
@@ -437,7 +467,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                             onClick={() => setReasoningExpanded(!reasoningExpanded)}
                             className={`w-full rounded-lg p-4 text-left transition-colors ${scanData.recommendation === 'buy'
                                 ? 'bg-green-50 dark:bg-green-900/30 border border-green-200 dark:border-green-800 hover:bg-green-100 dark:hover:bg-green-900/50'
-                                : scanData.recommendation === 'caution'
+                                : scanData.recommendation === 'maybe'
                                     ? 'bg-yellow-50 dark:bg-yellow-900/30 border border-yellow-200 dark:border-yellow-800 hover:bg-yellow-100 dark:hover:bg-yellow-900/50'
                                     : 'bg-red-50 dark:bg-red-900/30 border border-red-200 dark:border-red-800 hover:bg-red-100 dark:hover:bg-red-900/50'
                                 }`}
@@ -445,7 +475,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                             <div className="flex items-center justify-between">
                                 <h3 className="font-bold text-gray-900 dark:text-gray-100">
                                     {scanData.recommendation === 'buy' && '✅ Why This is a Strong Match'}
-                                    {scanData.recommendation === 'caution' && '⚠️ Why Caution is Advised'}
+                                    {scanData.recommendation === 'maybe' && '⚠️ Why Maybe is Suggested'}
                                     {scanData.recommendation === 'pass' && '❌ Why You Should Pass'}
                                 </h3>
                                 {reasoningExpanded ? (
@@ -459,7 +489,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                             <div
                                 className={`rounded-b-lg p-4 border-x border-b ${scanData.recommendation === 'buy'
                                     ? 'bg-green-50 dark:bg-green-900/30 border-green-200 dark:border-green-800'
-                                    : scanData.recommendation === 'caution'
+                                    : scanData.recommendation === 'maybe'
                                         ? 'bg-yellow-50 dark:bg-yellow-900/30 border-yellow-200 dark:border-yellow-800'
                                         : 'bg-red-50 dark:bg-red-900/30 border-red-200 dark:border-red-800'
                                     }`}

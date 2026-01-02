@@ -191,7 +191,7 @@ export default function LandingPage() {
               </h3>
               <p className="text-slate-400 leading-relaxed">
                 Scan VINs at auctions and get instant guidance. See if it matches your profile,
-                calculate profit potential, and get clear buy/caution/pass recommendation.
+                calculate profit potential, and get clear buy/maybe/pass recommendation.
               </p>
             </div>
 

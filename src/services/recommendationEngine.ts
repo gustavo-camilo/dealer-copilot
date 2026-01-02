@@ -338,7 +338,7 @@ export async function generateRecommendation(
   if (totalScore >= 75) {
     recommendation = 'buy';
   } else if (totalScore >= 55) {
-    recommendation = 'caution';
+    recommendation = 'maybe';
   } else {
     recommendation = 'pass';
   }

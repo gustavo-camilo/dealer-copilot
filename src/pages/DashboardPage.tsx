@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { VINScan } from '../types/database';
+import { VINScan, RecommendationType } from '../types/database';
 import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Globe, ChevronRight, Package, Eye, RefreshCw, X } from 'lucide-react';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
@@ -63,7 +63,7 @@ export default function DashboardPage() {
   const getRecommendationBadge = (recommendation: string) => {
     const badges = {
       buy: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400',
-      caution: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400',
+      maybe: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400',
       pass: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400',
     };
     return badges[recommendation as keyof typeof badges];
@@ -174,6 +174,31 @@ export default function DashboardPage() {
     }
   };
 
+  const handleScanUpdate = (updatedData: {
+    id: string;
+    recommendation?: RecommendationType;
+    estimated_profit?: number | null;
+    max_bid_suggestion?: number | null;
+    custom_recon_cost?: number | null;
+    custom_transport_cost?: number | null;
+    custom_max_bid?: number | null;
+    custom_market_price?: number | null;
+  }) => {
+    // Update recentScans list
+    setRecentScans(prevScans =>
+      prevScans.map(scan =>
+        scan.id === updatedData.id
+          ? { ...scan, ...updatedData }
+          : scan
+      )
+    );
+
+    // Update selectedScan if it's the one being edited
+    if (selectedScan?.id === updatedData.id) {
+      setSelectedScan(prev => prev ? { ...prev, ...updatedData } : null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 dark:bg-navy-950 flex items-center justify-center">
@@ -236,7 +261,7 @@ export default function DashboardPage() {
               to="/inventory"
               className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border-2 border-gray-200 dark:border-navy-700 hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
-              <Car className="h-8 w-8 text-blue-900 mx-auto mb-2" />
+              <Car className="h-8 w-8 text-blue-900 dark:text-cyan-400 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Inventory</h3>
             </Link>
 
@@ -252,7 +277,7 @@ export default function DashboardPage() {
               to="/recommendations"
               className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border-2 border-gray-200 dark:border-navy-700 hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
-              <Target className="h-8 w-8 text-blue-900 mx-auto mb-2" />
+              <Target className="h-8 w-8 text-blue-900 dark:text-emerald-400 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Recommendations</h3>
             </Link>
 
@@ -260,7 +285,7 @@ export default function DashboardPage() {
               to="/onboarding"
               className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border-2 border-gray-200 dark:border-navy-700 hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
-              <Globe className="h-8 w-8 text-blue-900 mx-auto mb-2" />
+              <Globe className="h-8 w-8 text-blue-900 dark:text-sky-400 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Scan Website</h3>
             </Link>
           </div>
@@ -271,7 +296,7 @@ export default function DashboardPage() {
           <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Vehicles</h3>
-              <Car className="h-5 w-5 text-blue-900" />
+              <Car className="h-5 w-5 text-blue-900 dark:text-cyan-400" />
             </div>
             <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalVehicles}</p>
           </div>
@@ -279,7 +304,7 @@ export default function DashboardPage() {
           <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Portfolio Value</h3>
-              <BarChart3 className="h-5 w-5 text-blue-900" />
+              <BarChart3 className="h-5 w-5 text-blue-900 dark:text-emerald-400" />
             </div>
             <p className="text-3xl font-bold text-gray-900 dark:text-white">
               ${stats.portfolioValue.toLocaleString()}
@@ -289,7 +314,7 @@ export default function DashboardPage() {
           <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg Days on Lot</h3>
-              <Clock className="h-5 w-5 text-blue-900" />
+              <Clock className="h-5 w-5 text-blue-900 dark:text-sky-400" />
             </div>
             <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.avgDaysInInventory}</p>
           </div>
@@ -444,14 +469,14 @@ export default function DashboardPage() {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
                     <div className="flex items-center gap-2 mb-1">
-                      <Car className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                      <Car className="w-4 h-4 text-blue-600 dark:text-cyan-400" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">Total Vehicles</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">{stats.totalVehicles}</p>
                   </div>
                   <div className="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg">
                     <div className="flex items-center gap-2 mb-1">
-                      <BarChart3 className="w-4 h-4 text-green-600 dark:text-green-400" />
+                      <BarChart3 className="w-4 h-4 text-green-600 dark:text-emerald-400" />
                       <span className="text-sm text-gray-600 dark:text-gray-400">Portfolio Value</span>
                     </div>
                     <p className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -462,7 +487,7 @@ export default function DashboardPage() {
                 <div className="p-4 bg-gray-50 dark:bg-navy-800 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm text-gray-600 dark:text-gray-400">Avg Days on Lot</span>
-                    <Clock className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+                    <Clock className="w-4 h-4 text-gray-600 dark:text-sky-400" />
                   </div>
                   <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.avgDaysInInventory} days</p>
                 </div>
@@ -527,6 +552,7 @@ export default function DashboardPage() {
                   isModal={true}
                   tenantZipCode={tenant?.zip_code}
                   onClose={handleCloseModal}
+                  onUpdate={handleScanUpdate}
                   onEditStatusChange={setIsEditingCosts}
                   onOutsideClick={() => setShowConfirmDialog(true)}
                   ref={scanResultRef}

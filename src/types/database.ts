@@ -8,7 +8,7 @@ export type VehicleStatus = 'available' | 'sold' | 'pending' | 'wholesaled';
 
 export type TitleStatus = 'clean' | 'salvage' | 'rebuilt' | 'unknown';
 
-export type RecommendationType = 'buy' | 'caution' | 'pass';
+export type RecommendationType = 'buy' | 'maybe' | 'pass';
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid';
 

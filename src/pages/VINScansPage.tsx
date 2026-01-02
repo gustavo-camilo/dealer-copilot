@@ -16,7 +16,7 @@ interface VINScan {
     model: string;
     trim?: string;
   };
-  recommendation: 'buy' | 'caution' | 'pass';
+  recommendation: 'buy' | 'maybe' | 'pass';
   confidence_score: number;
   market_data: any;
   match_reasoning: any[];
@@ -211,7 +211,7 @@ export default function VINScansPage() {
   const getRecommendationBadge = (recommendation: string) => {
     const badges = {
       buy: 'bg-green-100 text-green-800',
-      caution: 'bg-yellow-100 text-yellow-800',
+      maybe: 'bg-yellow-100 text-yellow-800',
       pass: 'bg-red-100 text-red-800',
     };
 

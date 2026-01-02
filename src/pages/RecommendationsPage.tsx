@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
+import { RecommendationType } from '../types/database';
 import {
   AlertTriangle,
   ThumbsUp,
@@ -29,7 +30,7 @@ interface Recommendation {
     trim?: string;
   };
   created_at: string;
-  recommendation: 'buy' | 'caution' | 'pass';
+  recommendation: 'buy' | 'maybe' | 'pass';
   confidence_score: number;
   estimated_profit: number | null;
   max_bid_suggestion: number | null;
@@ -79,7 +80,7 @@ export default function RecommendationsPage() {
   const observerTarget = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState({
     buy: 0,
-    caution: 0,
+    maybe: 0,
     pass: 0,
     avgConfidence: 0,
     potentialProfit: 0,
@@ -115,7 +116,7 @@ export default function RecommendationsPage() {
           // Calculate stats (only on initial load)
           if (!append) {
             const buy = data.filter((r) => r.recommendation === 'buy').length;
-            const caution = data.filter((r) => r.recommendation === 'caution').length;
+            const maybe = data.filter((r) => r.recommendation === 'maybe').length;
             const pass = data.filter((r) => r.recommendation === 'pass').length;
             const avgConfidence =
               data.reduce((sum, r) => sum + r.confidence_score, 0) / (data.length || 1);
@@ -125,7 +126,7 @@ export default function RecommendationsPage() {
 
             setStats({
               buy,
-              caution,
+              maybe,
               pass,
               avgConfidence,
               potentialProfit,
@@ -196,6 +197,51 @@ export default function RecommendationsPage() {
       navigate('/signin');
     } catch (error) {
       console.error('Error signing out:', error);
+    }
+  };
+
+  const handleRecommendationUpdate = (updatedData: {
+    id: string;
+    recommendation?: RecommendationType;
+    estimated_profit?: number | null;
+    max_bid_suggestion?: number | null;
+    custom_recon_cost?: number | null;
+    custom_transport_cost?: number | null;
+    custom_max_bid?: number | null;
+    custom_market_price?: number | null;
+  }) => {
+    const updateList = (prevList: Recommendation[]) =>
+      prevList.map(rec =>
+        rec.id === updatedData.id
+          ? { ...rec, ...updatedData }
+          : rec
+      );
+
+    setRecommendations(updateList);
+    setFilteredRecommendations(updateList);
+
+    // Update selectedRec if it's the one being edited
+    if (selectedRec?.id === updatedData.id) {
+      setSelectedRec(prev => prev ? { ...prev, ...updatedData } : null);
+    }
+
+    // Recalculate stats if recommendation changed
+    if (updatedData.recommendation) {
+      const oldRec = recommendations.find(r => r.id === updatedData.id)?.recommendation;
+      if (oldRec && oldRec !== updatedData.recommendation) {
+        setStats(prevStats => {
+          const newStats = { ...prevStats };
+          // Decrement old
+          if (oldRec === 'buy') newStats.buy--;
+          else if (oldRec === 'maybe') newStats.maybe--;
+          else if (oldRec === 'pass') newStats.pass--;
+          // Increment new
+          if (updatedData.recommendation === 'buy') newStats.buy++;
+          else if (updatedData.recommendation === 'maybe') newStats.maybe++;
+          else if (updatedData.recommendation === 'pass') newStats.pass++;
+          return newStats;
+        });
+      }
     }
   };
 
@@ -276,7 +322,7 @@ export default function RecommendationsPage() {
   const getRecommendationBadge = (recommendation: string) => {
     const badges = {
       buy: 'bg-green-100 text-green-800',
-      caution: 'bg-yellow-100 text-yellow-800',
+      maybe: 'bg-yellow-100 text-yellow-800',
       pass: 'bg-red-100 text-red-800',
     };
 
@@ -325,9 +371,9 @@ export default function RecommendationsPage() {
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center gap-3 mb-2">
               <AlertTriangle className="w-5 h-5 text-yellow-600" />
-              <span className="text-sm text-gray-600 dark:text-gray-400">Caution</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Maybe</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.caution}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.maybe}</div>
           </div>
 
           <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
@@ -520,6 +566,7 @@ export default function RecommendationsPage() {
                 isModal={true}
                 tenantZipCode={tenant?.zip_code}
                 onClose={handleCloseModal}
+                onUpdate={handleRecommendationUpdate}
                 onEditStatusChange={setIsEditingCosts}
                 onOutsideClick={() => setShowConfirmDialog(true)}
                 ref={scanResultRef}
