@@ -339,7 +339,7 @@ export default function RecommendationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
       {/* Header */}
       <Header
         user={user}

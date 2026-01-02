@@ -308,7 +308,7 @@ export default function VINScanPage() {
 
   if (result) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-navy-950">
+      <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
         {/* Header */}
         <Header
           user={user}
@@ -385,7 +385,7 @@ export default function VINScanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-navy-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
       {/* Header */}
       <Header
         user={user}

@@ -19,6 +19,15 @@ export default {
           900: '#0e1c2f',  // New dark background - primary dark background
           950: '#051627',  // Prussian blue - darkest sections/cards
         },
+        // Design system colors
+        brand: {
+          'bg-dark': '#031220',      // Main background color for dashboard pages (dark mode)
+          'topbar-dark': '#0F1C2D',  // Top bar background (dark mode)
+          'border-dark': '#1C3245',  // Border color for blocks (dark mode)
+        },
+      },
+      borderWidth: {
+        DEFAULT: '1px',  // Default border width changed to 1px
       },
     },
   },

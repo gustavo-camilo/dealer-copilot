@@ -27,7 +27,7 @@ export default function Header({
     };
 
     return (
-        <div className="sticky top-0 z-40 bg-blue-900 dark:bg-navy-900 border-b border-blue-800 dark:border-navy-700">
+        <div className="sticky top-0 z-40 bg-blue-900 dark:bg-brand-topbar-dark border-b border-blue-800 dark:border-brand-border-dark">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     <Link to="/dashboard" onClick={handleLogoClick} className="flex items-center">

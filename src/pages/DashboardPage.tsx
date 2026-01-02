@@ -201,7 +201,7 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-navy-950 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark flex items-center justify-center">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 dark:border-orange-500 mx-auto"></div>
           <p className="mt-4 text-gray-600 dark:text-gray-400">Loading dashboard...</p>
@@ -211,7 +211,7 @@ export default function DashboardPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-navy-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
       {/* Header */}
       <Header
         user={user}
@@ -240,18 +240,13 @@ export default function DashboardPage() {
           </div>
         )}
 
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">Dashboard</h1>
-          <p className="text-gray-600 dark:text-gray-400 mt-1">{tenant?.location}</p>
-        </div>
-
         {/* Quick Actions - Button Cards */}
         <div className="mb-8">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Link
               to="/scan"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border-2 border-gray-200 dark:border-navy-700 hover:border-orange-600 hover:shadow-md dark:hover:shadow-lg transition text-center"
+              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-orange-600 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
               <Scan className="h-8 w-8 text-orange-600 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Scan VIN</h3>
@@ -259,7 +254,7 @@ export default function DashboardPage() {
 
             <Link
               to="/inventory"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border-2 border-gray-200 dark:border-navy-700 hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
+              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
               <Car className="h-8 w-8 text-blue-900 dark:text-cyan-400 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Inventory</h3>
@@ -267,7 +262,7 @@ export default function DashboardPage() {
 
             <Link
               to="/competitors"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border-2 border-gray-200 dark:border-navy-700 hover:border-purple-600 hover:shadow-md dark:hover:shadow-lg transition text-center"
+              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-purple-600 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
               <Eye className="h-8 w-8 text-purple-600 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Competitor Intel</h3>
@@ -275,7 +270,7 @@ export default function DashboardPage() {
 
             <Link
               to="/recommendations"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border-2 border-gray-200 dark:border-navy-700 hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
+              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
               <Target className="h-8 w-8 text-blue-900 dark:text-emerald-400 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Recommendations</h3>
@@ -283,7 +278,7 @@ export default function DashboardPage() {
 
             <Link
               to="/onboarding"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border-2 border-gray-200 dark:border-navy-700 hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
+              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
               <Globe className="h-8 w-8 text-blue-900 dark:text-sky-400 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Scan Website</h3>
@@ -293,7 +288,7 @@ export default function DashboardPage() {
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700">
+          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Vehicles</h3>
               <Car className="h-5 w-5 text-blue-900 dark:text-cyan-400" />
@@ -301,7 +296,7 @@ export default function DashboardPage() {
             <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalVehicles}</p>
           </div>
 
-          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700">
+          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Portfolio Value</h3>
               <BarChart3 className="h-5 w-5 text-blue-900 dark:text-emerald-400" />
@@ -311,7 +306,7 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700">
+          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg Days on Lot</h3>
               <Clock className="h-5 w-5 text-blue-900 dark:text-sky-400" />
@@ -319,7 +314,7 @@ export default function DashboardPage() {
             <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.avgDaysInInventory}</p>
           </div>
 
-          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700">
+          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">This Week's Sales</h3>
               <TrendingUp className="h-5 w-5 text-orange-600" />
@@ -331,7 +326,7 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Buy Recommendations */}
           {recommendations.length > 0 && (
-            <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
+            <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recommended to Buy</h2>
                 <Link
@@ -372,7 +367,7 @@ export default function DashboardPage() {
           )}
 
           {/* Recent VIN Scans */}
-          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent VIN Scans</h2>
               {recentScans.length > 0 && (
@@ -402,7 +397,7 @@ export default function DashboardPage() {
                   <div
                     key={scan.id}
                     onClick={() => setSelectedScan(scan)}
-                    className="p-3 border border-gray-200 dark:border-navy-700 rounded-lg hover:bg-gray-50 dark:hover:bg-navy-800 hover:shadow-md transition cursor-pointer"
+                    className="p-3 border border-gray-200 dark:border-brand-border-dark rounded-lg hover:bg-gray-50 dark:hover:bg-navy-800 hover:shadow-md transition cursor-pointer"
                   >
                     <div className="flex items-center justify-between gap-4">
                       <div className="flex-1 min-w-0">
@@ -439,7 +434,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Inventory Analysis Section */}
-          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Inventory Analysis</h2>
               <Link
@@ -524,7 +519,7 @@ export default function DashboardPage() {
                 onClick={(e) => e.stopPropagation()}
               >
                 {/* Modal Header */}
-                <div className="sticky top-0 bg-white dark:bg-navy-900 border-b border-gray-200 dark:border-navy-700 p-4 md:p-6 flex items-center justify-between z-10">
+                <div className="sticky top-0 bg-white dark:bg-navy-900 border-b border-gray-200 dark:border-brand-border-dark p-4 md:p-6 flex items-center justify-between z-10">
                   <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Scan Details</h2>
                   <button
                     onClick={handleCloseModal}

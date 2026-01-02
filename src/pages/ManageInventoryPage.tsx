@@ -350,7 +350,7 @@ export default function ManageInventoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-navy-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
       <Toaster position="top-right" />
       {/* Header */}
       <Header
