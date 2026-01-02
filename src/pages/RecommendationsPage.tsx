@@ -214,26 +214,26 @@ export default function RecommendationsPage() {
     toast.custom((t) => (
       <div
         className={`${t.visible ? 'animate-enter' : 'animate-leave'
-          } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
+          } max-w-md w-full bg-white dark:bg-gray-900 shadow-lg dark:shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black dark:ring-gray-700 ring-opacity-5`}
       >
         <div className="flex-1 w-0 p-4">
           <div className="flex items-start">
             <div className="flex-shrink-0 pt-0.5">
-              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 className="h-6 w-6 text-red-600" />
+              <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900 flex items-center justify-center">
+                <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
             </div>
             <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-gray-900">
+              <p className="text-sm font-medium text-gray-900 dark:text-white">
                 Delete Scan?
               </p>
-              <p className="mt-1 text-sm text-gray-500">
+              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
                 Are you sure you want to delete this scan? This action cannot be undone.
               </p>
             </div>
           </div>
         </div>
-        <div className="flex border-l border-gray-200">
+        <div className="flex border-l border-gray-200 dark:border-gray-700">
           <button
             onClick={async () => {
               toast.dismiss(t.id);
@@ -254,15 +254,15 @@ export default function RecommendationsPage() {
                 toast.error('Failed to delete scan');
               }
             }}
-            className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-red-600 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
           >
             Delete
           </button>
         </div>
-        <div className="flex border-l border-gray-200">
+        <div className="flex border-l border-gray-200 dark:border-gray-700">
           <button
             onClick={() => toast.dismiss(t.id)}
-            className="w-full border border-transparent rounded-none p-4 flex items-center justify-center text-sm font-medium text-gray-600 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="w-full border border-transparent rounded-none p-4 flex items-center justify-center text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             Cancel
           </button>
@@ -293,7 +293,7 @@ export default function RecommendationsPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {/* Header */}
       <Header
         user={user}
@@ -306,54 +306,54 @@ export default function RecommendationsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">VIN Scan Recommendations</h1>
-          <p className="text-gray-600">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">VIN Scan Recommendations</h1>
+          <p className="text-gray-600 dark:text-gray-400">
             View all your scanned VINs with AI-powered buying recommendations
           </p>
         </div>
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center gap-3 mb-2">
               <ThumbsUp className="w-5 h-5 text-green-600" />
-              <span className="text-sm text-gray-600">Buy</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Buy</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.buy}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.buy}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center gap-3 mb-2">
               <AlertTriangle className="w-5 h-5 text-yellow-600" />
-              <span className="text-sm text-gray-600">Caution</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Caution</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.caution}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.caution}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center gap-3 mb-2">
               <TrendingDown className="w-5 h-5 text-red-600" />
-              <span className="text-sm text-gray-600">Pass</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Pass</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.pass}</div>
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pass}</div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center gap-3 mb-2">
               <Target className="w-5 h-5 text-blue-600" />
-              <span className="text-sm text-gray-600">Avg Confidence</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
               {stats.avgConfidence.toFixed(0)}%
             </div>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
             <div className="flex items-center gap-3 mb-2">
               <DollarSign className="w-5 h-5 text-purple-600" />
-              <span className="text-sm text-gray-600">Potential Profit</span>
+              <span className="text-sm text-gray-600 dark:text-gray-400">Potential Profit</span>
             </div>
-            <div className="text-2xl font-bold text-gray-900">
+            <div className="text-2xl font-bold text-gray-900 dark:text-white">
               {formatCurrency(stats.potentialProfit)}
             </div>
           </div>
@@ -362,20 +362,20 @@ export default function RecommendationsPage() {
         {/* Search Bar */}
         <div className="mb-6">
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
             <input
               type="text"
               placeholder="Search by VIN, make, model, year..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
 
         {/* Results Count */}
         {searchQuery && (
-          <div className="mb-4 text-sm text-gray-600">
+          <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
             Found {filteredRecommendations.length} result{filteredRecommendations.length !== 1 ? 's' : ''}
           </div>
         )}
@@ -386,12 +386,12 @@ export default function RecommendationsPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : filteredRecommendations.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+            <AlertCircle className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               {searchQuery ? 'No results found' : 'No VIN scans yet'}
             </h3>
-            <p className="text-gray-600">
+            <p className="text-gray-600 dark:text-gray-400">
               {searchQuery
                 ? 'Try adjusting your search terms'
                 : 'Start scanning VINs to see recommendations here'}
@@ -403,22 +403,22 @@ export default function RecommendationsPage() {
               <div
                 key={rec.id}
                 onClick={() => setSelectedRec(rec)}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition cursor-pointer"
+                className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer"
               >
                 <div className="flex items-center justify-between gap-4">
                   {/* Left: Vehicle Info */}
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-gray-900 truncate">
+                      <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                         {rec.decoded_data.year} {formatVehicleName(rec.decoded_data.make)} {formatVehicleName(rec.decoded_data.model)}
                       </h3>
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(rec.recommendation)} flex-shrink-0`}>
                         {rec.recommendation.toUpperCase()}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <span className="hidden sm:inline">Max Bid: {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}</span>
-                      <span className={`hidden sm:inline font-medium ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                      <span className={`hidden sm:inline font-medium ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
                         Profit: {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
                       </span>
                     </div>
@@ -431,14 +431,14 @@ export default function RecommendationsPage() {
                         e.stopPropagation();
                         setSelectedRec(rec);
                       }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0"
+                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
                       title="View Details"
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
                     <button
                       onClick={(e) => handleDeleteScan(e, rec.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition flex-shrink-0"
+                      className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
                       title="Delete Scan"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -447,16 +447,16 @@ export default function RecommendationsPage() {
                 </div>
 
                 {/* Mobile: Show financial info */}
-                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-4 text-sm sm:hidden">
+                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex gap-4 text-sm sm:hidden">
                   <div>
-                    <span className="text-gray-500">Max Bid:</span>
-                    <span className="ml-1 font-semibold text-blue-600">
+                    <span className="text-gray-500 dark:text-gray-400">Max Bid:</span>
+                    <span className="ml-1 font-semibold text-blue-600 dark:text-blue-400">
                       {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-500">Profit:</span>
-                    <span className={`ml-1 font-semibold ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
+                    <span className="text-gray-500 dark:text-gray-400">Profit:</span>
+                    <span className={`ml-1 font-semibold ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
                       {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
                     </span>
                   </div>
@@ -468,13 +468,13 @@ export default function RecommendationsPage() {
             {hasMore && !searchQuery && (
               <div ref={observerTarget} className="py-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="text-sm text-gray-500 mt-2">Loading more...</p>
+                <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Loading more...</p>
               </div>
             )}
 
             {/* End of Results */}
             {!hasMore && recommendations.length > 0 && !searchQuery && (
-              <div className="py-8 text-center text-sm text-gray-500">
+              <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
                 You've reached the end of your scan history
               </div>
             )}
@@ -484,21 +484,21 @@ export default function RecommendationsPage() {
         {/* Details Modal */}
         {selectedRec && (
           <div
-            className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
+            className="fixed inset-0 bg-gray-900 dark:bg-gray-950 bg-opacity-50 dark:bg-opacity-75 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
             onClick={handleCloseModal}
           >
             <div
-              className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
+              className="bg-white dark:bg-gray-900 w-full md:max-w-4xl md:rounded-lg shadow-xl dark:shadow-2xl max-h-screen overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
+              <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 md:p-6 flex items-center justify-between z-10">
+                <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Scan Details</h2>
                 <button
                   onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
                 >
-                  <X className="w-6 h-6" />
+                  <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
                 </button>
               </div>
 

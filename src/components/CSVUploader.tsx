@@ -124,15 +124,15 @@ export default function CSVUploader({
             transition-all duration-200
             ${
               isDragging
-                ? 'border-blue-500 bg-blue-500/10 scale-105'
-                : 'border-white/20 bg-white/5 hover:border-white/40 hover:bg-white/10'
+                ? 'border-blue-500 bg-blue-500/10 scale-105 dark:border-blue-400 dark:bg-blue-500/20'
+                : 'border-gray-300 bg-gray-50 dark:border-navy-600 dark:bg-navy-700 hover:border-gray-400 dark:hover:border-navy-500 hover:bg-gray-100 dark:hover:bg-navy-600'
             }
           `}
         >
           <div className="flex flex-col items-center gap-4">
             <svg
               className={`w-16 h-16 transition-colors ${
-                isDragging ? 'text-blue-400' : 'text-gray-400'
+                isDragging ? 'text-blue-400 dark:text-blue-300' : 'text-gray-400 dark:text-gray-500'
               }`}
               fill="none"
               stroke="currentColor"
@@ -147,22 +147,22 @@ export default function CSVUploader({
             </svg>
 
             <div>
-              <p className="text-lg font-medium text-white mb-1">
+              <p className="text-lg font-medium text-gray-900 dark:text-white mb-1">
                 {isDragging ? 'Drop your CSV file here' : 'Drop CSV file here or click to browse'}
               </p>
-              <p className="text-sm text-gray-400">
+              <p className="text-sm text-gray-600 dark:text-gray-400">
                 Maximum file size: {maxSizeMB}MB
               </p>
             </div>
           </div>
         </div>
       ) : (
-        <div className="bg-white/10 backdrop-blur-md rounded-xl p-6">
+        <div className="bg-gray-50 dark:bg-navy-700 border border-gray-200 dark:border-navy-600 rounded-xl p-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <div className="p-3 bg-green-500/20 rounded-lg">
+              <div className="p-3 bg-green-100 dark:bg-green-500/20 rounded-lg">
                 <svg
-                  className="w-8 h-8 text-green-400"
+                  className="w-8 h-8 text-green-600 dark:text-green-400"
                   fill="none"
                   stroke="currentColor"
                   viewBox="0 0 24 24"
@@ -177,8 +177,8 @@ export default function CSVUploader({
               </div>
 
               <div>
-                <p className="font-medium text-white">{selectedFile.name}</p>
-                <p className="text-sm text-gray-400">
+                <p className="font-medium text-gray-900 dark:text-white">{selectedFile.name}</p>
+                <p className="text-sm text-gray-600 dark:text-gray-400">
                   {(selectedFile.size / 1024).toFixed(2)} KB
                 </p>
               </div>
@@ -186,11 +186,11 @@ export default function CSVUploader({
 
             <button
               onClick={handleClear}
-              className="p-2 hover:bg-white/10 rounded-lg transition"
+              className="p-2 hover:bg-gray-200 dark:hover:bg-navy-600 rounded-lg transition"
               title="Remove file"
             >
               <svg
-                className="w-6 h-6 text-gray-400 hover:text-red-400"
+                className="w-6 h-6 text-gray-600 dark:text-gray-400 hover:text-red-600 dark:hover:text-red-400"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -208,10 +208,10 @@ export default function CSVUploader({
       )}
 
       {error && (
-        <div className="mt-4 p-4 bg-red-500/20 border border-red-500/50 rounded-lg">
+        <div className="mt-4 p-4 bg-red-100 dark:bg-red-500/20 border border-red-300 dark:border-red-500/50 rounded-lg">
           <div className="flex items-center gap-2">
             <svg
-              className="w-5 h-5 text-red-400 flex-shrink-0"
+              className="w-5 h-5 text-red-600 dark:text-red-400 flex-shrink-0"
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -223,7 +223,7 @@ export default function CSVUploader({
                 d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
               />
             </svg>
-            <p className="text-sm text-red-200">{error}</p>
+            <p className="text-sm text-red-700 dark:text-red-200">{error}</p>
           </div>
         </div>
       )}

@@ -48,7 +48,7 @@ export default function SupportTicketCard({ ticket, onUpdateStatus }: SupportTic
     };
 
     return (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 transition-all hover:shadow-md">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 transition-all hover:shadow-md dark:hover:shadow-lg">
             <div className="flex items-start justify-between">
                 <div className="flex-1 cursor-pointer" onClick={() => setExpanded(!expanded)}>
                     <div className="flex items-center gap-3 mb-2">
@@ -58,18 +58,18 @@ export default function SupportTicketCard({ ticket, onUpdateStatus }: SupportTic
                         <span className={`text-xs uppercase ${getPriorityColor(ticket.priority)}`}>
                             {ticket.priority} Priority
                         </span>
-                        <span className="text-xs text-gray-500 flex items-center">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 flex items-center">
                             <Clock className="h-3 w-3 mr-1" />
                             {new Date(ticket.created_at).toLocaleDateString()}
                         </span>
                     </div>
 
-                    <h3 className="text-lg font-semibold text-gray-900 mb-1 flex items-center gap-2">
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
                         {ticket.type === 'missing_market_data' && <AlertCircle className="h-5 w-5 text-orange-500" />}
                         {ticket.subject}
                     </h3>
 
-                    <p className="text-sm text-gray-600">
+                    <p className="text-sm text-gray-600 dark:text-gray-300">
                         Reported by <span className="font-medium">{ticket.user?.full_name || 'Unknown User'}</span> from <span className="font-medium">{ticket.tenant?.name || 'Unknown Dealer'}</span>
                     </p>
                 </div>
@@ -78,7 +78,7 @@ export default function SupportTicketCard({ ticket, onUpdateStatus }: SupportTic
                     <select
                         value={ticket.status}
                         onChange={(e) => onUpdateStatus(ticket.id, e.target.value)}
-                        className="text-sm border-gray-300 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="text-sm border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:border-blue-500 focus:ring-blue-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <option value="open">Open</option>
@@ -89,7 +89,7 @@ export default function SupportTicketCard({ ticket, onUpdateStatus }: SupportTic
 
                     <button
                         onClick={() => setExpanded(!expanded)}
-                        className="text-gray-400 hover:text-gray-600"
+                        className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300"
                     >
                         {expanded ? <ChevronUp className="h-5 w-5" /> : <ChevronDown className="h-5 w-5" />}
                     </button>
@@ -97,29 +97,29 @@ export default function SupportTicketCard({ ticket, onUpdateStatus }: SupportTic
             </div>
 
             {expanded && (
-                <div className="mt-4 pt-4 border-t border-gray-100">
+                <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <div>
-                            <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Ticket Details</h4>
-                            <div className="bg-gray-50 p-3 rounded text-sm font-mono text-gray-700 overflow-auto max-h-60">
+                            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Ticket Details</h4>
+                            <div className="bg-gray-50 dark:bg-gray-900 p-3 rounded text-sm font-mono text-gray-700 dark:text-gray-300 overflow-auto max-h-60">
                                 <pre>{JSON.stringify(ticket.details, null, 2)}</pre>
                             </div>
                         </div>
                         <div>
-                            <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Contact Info</h4>
-                            <div className="text-sm text-gray-600 space-y-1">
+                            <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Contact Info</h4>
+                            <div className="text-sm text-gray-600 dark:text-gray-300 space-y-1">
                                 <p>Email: {ticket.user?.email}</p>
                                 <p>Dealer Email: {ticket.tenant?.contact_email}</p>
                             </div>
 
                             {ticket.type === 'missing_market_data' && (
                                 <div className="mt-4">
-                                    <h4 className="text-xs font-semibold text-gray-500 uppercase mb-2">Quick Actions</h4>
+                                    <h4 className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase mb-2">Quick Actions</h4>
                                     <a
                                         href={`https://www.google.com/search?q=${ticket.details?.decoded_data?.year}+${ticket.details?.decoded_data?.make}+${ticket.details?.decoded_data?.model}+price`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        className="text-blue-600 hover:text-blue-800 text-sm flex items-center gap-1"
+                                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 text-sm flex items-center gap-1"
                                     >
                                         <MessageSquare className="h-4 w-4" />
                                         Google Search Vehicle

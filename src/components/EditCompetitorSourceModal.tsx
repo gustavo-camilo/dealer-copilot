@@ -107,14 +107,14 @@ export default function EditCompetitorSourceModal({
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full shadow-xl">
+    <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-navy-900 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+      <div className="bg-white dark:bg-navy-800 rounded-lg max-w-md w-full shadow-xl">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-xl font-semibold text-gray-900">Edit Competitor Source</h2>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-navy-700">
+          <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Edit Competitor Source</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition"
           >
             <X className="w-5 h-5" />
           </button>
@@ -124,18 +124,18 @@ export default function EditCompetitorSourceModal({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           {/* Source URL (Read-only) */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Source URL
             </label>
-            <div className="px-3 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-600 text-sm">
+            <div className="px-3 py-2 bg-gray-50 dark:bg-navy-700 border border-gray-300 dark:border-navy-600 rounded-lg text-gray-600 dark:text-gray-400 text-sm">
               {source.source_url}
             </div>
-            <p className="text-xs text-gray-500 mt-1">This URL cannot be changed</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">This URL cannot be changed</p>
           </div>
 
           {/* Source Name */}
           <div>
-            <label htmlFor="source_name" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="source_name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Display Name <span className="text-red-500">*</span>
             </label>
             <input
@@ -143,59 +143,59 @@ export default function EditCompetitorSourceModal({
               id="source_name"
               value={formData.source_name}
               onChange={(e) => setFormData({ ...formData, source_name: e.target.value })}
-              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                errors.source_name ? 'border-red-500' : 'border-gray-300'
+              className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-navy-700 dark:text-white dark:focus:ring-blue-400 dark:focus:border-blue-400 ${
+                errors.source_name ? 'border-red-500' : 'border-gray-300 dark:border-navy-600'
               }`}
               placeholder="e.g., ABC Motors"
               maxLength={100}
             />
             {errors.source_name && (
-              <p className="text-sm text-red-600 mt-1">{errors.source_name}</p>
+              <p className="text-sm text-red-600 dark:text-red-400 mt-1">{errors.source_name}</p>
             )}
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               This name will be displayed to tenants viewing competitor intelligence
             </p>
           </div>
 
           {/* Notes */}
           <div>
-            <label htmlFor="notes" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="notes" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Notes (Optional)
             </label>
             <textarea
               id="notes"
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              className="w-full px-3 py-2 border border-gray-300 dark:border-navy-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-navy-700 dark:text-white dark:focus:ring-blue-400 dark:focus:border-blue-400"
               placeholder="Internal notes about this competitor source..."
               rows={3}
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               For internal use only (not visible to tenants)
             </p>
           </div>
 
           {/* Error Message */}
           {errors.submit && (
-            <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-              <p className="text-sm text-red-600">{errors.submit}</p>
+            <div className="bg-red-50 dark:bg-red-900 border border-red-200 dark:border-red-700 rounded-lg p-3">
+              <p className="text-sm text-red-600 dark:text-red-300">{errors.submit}</p>
             </div>
           )}
 
           {/* Footer */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
+          <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-navy-700">
             <button
               type="button"
               onClick={onClose}
               disabled={isSubmitting}
-              className="px-4 py-2 text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-lg transition disabled:opacity-50"
+              className="px-4 py-2 text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-navy-700 hover:bg-gray-200 dark:hover:bg-navy-600 rounded-lg transition disabled:opacity-50"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={isSubmitting}
-              className="px-4 py-2 text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition disabled:opacity-50"
+              className="px-4 py-2 text-white bg-blue-600 dark:bg-blue-700 hover:bg-blue-700 dark:hover:bg-blue-600 rounded-lg transition disabled:opacity-50"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </button>

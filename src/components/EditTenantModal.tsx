@@ -122,19 +122,19 @@ export default function EditTenantModal({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 dark:bg-navy-900 dark:bg-opacity-70 p-4"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+        className="bg-white dark:bg-navy-800 rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-gray-200">
-          <h2 className="text-2xl font-semibold text-gray-900">Edit Dealership</h2>
+        <div className="flex items-center justify-between p-6 border-b border-gray-200 dark:border-navy-700">
+          <h2 className="text-2xl font-semibold text-gray-900 dark:text-white">Edit Dealership</h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 transition"
+            className="text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-400 transition"
             aria-label="Close modal"
           >
             <X size={24} />
@@ -146,7 +146,7 @@ export default function EditTenantModal({
           <div className="space-y-4">
             {/* Dealership Name */}
             <div>
-              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Dealership Name <span className="text-red-500">*</span>
               </label>
               <input
@@ -154,17 +154,17 @@ export default function EditTenantModal({
                 id="name"
                 value={formData.name}
                 onChange={(e) => handleChange('name', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 ${
-                  errors.name ? 'border-red-500' : 'border-gray-300'
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-navy-700 dark:text-white dark:focus:ring-blue-500 ${
+                  errors.name ? 'border-red-500' : 'border-gray-300 dark:border-navy-600'
                 }`}
                 placeholder="Enter dealership name"
               />
-              {errors.name && <p className="mt-1 text-sm text-red-500">{errors.name}</p>}
+              {errors.name && <p className="mt-1 text-sm text-red-500 dark:text-red-400">{errors.name}</p>}
             </div>
 
             {/* Website URL */}
             <div>
-              <label htmlFor="website_url" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="website_url" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Website URL
               </label>
               <input
@@ -172,7 +172,7 @@ export default function EditTenantModal({
                 id="website_url"
                 value={formData.website_url}
                 onChange={(e) => handleChange('website_url', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-navy-700 dark:text-white dark:focus:ring-blue-500"
                 placeholder="https://example.com"
               />
             </div>
@@ -180,7 +180,7 @@ export default function EditTenantModal({
             {/* Location and ZIP Code - Side by Side */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="location" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   Location (City, State)
                 </label>
                 <input
@@ -188,13 +188,13 @@ export default function EditTenantModal({
                   id="location"
                   value={formData.location}
                   onChange={(e) => handleChange('location', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                  className="w-full px-3 py-2 border border-gray-300 dark:border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-navy-700 dark:text-white dark:focus:ring-blue-500"
                   placeholder="City, State"
                 />
               </div>
 
               <div>
-                <label htmlFor="zip_code" className="block text-sm font-medium text-gray-700 mb-1">
+                <label htmlFor="zip_code" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                   ZIP Code
                 </label>
                 <input
@@ -202,19 +202,19 @@ export default function EditTenantModal({
                   id="zip_code"
                   value={formData.zip_code}
                   onChange={(e) => handleChange('zip_code', e.target.value)}
-                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 ${
-                    errors.zip_code ? 'border-red-500' : 'border-gray-300'
+                  className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-navy-700 dark:text-white dark:focus:ring-blue-500 ${
+                    errors.zip_code ? 'border-red-500' : 'border-gray-300 dark:border-navy-600'
                   }`}
                   placeholder="12345"
                   maxLength={10}
                 />
-                {errors.zip_code && <p className="mt-1 text-sm text-red-500">{errors.zip_code}</p>}
+                {errors.zip_code && <p className="mt-1 text-sm text-red-500 dark:text-red-400">{errors.zip_code}</p>}
               </div>
             </div>
 
             {/* Contact Email */}
             <div>
-              <label htmlFor="contact_email" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="contact_email" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Contact Email <span className="text-red-500">*</span>
               </label>
               <input
@@ -222,17 +222,17 @@ export default function EditTenantModal({
                 id="contact_email"
                 value={formData.contact_email}
                 onChange={(e) => handleChange('contact_email', e.target.value)}
-                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 ${
-                  errors.contact_email ? 'border-red-500' : 'border-gray-300'
+                className={`w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-navy-700 dark:text-white dark:focus:ring-blue-500 ${
+                  errors.contact_email ? 'border-red-500' : 'border-gray-300 dark:border-navy-600'
                 }`}
                 placeholder="contact@dealership.com"
               />
-              {errors.contact_email && <p className="mt-1 text-sm text-red-500">{errors.contact_email}</p>}
+              {errors.contact_email && <p className="mt-1 text-sm text-red-500 dark:text-red-400">{errors.contact_email}</p>}
             </div>
 
             {/* Contact Phone */}
             <div>
-              <label htmlFor="contact_phone" className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="contact_phone" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                 Contact Phone
               </label>
               <input
@@ -240,25 +240,25 @@ export default function EditTenantModal({
                 id="contact_phone"
                 value={formData.contact_phone}
                 onChange={(e) => handleChange('contact_phone', e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600"
+                className="w-full px-3 py-2 border border-gray-300 dark:border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:bg-navy-700 dark:text-white dark:focus:ring-blue-500"
                 placeholder="(555) 123-4567"
               />
             </div>
           </div>
 
           {/* Footer Actions */}
-          <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200">
+          <div className="flex justify-end gap-3 mt-6 pt-6 border-t border-gray-200 dark:border-navy-700">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              className="px-4 py-2 border border-gray-300 dark:border-navy-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-navy-700 transition"
               disabled={isSubmitting}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:bg-blue-400 disabled:cursor-not-allowed"
+              className="px-4 py-2 bg-blue-600 dark:bg-blue-700 text-white rounded-lg hover:bg-blue-700 dark:hover:bg-blue-600 transition disabled:bg-blue-400 dark:disabled:bg-blue-800 disabled:cursor-not-allowed"
               disabled={isSubmitting}
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}

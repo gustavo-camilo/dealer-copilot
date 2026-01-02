@@ -153,28 +153,28 @@ export default function OnboardingPage() {
   };
 
   const renderHeader = () => (
-    <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+    <div className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           <Link to="/dashboard" className="flex items-center">
-            <Target className="h-8 w-8 text-blue-900" />
-            <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+            <Target className="h-8 w-8 text-blue-900 dark:text-blue-400" />
+            <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Dealer Co-Pilot</span>
           </Link>
           <div className="flex items-center space-x-4 relative">
-            <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+            <span className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline">{tenant?.name}</span>
             <Link
               to="/scan"
-              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
+              className="bg-orange-600 dark:bg-orange-500 text-white px-4 py-2 rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 transition hidden md:inline-block"
             >
               Scan VIN
             </Link>
             <div className="relative">
               <button
                 onClick={() => setMenuOpen(!menuOpen)}
-                className="p-2 rounded-lg hover:bg-gray-100 transition"
+                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                 aria-label="Menu"
               >
-                {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                {menuOpen ? <X className="h-6 w-6 dark:text-white" /> : <Menu className="h-6 w-6 dark:text-white" />}
               </button>
 
               {menuOpen && (
@@ -195,14 +195,14 @@ export default function OnboardingPage() {
 
   if (step === 'analyzing') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         {renderHeader()}
         <div className="flex items-center justify-center px-4 py-8">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8">
+          <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg shadow-sm p-8">
             <div className="text-center mb-6">
-              <Target className="h-12 w-12 text-blue-900 mx-auto mb-4 animate-pulse" />
-              <h2 className="text-2xl font-bold text-gray-900">Scanning Your Website</h2>
-              <p className="text-gray-600 mt-2">This may take up to 30 seconds...</p>
+              <Target className="h-12 w-12 text-blue-900 dark:text-blue-400 mx-auto mb-4 animate-pulse" />
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Scanning Your Website</h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">This may take up to 30 seconds...</p>
             </div>
 
             <div className="space-y-3 mb-6">
@@ -215,12 +215,12 @@ export default function OnboardingPage() {
               ].map((stepData, index) => (
                 <div key={index} className="flex items-center text-sm">
                   <CheckCircle
-                    className={`h-5 w-5 mr-2 flex-shrink-0 ${analysisProgress >= stepData.progress ? 'text-green-600' : 'text-gray-300'
+                    className={`h-5 w-5 mr-2 flex-shrink-0 ${analysisProgress >= stepData.progress ? 'text-green-600 dark:text-green-500' : 'text-gray-300 dark:text-gray-600'
                       }`}
                   />
                   <span
                     className={
-                      analysisProgress >= stepData.progress ? 'text-gray-900' : 'text-gray-400'
+                      analysisProgress >= stepData.progress ? 'text-gray-900 dark:text-white' : 'text-gray-400 dark:text-gray-500'
                     }
                   >
                     {stepData.message}
@@ -229,13 +229,13 @@ export default function OnboardingPage() {
               ))}
             </div>
 
-            <div className="w-full bg-gray-200 rounded-full h-3">
+            <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3">
               <div
-                className="bg-blue-900 h-3 rounded-full transition-all duration-500"
+                className="bg-blue-900 dark:bg-blue-500 h-3 rounded-full transition-all duration-500"
                 style={{ width: `${analysisProgress}%` }}
               />
             </div>
-            <p className="text-center text-sm text-gray-600 mt-2">{analysisProgress}%</p>
+            <p className="text-center text-sm text-gray-600 dark:text-gray-400 mt-2">{analysisProgress}%</p>
           </div>
         </div>
       </div>
@@ -244,48 +244,48 @@ export default function OnboardingPage() {
 
   if (step === 'error') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         {renderHeader()}
         <div className="flex items-center justify-center px-4 py-8">
-          <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8">
+          <div className="max-w-md w-full bg-white dark:bg-gray-900 rounded-lg shadow-sm p-8">
             <div className="text-center mb-6">
-              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <AlertCircle className="h-10 w-10 text-red-600" />
+              <div className="bg-red-100 dark:bg-red-900 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="h-10 w-10 text-red-600 dark:text-red-400" />
               </div>
-              <h2 className="text-2xl font-bold text-gray-900">Scraping Failed</h2>
-              <p className="text-gray-600 mt-2">We couldn't scan your website</p>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Scraping Failed</h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">We couldn't scan your website</p>
             </div>
 
-            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
-              <p className="text-sm text-red-800">{errorMessage}</p>
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-800 dark:text-red-300">{errorMessage}</p>
             </div>
 
             <div className="space-y-3">
               <button
                 onClick={handleRetry}
-                className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
+                className="w-full bg-blue-900 dark:bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 dark:hover:bg-blue-700 transition"
               >
                 Try Again
               </button>
               <button
                 onClick={handleSkip}
-                className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition"
+                className="w-full border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 py-3 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition"
               >
                 Back to Dashboard
               </button>
             </div>
 
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                 Common Issues:
               </h3>
-              <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+              <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
                 <li>Website URL is incorrect or inaccessible</li>
                 <li>Website requires authentication</li>
                 <li>Inventory page structure is not recognized</li>
                 <li>Website is blocking automated requests</li>
               </ul>
-              <p className="text-xs text-gray-500 mt-3">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
                 Contact support if you continue to experience issues.
               </p>
             </div>
@@ -297,35 +297,35 @@ export default function OnboardingPage() {
 
   if (step === 'complete') {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
         {renderHeader()}
         <div className="flex items-center justify-center px-4 py-8">
-          <div className="max-w-2xl w-full bg-white rounded-lg shadow-sm p-8">
+          <div className="max-w-2xl w-full bg-white dark:bg-gray-900 rounded-lg shadow-sm p-8">
             <div className="text-center mb-6">
-              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <RefreshCw className="h-10 w-10 text-blue-600 animate-spin" />
+              <div className="bg-blue-100 dark:bg-blue-900 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <RefreshCw className="h-10 w-10 text-blue-600 dark:text-blue-400 animate-spin" />
               </div>
-              <h2 className="text-3xl font-bold text-gray-900">Your inventory is being processed</h2>
-              <p className="text-gray-600 mt-2">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
+              <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Your inventory is being processed</h2>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
             </div>
 
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
-              <p className="text-blue-800 font-medium">You'll be notified when it is ready for you to review.</p>
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6 mb-6 text-center">
+              <p className="text-blue-800 dark:text-blue-300 font-medium">You'll be notified when it is ready for you to review.</p>
             </div>
 
-            <div className="bg-gray-50 rounded-lg p-6 mb-6">
-              <h3 className="font-bold text-gray-900 mb-3">While you wait, you can:</h3>
-              <ul className="space-y-2 text-sm text-gray-700">
+            <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-6 mb-6">
+              <h3 className="font-bold text-gray-900 dark:text-white mb-3">While you wait, you can:</h3>
+              <ul className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
                 <li className="flex items-center">
-                  <span className="text-green-600 mr-2">✓</span>
+                  <span className="text-green-600 dark:text-green-500 mr-2">✓</span>
                   Scan VINs to get instant purchase recommendations
                 </li>
                 <li className="flex items-center">
-                  <span className="text-green-600 mr-2">✓</span>
+                  <span className="text-green-600 dark:text-green-500 mr-2">✓</span>
                   Set up your default cost settings in Settings
                 </li>
                 <li className="flex items-center">
-                  <span className="text-green-600 mr-2">✓</span>
+                  <span className="text-green-600 dark:text-green-500 mr-2">✓</span>
                   Explore the dashboard and familiarize yourself with the features
                 </li>
               </ul>
@@ -334,13 +334,13 @@ export default function OnboardingPage() {
             <div className="space-y-3">
               <button
                 onClick={() => navigate('/dashboard')}
-                className="w-full bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 transition"
+                className="w-full bg-orange-600 dark:bg-orange-500 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 dark:hover:bg-orange-600 transition"
               >
                 Go to Dashboard
               </button>
               <button
                 onClick={() => navigate('/scan')}
-                className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
+                className="w-full border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 py-3 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-800 transition flex items-center justify-center gap-2"
               >
                 <Target className="w-4 h-4" />
                 VIN Scan
@@ -353,16 +353,16 @@ export default function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
       {renderHeader()}
       <div className="flex items-center justify-center px-4 py-8">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
-            <Target className="h-12 w-12 text-blue-900 mx-auto mb-4" />
-            <h2 className="text-3xl font-bold text-gray-900">
+            <Target className="h-12 w-12 text-blue-900 dark:text-blue-400 mx-auto mb-4" />
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">
               {lastScanDate ? 'Scan Website Again' : 'Welcome to Dealer Co-Pilot'}
             </h2>
-            <p className="text-gray-600 mt-2">
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
               {lastScanDate
                 ? 'Re-scan your inventory to get the latest data'
                 : "Let's scan your inventory in real-time"}
@@ -370,22 +370,22 @@ export default function OnboardingPage() {
           </div>
 
           {lastScanDate && (
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-              <div className="flex items-center text-blue-900 mb-2">
+            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4 mb-6">
+              <div className="flex items-center text-blue-900 dark:text-blue-300 mb-2">
                 <Clock className="h-5 w-5 mr-2" />
                 <span className="font-semibold">Last Scan</span>
               </div>
-              <p className="text-sm text-blue-800">
+              <p className="text-sm text-blue-800 dark:text-blue-300">
                 {lastScanDate.toLocaleDateString()} at {lastScanDate.toLocaleTimeString()}
               </p>
-              <p className="text-sm text-blue-800 mt-1">
+              <p className="text-sm text-blue-800 dark:text-blue-300 mt-1">
                 Found {vehicleCount} vehicle{vehicleCount !== 1 ? 's' : ''} in inventory
               </p>
             </div>
           )}
 
-          <div className="bg-white rounded-lg shadow-sm p-8">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm p-8">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               {lastScanDate ? 'Dealership Website' : "What's your dealership website?"}
             </label>
             <input
@@ -393,13 +393,13 @@ export default function OnboardingPage() {
               value={websiteUrl}
               onChange={(e) => setWebsiteUrl(e.target.value)}
               placeholder="https://www.yourdealership.com"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 mb-4"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-gray-600 dark:bg-gray-800 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-blue-500 mb-4"
             />
 
             <button
               onClick={handleAnalyze}
               disabled={!websiteUrl}
-              className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed mb-3 flex items-center justify-center"
+              className="w-full bg-blue-900 dark:bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 dark:hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed mb-3 flex items-center justify-center"
             >
               {lastScanDate && <RefreshCw className="h-5 w-5 mr-2" />}
               {lastScanDate ? 'Re-Scan My Website' : 'Scan My Inventory'} →
@@ -407,14 +407,14 @@ export default function OnboardingPage() {
 
             <button
               onClick={handleSkip}
-              className="w-full text-gray-600 hover:text-gray-900 text-sm"
+              className="w-full text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-300 text-sm"
             >
               {lastScanDate ? 'Back to Dashboard' : 'Skip for now'}
             </button>
 
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
-              <h3 className="text-sm font-semibold text-gray-900 mb-2">How it works:</h3>
-              <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+              <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-2">How it works:</h3>
+              <ul className="text-xs text-gray-600 dark:text-gray-400 space-y-1 list-disc list-inside">
                 <li>We scan your dealership website for vehicle listings</li>
                 <li>Extract detailed information about each vehicle</li>
                 <li>Track inventory changes and identify sold vehicles</li>

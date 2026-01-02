@@ -148,19 +148,19 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
   }, [maxBid, auctionFee, reconCost, transportCost, marketPrice, totalCost, estimatedProfit, costsEdited, onCostsChange]);
 
   return (
-    <div ref={containerRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+    <div ref={containerRef} className="bg-white dark:bg-navy-800 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
-          <h3 className="font-bold text-gray-900">💰 Profit Calculator</h3>
+          <h3 className="font-bold text-gray-900 dark:text-white">💰 Profit Calculator</h3>
           {costsEdited && (
-            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+            <span className="px-2 py-0.5 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-800 dark:text-yellow-300 text-xs font-medium rounded">
               Edited
             </span>
           )}
         </div>
         <div className="flex items-center gap-3">
           {isSaving && (
-            <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-[10px] items-center">
+            <div className="flex items-center gap-1.5 text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-500/20 px-2 py-0.5 rounded text-[10px] items-center">
               <Loader2 className="h-3 w-3 animate-spin" />
               <span>Saving...</span>
             </div>
@@ -168,7 +168,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
           {costsEdited && (
             <button
               onClick={resetToDefaults}
-              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+              className="p-1.5 text-gray-500 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-500/20 rounded-md transition-colors"
               title="Reset to Defaults"
             >
               <RotateCcw className="h-4 w-4" />
@@ -187,8 +187,8 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
               setIsEditing(!isEditing);
             }}
             className={`text-sm flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${isEditing
-              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-              : 'text-blue-900 hover:text-blue-700 hover:bg-blue-50'
+              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm dark:bg-blue-600 dark:hover:bg-blue-700'
+              : 'text-blue-900 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-500/20'
               }`}
           >
             {isEditing ? (
@@ -204,67 +204,67 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
       <div className="space-y-3">
         {/* Max Bid */}
         <div className="flex justify-between items-center">
-          <span className="text-gray-600 font-medium">Suggested Max Bid</span>
+          <span className="text-gray-600 dark:text-gray-400 font-medium">Suggested Max Bid</span>
           {isEditing ? (
             <input
               type="number"
               value={maxBid}
               onChange={(e) => setMaxBid(Number(e.target.value))}
-              className="w-32 px-3 py-1 border border-gray-300 rounded text-right font-semibold"
+              className="w-32 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right font-semibold bg-white dark:bg-navy-700 text-gray-900 dark:text-white"
             />
           ) : (
-            <span className="font-semibold">${maxBid.toLocaleString()}</span>
+            <span className="font-semibold text-gray-900 dark:text-white">${maxBid.toLocaleString()}</span>
           )}
         </div>
 
         {/* Auction Fee */}
         <div className="flex justify-between items-center text-sm">
-          <span className="text-gray-600">+ Auction Fee</span>
+          <span className="text-gray-600 dark:text-gray-400">+ Auction Fee</span>
           {isEditing ? (
             <input
               type="number"
               value={customAuctionFee !== null ? customAuctionFee : calculatedAuctionFee}
               onChange={(e) => setCustomAuctionFee(Number(e.target.value))}
-              className="w-24 px-3 py-1 border border-gray-300 rounded text-right"
+              className="w-24 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right bg-white dark:bg-navy-700 text-gray-900 dark:text-white"
               placeholder="Custom Fee"
             />
           ) : (
-            <span className="font-medium">${auctionFee.toLocaleString()}</span>
+            <span className="font-medium text-gray-900 dark:text-white">${auctionFee.toLocaleString()}</span>
           )}
         </div>
         {/* Recon Cost */}
         <div className="flex justify-between items-center text-sm">
-          <span className="text-gray-600">+ Recon/Detail</span>
+          <span className="text-gray-600 dark:text-gray-400">+ Recon/Detail</span>
           {isEditing ? (
             <input
               type="number"
               value={reconCost}
               onChange={(e) => setReconCost(Number(e.target.value))}
-              className="w-24 px-3 py-1 border border-gray-300 rounded text-right"
+              className="w-24 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right bg-white dark:bg-navy-700 text-gray-900 dark:text-white"
             />
           ) : (
-            <span className="font-medium">${reconCost.toLocaleString()}</span>
+            <span className="font-medium text-gray-900 dark:text-white">${reconCost.toLocaleString()}</span>
           )}
         </div>
 
         {/* Transport Cost */}
         <div className="flex justify-between items-center text-sm">
-          <span className="text-gray-600">+ Transport</span>
+          <span className="text-gray-600 dark:text-gray-400">+ Transport</span>
           {isEditing ? (
             <input
               type="number"
               value={transportCost}
               onChange={(e) => setTransportCost(Number(e.target.value))}
-              className="w-24 px-3 py-1 border border-gray-300 rounded text-right"
+              className="w-24 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right bg-white dark:bg-navy-700 text-gray-900 dark:text-white"
             />
           ) : (
-            <span className="font-medium">${transportCost.toLocaleString()}</span>
+            <span className="font-medium text-gray-900 dark:text-white">${transportCost.toLocaleString()}</span>
           )}
         </div>
 
         {/* Total Investment */}
-        <div className="border-t pt-3">
-          <div className="flex justify-between font-semibold">
+        <div className="border-t border-gray-200 dark:border-navy-700 pt-3">
+          <div className="flex justify-between font-semibold text-gray-900 dark:text-white">
             <span>Total Investment</span>
             <span>${totalCost.toLocaleString()}</span>
           </div>
@@ -272,26 +272,26 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
 
         {/* Market Retail */}
         <div className="flex justify-between items-center text-sm">
-          <span className="text-gray-600">Market Retail Price</span>
+          <span className="text-gray-600 dark:text-gray-400">Market Retail Price</span>
           {isEditing ? (
             <input
               type="number"
               value={marketPrice}
               onChange={(e) => setMarketPrice(Number(e.target.value))}
-              className="w-32 px-3 py-1 border border-gray-300 rounded text-right font-medium"
+              className="w-32 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right font-medium bg-white dark:bg-navy-700 text-gray-900 dark:text-white"
             />
           ) : (
-            <span className="font-medium">${marketPrice.toLocaleString()}</span>
+            <span className="font-medium text-gray-900 dark:text-white">${marketPrice.toLocaleString()}</span>
           )}
         </div>
 
         {/* Expected Gross Profit */}
         <div
-          className={`flex justify-between text-lg font-bold pt-2 border-t ${estimatedProfit >= 1500
-            ? 'text-green-600'
+          className={`flex justify-between text-lg font-bold pt-2 border-t border-gray-200 dark:border-navy-700 ${estimatedProfit >= 1500
+            ? 'text-green-600 dark:text-green-400'
             : estimatedProfit >= 800
-              ? 'text-yellow-600'
-              : 'text-red-600'
+              ? 'text-yellow-600 dark:text-yellow-400'
+              : 'text-red-600 dark:text-red-400'
             }`}
         >
           <span>Expected Gross Profit</span>
@@ -299,20 +299,20 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
         </div>
 
         {/* Profit Margin */}
-        <div className="flex justify-between text-sm text-gray-600">
+        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
           <span>Profit Margin</span>
           <span className="font-medium">{profitMargin.toFixed(1)}%</span>
         </div>
 
         {/* ROI */}
-        <div className="flex justify-between text-sm text-gray-600">
+        <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400">
           <span>Return on Investment (ROI)</span>
           <span className="font-medium">{((estimatedProfit / totalCost) * 100).toFixed(1)}%</span>
         </div>
       </div>
 
       {isEditing && (
-        <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-900">
+        <div className="mt-4 p-3 bg-blue-50 dark:bg-blue-500/20 rounded-lg text-sm text-blue-900 dark:text-blue-300">
           💡 Tip: Adjust costs based on this specific vehicle's needs. Your changes only apply to
           this scan.
         </div>

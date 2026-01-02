@@ -61,10 +61,10 @@ export default function EditableCostInput({
 
   return (
     <div className="relative">
-      <label className="block text-sm font-medium text-gray-300 mb-2">
+      <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
         {label}
         {isEdited && (
-          <span className="ml-2 px-2 py-0.5 bg-yellow-500/20 text-yellow-300 text-xs rounded">
+          <span className="ml-2 px-2 py-0.5 bg-yellow-100 dark:bg-yellow-500/20 text-yellow-800 dark:text-yellow-300 text-xs rounded">
             Edited
           </span>
         )}
@@ -74,7 +74,7 @@ export default function EditableCostInput({
         <div className="flex gap-2">
           <div className="relative flex-1">
             {prefix && (
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                 {prefix}
               </span>
             )}
@@ -86,12 +86,12 @@ export default function EditableCostInput({
               min={min}
               step={step}
               autoFocus
-              className={`w-full px-4 py-2 bg-white/10 border-2 border-blue-500 rounded-lg text-white focus:outline-none ${
+              className={`w-full px-4 py-2 bg-white dark:bg-navy-700 border-2 border-blue-500 rounded-lg text-gray-900 dark:text-white focus:outline-none ${
                 prefix ? 'pl-8' : ''
               } ${suffix ? 'pr-8' : ''}`}
             />
             {suffix && (
-              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">
+              <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 dark:text-gray-400">
                 {suffix}
               </span>
             )}
@@ -99,7 +99,7 @@ export default function EditableCostInput({
 
           <button
             onClick={handleSave}
-            className="p-2 bg-green-600 hover:bg-green-700 rounded-lg transition"
+            className="p-2 bg-green-600 hover:bg-green-700 dark:bg-green-600 dark:hover:bg-green-700 rounded-lg transition text-white"
             title="Save"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -109,7 +109,7 @@ export default function EditableCostInput({
 
           <button
             onClick={handleCancel}
-            className="p-2 bg-gray-600 hover:bg-gray-700 rounded-lg transition"
+            className="p-2 bg-gray-600 hover:bg-gray-700 dark:bg-gray-700 dark:hover:bg-gray-600 rounded-lg transition text-white"
             title="Cancel"
           >
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -120,10 +120,10 @@ export default function EditableCostInput({
       ) : (
         <div
           onClick={() => setIsEditing(true)}
-          className="group relative px-4 py-2 bg-white/5 border border-white/20 rounded-lg cursor-pointer hover:bg-white/10 hover:border-white/30 transition"
+          className="group relative px-4 py-2 bg-gray-50 dark:bg-navy-700 border border-gray-200 dark:border-navy-600 rounded-lg cursor-pointer hover:bg-gray-100 dark:hover:bg-navy-600 transition"
         >
           <div className="flex items-center justify-between">
-            <span className="text-white font-medium">
+            <span className="text-gray-900 dark:text-white font-medium">
               {prefix}{formatValue(value)}{suffix}
             </span>
 
@@ -134,7 +134,7 @@ export default function EditableCostInput({
                     e.stopPropagation();
                     onChange(defaultValue);
                   }}
-                  className="text-xs text-gray-400 hover:text-white transition"
+                  className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition"
                   title="Reset to default"
                 >
                   Reset
@@ -142,7 +142,7 @@ export default function EditableCostInput({
               )}
 
               <svg
-                className="w-4 h-4 text-gray-400 group-hover:text-white transition"
+                className="w-4 h-4 text-gray-400 group-hover:text-gray-600 dark:text-gray-500 dark:group-hover:text-gray-300 transition"
                 fill="none"
                 stroke="currentColor"
                 viewBox="0 0 24 24"
@@ -158,7 +158,7 @@ export default function EditableCostInput({
           </div>
 
           {!isEdited && (
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
               Default: {prefix}{formatValue(defaultValue)}{suffix}
             </p>
           )}

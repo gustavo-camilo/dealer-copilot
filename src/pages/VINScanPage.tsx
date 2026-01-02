@@ -308,7 +308,7 @@ export default function VINScanPage() {
 
   if (result) {
     return (
-      <div className="min-h-screen bg-gray-50">
+      <div className="min-h-screen bg-gray-50 dark:bg-navy-950">
         {/* Header */}
         <Header
           user={user}
@@ -385,7 +385,7 @@ export default function VINScanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-navy-950">
       {/* Header */}
       <Header
         user={user}
@@ -405,23 +405,23 @@ export default function VINScanPage() {
       <div className="flex-1 flex items-center justify-center px-4 py-12">
         <div className="max-w-md w-full">
           <div className="text-center mb-8">
-            <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Target className="h-8 w-8 text-blue-900" />
+            <div className="bg-blue-100 dark:bg-navy-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Target className="h-8 w-8 text-blue-900 dark:text-orange-500" />
             </div>
-            <h2 className="text-3xl font-bold text-gray-900">Scan VIN</h2>
-            <p className="text-gray-600 mt-2">
+            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Scan VIN</h2>
+            <p className="text-gray-600 dark:text-gray-400 mt-2">
               Enter a VIN to get instant AI-powered buy/no-buy guidance
             </p>
           </div>
 
-          <div className="bg-white rounded-lg shadow-sm p-8">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm p-8 border border-gray-200 dark:border-navy-700">
             {error && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200 text-sm">
                 {error}
               </div>
             )}
 
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Vehicle Identification Number (VIN)
             </label>
             <input
@@ -430,12 +430,12 @@ export default function VINScanPage() {
               onChange={(e) => setVin(e.target.value.toUpperCase())}
               placeholder="1HGCV1F30LA012345"
               maxLength={17}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 mb-4 font-mono"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-orange-500 mb-4 font-mono bg-white dark:bg-navy-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               disabled={loading}
             />
-            <p className="text-xs text-gray-500 mb-4">Enter 17-character VIN number</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Enter 17-character VIN number</p>
 
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Mileage (optional)
             </label>
             <input
@@ -443,10 +443,10 @@ export default function VINScanPage() {
               value={mileage}
               onChange={(e) => setMileage(e.target.value)}
               placeholder="e.g., 45000"
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 mb-4"
+              className="w-full px-4 py-3 border border-gray-300 dark:border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-orange-500 mb-4 bg-white dark:bg-navy-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
               disabled={loading}
             />
-            <p className="text-xs text-gray-500 mb-6">
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-6">
               Providing mileage improves accuracy of recommendations
             </p>
 
@@ -455,12 +455,12 @@ export default function VINScanPage() {
               disabled={vin.length !== 17 || loading}
               className="w-full bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
             >
-              {loading && <Loader2 className="h-5 w-5 animate-spin" />}
+              {loading && <Loader2 className="h-5 w-5 animate-spin border-4 border-blue-900 dark:border-orange-500 border-t-transparent" />}
               {loading ? 'Analyzing Vehicle...' : 'Analyze Vehicle'}
             </button>
 
-            <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
-              <p className="font-semibold mb-2">What you'll get:</p>
+            <div className="mt-6 p-4 bg-gray-50 dark:bg-navy-800 rounded-lg text-sm text-gray-600 dark:text-gray-400">
+              <p className="font-semibold mb-2 text-gray-900 dark:text-white">What you'll get:</p>
               <ul className="space-y-1">
                 <li>✓ Complete vehicle decode and specifications</li>
                 <li>✓ Market pricing analysis</li>

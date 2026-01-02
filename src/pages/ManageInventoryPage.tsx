@@ -330,8 +330,8 @@ export default function ManageInventoryPage() {
 
   const getStatusBadge = (status: string) => {
     const badges = {
-      active: 'bg-green-100 text-green-800',
-      sold: 'bg-blue-100 text-blue-800',
+      active: 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200',
+      sold: 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200',
     };
 
     const labels = {
@@ -350,7 +350,7 @@ export default function ManageInventoryPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 dark:bg-navy-950">
       <Toaster position="top-right" />
       {/* Header */}
       <Header
@@ -365,8 +365,8 @@ export default function ManageInventoryPage() {
         {/* Header */}
         <div className="mb-8 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Manage Inventory</h1>
-            <p className="text-gray-600">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">Manage Inventory</h1>
+            <p className="text-gray-600 dark:text-gray-400">
               Track your current inventory and sales from website scraping
             </p>
           </div>
@@ -384,17 +384,17 @@ export default function ManageInventoryPage() {
         {/* Processing Status Message */}
         {(tenant?.inventory_status === 'pending' || tenant?.inventory_status === 'processing' || tenant?.inventory_status === 'pending_review') && (
           <div className="flex items-center justify-center px-4 py-8">
-            <div className="max-w-2xl w-full bg-white rounded-lg shadow-sm p-8">
+            <div className="max-w-2xl w-full bg-white dark:bg-navy-900 rounded-lg shadow-sm p-8">
               <div className="text-center mb-6">
-                <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <RefreshCw className="h-10 w-10 text-blue-600 animate-spin" />
+                <div className="bg-blue-100 dark:bg-blue-900 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <RefreshCw className="h-10 w-10 text-blue-600 dark:text-blue-400 animate-spin" />
                 </div>
-                <h2 className="text-3xl font-bold text-gray-900">Your inventory is being processed</h2>
-                <p className="text-gray-600 mt-2">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
+                <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Your inventory is being processed</h2>
+                <p className="text-gray-600 dark:text-gray-400 mt-2">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
               </div>
 
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
-                <p className="text-blue-800 font-medium">You'll be notified via email when it is ready for you to review.</p>
+              <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-6 mb-6 text-center">
+                <p className="text-blue-800 dark:text-blue-200 font-medium">You'll be notified via email when it is ready for you to review.</p>
               </div>
 
               <div className="space-y-3">
@@ -407,7 +407,7 @@ export default function ManageInventoryPage() {
               </div>
 
               {tenant?.inventory_ready_at && (
-                <p className="text-xs text-blue-600 mt-6 text-center">
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-6 text-center">
                   Last updated: {new Date(tenant.inventory_ready_at).toLocaleString()}
                 </p>
               )}
@@ -420,65 +420,65 @@ export default function ManageInventoryPage() {
           <>
             {/* Stats Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
                 <div className="flex items-center gap-3 mb-2">
                   <Package className="w-5 h-5 text-blue-600" />
-                  <span className="text-sm text-gray-600">Total Vehicles</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Total Vehicles</span>
                 </div>
-                <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.total}</div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
                 <div className="flex items-center gap-3 mb-2">
                   <TrendingUp className="w-5 h-5 text-green-600" />
-                  <span className="text-sm text-gray-600">Active</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Active</span>
                 </div>
-                <div className="text-2xl font-bold text-gray-900">{stats.active}</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.active}</div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
                 <div className="flex items-center gap-3 mb-2">
                   <DollarSign className="w-5 h-5 text-purple-600" />
-                  <span className="text-sm text-gray-600">Avg Price</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Avg Price</span>
                 </div>
-                <div className="text-2xl font-bold text-gray-900">{formatCurrency(stats.avgPrice)}</div>
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">{formatCurrency(stats.avgPrice)}</div>
               </div>
 
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
                 <div className="flex items-center gap-3 mb-2">
                   <Calendar className="w-5 h-5 text-orange-600" />
-                  <span className="text-sm text-gray-600">Total Value</span>
+                  <span className="text-sm text-gray-600 dark:text-gray-400">Total Value</span>
                 </div>
-                <div className="text-2xl font-bold text-gray-900">
+                <div className="text-2xl font-bold text-gray-900 dark:text-white">
                   {formatCurrency(stats.totalValue)}
                 </div>
               </div>
             </div>
 
             {/* Filters and Search */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
+            <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-4 mb-6">
               <div className="flex flex-col lg:flex-row gap-4">
                 {/* Search */}
                 <div className="flex-1">
                   <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
                     <input
                       type="text"
                       placeholder="Search by VIN, stock number, make, model..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 dark:border-navy-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-navy-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400"
                     />
                   </div>
                 </div>
 
                 {/* Status Filter */}
                 <div className="flex items-center gap-2">
-                  <Filter className="w-5 h-5 text-gray-400" />
+                  <Filter className="w-5 h-5 text-gray-400 dark:text-gray-500" />
                   <select
                     value={statusFilter}
                     onChange={(e) => setStatusFilter(e.target.value as StatusFilter)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-4 py-2 border border-gray-300 dark:border-navy-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-navy-800 text-gray-900 dark:text-white"
                   >
                     <option value="all">All Status</option>
                     <option value="active">Active</option>
@@ -491,7 +491,7 @@ export default function ManageInventoryPage() {
                   <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value as SortBy)}
-                    className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    className="px-4 py-2 border border-gray-300 dark:border-navy-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white dark:bg-navy-800 text-gray-900 dark:text-white"
                   >
                     <option value="recent">Recently Updated</option>
                     <option value="oldest">Oldest First</option>
@@ -504,10 +504,10 @@ export default function ManageInventoryPage() {
                 </div>
 
                 {/* View Toggle */}
-                <div className="flex items-center gap-2 bg-gray-100 p-1 rounded-lg">
+                <div className="flex items-center gap-2 bg-gray-100 dark:bg-navy-800 p-1 rounded-lg">
                   <button
                     onClick={() => setViewMode('grid')}
-                    className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900'
+                    className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white dark:bg-navy-700 shadow-sm text-blue-600' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                       }`}
                     title="Grid View"
                   >
@@ -515,7 +515,7 @@ export default function ManageInventoryPage() {
                   </button>
                   <button
                     onClick={() => setViewMode('list')}
-                    className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white shadow-sm text-blue-600' : 'text-gray-600 hover:text-gray-900'
+                    className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-navy-700 shadow-sm text-blue-600' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
                       }`}
                     title="List View"
                   >
@@ -526,22 +526,22 @@ export default function ManageInventoryPage() {
             </div>
 
             {/* Results Count */}
-            <div className="mb-4 text-sm text-gray-600">
+            <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
               Showing {filteredVehicles.length} of {vehicles.length} vehicles
             </div>
 
             {/* Vehicles Grid or List */}
             {loading ? (
               <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-orange-500"></div>
               </div>
             ) : filteredVehicles.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-                <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-12 text-center">
+                <AlertCircle className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
                   {searchQuery || statusFilter !== 'all' ? 'No vehicles found' : 'No inventory yet'}
                 </h3>
-                <p className="text-gray-600">
+                <p className="text-gray-600 dark:text-gray-400">
                   {searchQuery || statusFilter !== 'all'
                     ? 'Try adjusting your filters'
                     : 'Start scraping your website to track inventory'}
@@ -557,10 +557,10 @@ export default function ManageInventoryPage() {
                   return (
                     <div
                       key={vehicle.id}
-                      className="bg-white rounded-lg shadow-sm border border-gray-200 overflow-hidden hover:shadow-lg transition-shadow"
+                      className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 overflow-hidden hover:shadow-lg transition-shadow"
                     >
                       {/* Vehicle Image */}
-                      <div className="relative h-40 md:h-48 bg-gray-100">
+                      <div className="relative h-40 md:h-48 bg-gray-100 dark:bg-navy-800">
                         {firstImage ? (
                           <img
                             src={firstImage}
@@ -573,7 +573,7 @@ export default function ManageInventoryPage() {
                           />
                         ) : (
                           <div className="flex items-center justify-center h-full">
-                            <Car className="w-12 h-12 md:w-16 md:h-16 text-gray-300" />
+                            <Car className="w-12 h-12 md:w-16 md:h-16 text-gray-300 dark:text-gray-600" />
                           </div>
                         )}
                         <div className="absolute top-2 right-2">
@@ -581,34 +581,34 @@ export default function ManageInventoryPage() {
                         </div>
                         <button
                           onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
-                          className="absolute top-2 left-2 p-1.5 md:p-2 bg-white/90 hover:bg-red-50 rounded-full shadow-sm transition-colors group"
+                          className="absolute top-2 left-2 p-1.5 md:p-2 bg-white/90 dark:bg-navy-700/90 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-full shadow-sm transition-colors group"
                           title="Delete vehicle"
                         >
-                          <Trash2 className="w-3 h-3 md:w-4 md:h-4 text-gray-500 group-hover:text-red-600" />
+                          <Trash2 className="w-3 h-3 md:w-4 md:h-4 text-gray-500 dark:text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400" />
                         </button>
                       </div>
 
                       {/* Vehicle Info */}
                       <div className="p-3 md:p-4">
                         {/* Title */}
-                        <h3 className="text-sm md:text-lg font-semibold text-gray-900 mb-1 md:mb-2 line-clamp-2">
+                        <h3 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-white mb-1 md:mb-2 line-clamp-2">
                           {vehicle.year} {vehicle.make} {vehicle.model}
                         </h3>
 
                         {/* Price and Mileage */}
-                        <div className="flex items-center justify-between mb-2 md:mb-3 pb-2 md:pb-3 border-b border-gray-200">
-                          <div className="text-lg md:text-2xl font-bold text-gray-900">
+                        <div className="flex items-center justify-between mb-2 md:mb-3 pb-2 md:pb-3 border-b border-gray-200 dark:border-navy-700">
+                          <div className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
                             {formatCurrency(vehicle.price)}
                           </div>
                           {vehicle.mileage && (
-                            <div className="text-xs md:text-sm text-gray-600">
+                            <div className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
                               {vehicle.mileage.toLocaleString()} mi
                             </div>
                           )}
                         </div>
 
                         {/* Listing Date and Days */}
-                        <div className="space-y-1 text-xs md:text-sm text-gray-600 mb-2 md:mb-3">
+                        <div className="space-y-1 text-xs md:text-sm text-gray-600 dark:text-gray-400 mb-2 md:mb-3">
                           <div>
                             <span className="font-medium">Listed:</span> {formatDate(vehicle.first_seen_at)}
                           </div>
@@ -618,7 +618,7 @@ export default function ManageInventoryPage() {
                         </div>
 
                         {/* Additional Details (Collapsible) */}
-                        <div className="text-xs text-gray-500 space-y-1 mb-2 md:mb-3">
+                        <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1 mb-2 md:mb-3">
                           {vehicle.stock_number && (
                             <div className="hidden md:block">Stock #: {vehicle.stock_number}</div>
                           )}
@@ -636,7 +636,7 @@ export default function ManageInventoryPage() {
                             href={vehicle.listing_url}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="block w-full text-center text-xs md:text-sm text-blue-600 hover:text-blue-800 font-medium hover:underline"
+                            className="block w-full text-center text-xs md:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium hover:underline"
                           >
                             View Listing →
                           </a>
@@ -648,7 +648,7 @@ export default function ManageInventoryPage() {
               </div>
             ) : (
               /* List View */
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 divide-y divide-gray-200">
+              <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 divide-y divide-gray-200 dark:divide-navy-700">
                 {filteredVehicles.map((vehicle) => {
                   const firstImage = vehicle.image_urls && vehicle.image_urls.length > 0 ? vehicle.image_urls[0] : null;
                   const daysInInventory = getDaysInInventory(vehicle.first_seen_at);
@@ -656,10 +656,10 @@ export default function ManageInventoryPage() {
                   return (
                     <div
                       key={vehicle.id}
-                      className="flex items-center gap-3 md:gap-4 p-3 md:p-4 hover:bg-gray-50 transition-colors"
+                      className="flex items-center gap-3 md:gap-4 p-3 md:p-4 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors"
                     >
                       {/* Thumbnail */}
-                      <div className="relative w-16 h-16 md:w-20 md:h-20 flex-shrink-0 bg-gray-100 rounded overflow-hidden">
+                      <div className="relative w-16 h-16 md:w-20 md:h-20 flex-shrink-0 bg-gray-100 dark:bg-navy-800 rounded overflow-hidden">
                         {firstImage ? (
                           <img
                             src={firstImage}
@@ -671,7 +671,7 @@ export default function ManageInventoryPage() {
                           />
                         ) : (
                           <div className="flex items-center justify-center h-full">
-                            <Car className="w-8 h-8 text-gray-300" />
+                            <Car className="w-8 h-8 text-gray-300 dark:text-gray-600" />
                           </div>
                         )}
                       </div>
@@ -680,11 +680,11 @@ export default function ManageInventoryPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
                           <div className="flex-1 min-w-0">
-                            <h3 className="text-sm md:text-base font-semibold text-gray-900 truncate">
+                            <h3 className="text-sm md:text-base font-semibold text-gray-900 dark:text-white truncate">
                               {vehicle.year} {vehicle.make} {vehicle.model}
                             </h3>
-                            <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-600 mt-1">
-                              <span className="font-bold text-gray-900">{formatCurrency(vehicle.price)}</span>
+                            <div className="flex items-center gap-2 md:gap-4 text-xs md:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                              <span className="font-bold text-gray-900 dark:text-white">{formatCurrency(vehicle.price)}</span>
                               {vehicle.mileage && (
                                 <span className="hidden md:inline">{vehicle.mileage.toLocaleString()} mi</span>
                               )}
@@ -695,10 +695,10 @@ export default function ManageInventoryPage() {
                             {getStatusBadge(vehicle.status)}
                             <button
                               onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
-                              className="p-1.5 hover:bg-red-50 rounded-full transition-colors group"
+                              className="p-1.5 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-full transition-colors group"
                               title="Delete vehicle"
                             >
-                              <Trash2 className="w-4 h-4 text-gray-400 group-hover:text-red-600" />
+                              <Trash2 className="w-4 h-4 text-gray-400 dark:text-gray-500 group-hover:text-red-600 dark:group-hover:text-red-400" />
                             </button>
                           </div>
                         </div>

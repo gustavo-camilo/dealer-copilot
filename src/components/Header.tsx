@@ -27,15 +27,15 @@ export default function Header({
     };
 
     return (
-        <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+        <div className="sticky top-0 z-40 bg-white dark:bg-navy-900 border-b border-gray-200 dark:border-navy-700">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                 <div className="flex justify-between items-center h-16">
                     <Link to="/dashboard" onClick={handleLogoClick} className="flex items-center">
                         <Target className="h-8 w-8 text-blue-900" />
-                        <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+                        <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Dealer Co-Pilot</span>
                     </Link>
                     <div className="flex items-center space-x-4 relative">
-                        <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+                        <span className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline">{tenant?.name}</span>
                         <button
                             onClick={() => {
                                 if (onScanVinClick) {
@@ -51,7 +51,7 @@ export default function Header({
                         <div className="relative">
                             <button
                                 onClick={() => setMenuOpen(!menuOpen)}
-                                className="p-2 rounded-lg hover:bg-gray-100 transition"
+                                className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-800 transition"
                                 aria-label="Menu"
                             >
                                 {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}

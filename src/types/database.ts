@@ -42,6 +42,7 @@ export interface Tenant {
   max_users: number;
   max_vehicles: number;
   cost_settings: TenantCostSettings | null;
+  dark_mode_enabled: boolean | null;
   inventory_status: InventoryStatus;
   inventory_ready_at: string | null;
   created_at: string;

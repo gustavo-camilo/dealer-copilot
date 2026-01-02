@@ -123,15 +123,15 @@ export default function AdminPage() {
       toast.dismiss(toastId);
       toast.custom(
         (t) => (
-          <div className="max-w-sm w-full bg-white shadow-lg rounded-lg border border-gray-200 p-4">
-            <p className="text-sm text-gray-800">{message}</p>
+          <div className="max-w-sm w-full bg-white dark:bg-gray-800 shadow-lg rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+            <p className="text-sm text-gray-800 dark:text-gray-200">{message}</p>
             <div className="mt-3 flex justify-end gap-2">
               <button
                 onClick={() => {
                   toast.dismiss(t.id);
                   finish(false);
                 }}
-                className="px-3 py-1.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                className="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600"
               >
                 Cancel
               </button>
@@ -140,7 +140,7 @@ export default function AdminPage() {
                   toast.dismiss(t.id);
                   finish(true);
                 }}
-                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 rounded-md hover:bg-red-700"
+                className="px-3 py-1.5 text-sm font-medium text-white bg-red-600 dark:bg-red-700 rounded-md hover:bg-red-700 dark:hover:bg-red-600"
               >
                 {confirmLabel}
               </button>
@@ -661,32 +661,32 @@ export default function AdminPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading admin panel...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 dark:border-blue-400 mx-auto"></div>
+          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading admin panel...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50" aria-busy={scraping}>
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900" aria-busy={scraping}>
+      <div className="sticky top-0 z-40 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
-              <Target className="h-8 w-8 text-blue-900" />
-              <span className="ml-2 text-xl font-bold text-gray-900">
+              <Target className="h-8 w-8 text-blue-900 dark:text-blue-400" />
+              <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">
                 {isVAUploader ? 'Dealer Co-Pilot - Upload Portal' : 'Dealer Co-Pilot Admin'}
               </span>
             </div>
             <div className="flex items-center space-x-4">
-              <Link to="/dashboard" className="flex items-center text-gray-600 hover:text-gray-900">
+              <Link to="/dashboard" className="flex items-center text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200">
                 <LayoutDashboard className="h-4 w-4 mr-2" />
                 Dashboard
               </Link>
-              <button onClick={handleSignOut} className="flex items-center text-red-600 hover:text-red-700">
+              <button onClick={handleSignOut} className="flex items-center text-red-600 dark:text-red-500 hover:text-red-700 dark:hover:text-red-400">
                 <LogOut className="h-4 w-4 mr-2" />
                 Sign Out
               </button>
@@ -697,51 +697,51 @@ export default function AdminPage() {
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900">
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
             {isVAUploader ? 'Scraping Upload Portal' : 'Super Admin Panel'}
           </h1>
-          <p className="text-gray-600 mt-1">
+          <p className="text-gray-600 dark:text-gray-400 mt-1">
             {isVAUploader ? 'Upload CSV files for dealership inventories' : 'Manage all dealerships and scraping operations'}
           </p>
         </div>
 
         {isSuperAdmin && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-600">Total Tenants</h3>
-                <Building2 className="h-5 w-5 text-blue-900" />
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Tenants</h3>
+                <Building2 className="h-5 w-5 text-blue-900 dark:text-blue-400" />
               </div>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalTenants}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalTenants}</p>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-600">Active Tenants</h3>
-                <CreditCard className="h-5 w-5 text-green-600" />
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Active Tenants</h3>
+                <CreditCard className="h-5 w-5 text-green-600 dark:text-green-400" />
               </div>
-              <p className="text-3xl font-bold text-gray-900">{stats.activeTenants}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.activeTenants}</p>
             </div>
 
-            <div className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-sm font-medium text-gray-600">Total Users</h3>
-                <Users className="h-5 w-5 text-blue-900" />
+                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Users</h3>
+                <Users className="h-5 w-5 text-blue-900 dark:text-blue-400" />
               </div>
-              <p className="text-3xl font-bold text-gray-900">{stats.totalUsers}</p>
+              <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalUsers}</p>
             </div>
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-          <div className="border-b border-gray-200">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+          <div className="border-b border-gray-200 dark:border-gray-700">
             <nav className="flex -mb-px overflow-x-auto">
               {isSuperAdmin && (
                 <button
                   onClick={() => setActiveTab('tenants')}
                   className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'tenants'
-                    ? 'border-blue-900 text-blue-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                 >
                   <Building2 className="inline-block h-4 w-4 mr-2" />
@@ -752,8 +752,8 @@ export default function AdminPage() {
               <button
                 onClick={() => setActiveTab('scraping-queue')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'scraping-queue'
-                  ? 'border-blue-900 text-blue-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
               >
                 <Clock className="inline-block h-4 w-4 mr-2" />
@@ -763,8 +763,8 @@ export default function AdminPage() {
               <button
                 onClick={() => setActiveTab('upload')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'upload'
-                  ? 'border-blue-900 text-blue-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
               >
                 <Upload className="inline-block h-4 w-4 mr-2" />
@@ -774,8 +774,8 @@ export default function AdminPage() {
               <button
                 onClick={() => setActiveTab('history')}
                 className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'history'
-                  ? 'border-blue-900 text-blue-900'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400'
+                  : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                   }`}
               >
                 <FileText className="inline-block h-4 w-4 mr-2" />
@@ -786,8 +786,8 @@ export default function AdminPage() {
                 <button
                   onClick={() => setActiveTab('reviews')}
                   className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'reviews'
-                    ? 'border-blue-900 text-blue-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                 >
                   <Database className="inline-block h-4 w-4 mr-2" />
@@ -799,8 +799,8 @@ export default function AdminPage() {
                 <button
                   onClick={() => setActiveTab('support')}
                   className={`px-6 py-4 text-sm font-medium border-b-2 whitespace-nowrap ${activeTab === 'support'
-                    ? 'border-blue-900 text-blue-900'
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
                     }`}
                 >
                   <MessageSquare className="inline-block h-4 w-4 mr-2" />
@@ -814,59 +814,59 @@ export default function AdminPage() {
             {activeTab === 'tenants' && isSuperAdmin && (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-gray-50">
+                  <thead className="bg-gray-50 dark:bg-gray-700">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dealership</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Plan</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Inventory</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Created</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Dealership</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Contact</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Plan</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Inventory</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Created</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
                     </tr>
                   </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
+                  <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                     {tenants.map((tenant) => (
-                      <tr key={tenant.id} className="hover:bg-gray-50">
+                      <tr key={tenant.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div>
-                            <div className="font-medium text-gray-900">{tenant.name}</div>
-                            <div className="text-sm text-gray-500">{tenant.location || 'N/A'}</div>
+                            <div className="font-medium text-gray-900 dark:text-white">{tenant.name}</div>
+                            <div className="text-sm text-gray-500 dark:text-gray-400">{tenant.location || 'N/A'}</div>
                           </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm text-gray-900">{tenant.contact_email}</div>
-                          <div className="text-sm text-gray-500">{tenant.contact_phone || 'N/A'}</div>
+                          <div className="text-sm text-gray-900 dark:text-white">{tenant.contact_email}</div>
+                          <div className="text-sm text-gray-500 dark:text-gray-400">{tenant.contact_phone || 'N/A'}</div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800 uppercase">
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 uppercase">
                             {tenant.plan_type}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full uppercase ${tenant.status === 'active' ? 'bg-green-100 text-green-800' :
-                            tenant.status === 'trial' ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-red-100 text-red-800'
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full uppercase ${tenant.status === 'active' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
+                            tenant.status === 'trial' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
+                              'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                             }`}>
                             {tenant.status}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 text-xs font-semibold rounded-full uppercase ${tenant.inventory_status === 'ready' ? 'bg-green-100 text-green-800' :
-                            tenant.inventory_status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                              tenant.inventory_status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                'bg-red-100 text-red-800'
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full uppercase ${tenant.inventory_status === 'ready' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
+                            tenant.inventory_status === 'processing' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' :
+                              tenant.inventory_status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
+                                'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                             }`}>
                             {tenant.inventory_status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                           {new Date(tenant.created_at).toLocaleDateString()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           <button
                             onClick={() => handleEditTenant(tenant)}
-                            className="text-blue-600 hover:text-blue-900 flex items-center gap-1"
+                            className="text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 flex items-center gap-1"
                             title="Edit dealership"
                           >
                             <Edit size={16} />
@@ -885,17 +885,17 @@ export default function AdminPage() {
                 <div className="mb-6 flex flex-col sm:flex-row gap-4">
                   <div className="flex-1">
                     <div className="relative">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-5 w-5" />
+                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-600 h-5 w-5" />
                       <input
                         type="text"
                         placeholder="Search queue..."
-                        className="pl-10 w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                        className="pl-10 w-full rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
                       />
                     </div>
                   </div>
                   <div className="flex gap-2">
                     <select
-                      className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
                       value={queueFilter.type}
                       onChange={(e) => setQueueFilter({ ...queueFilter, type: e.target.value })}
                     >
@@ -904,7 +904,7 @@ export default function AdminPage() {
                       <option value="competitor">Competitors</option>
                     </select>
                     <select
-                      className="rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className="rounded-md border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500 dark:focus:ring-blue-400"
                       value={queueFilter.status}
                       onChange={(e) => setQueueFilter({ ...queueFilter, status: e.target.value })}
                     >
@@ -918,23 +918,23 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="bg-white shadow overflow-hidden sm:rounded-md">
-                  <ul className="divide-y divide-gray-200">
+                <div className="bg-white dark:bg-gray-800 shadow overflow-hidden sm:rounded-md">
+                  <ul className="divide-y divide-gray-200 dark:divide-gray-700">
                     {scrapingQueue.length === 0 ? (
-                      <li className="px-6 py-4 text-center text-gray-500">
+                      <li className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                         No requests found matching your filters.
                       </li>
                     ) : (
                       scrapingQueue.map((item) => (
-                        <li key={item.id} className="px-6 py-4 hover:bg-gray-50">
+                        <li key={item.id} className="px-6 py-4 hover:bg-gray-50 dark:hover:bg-gray-700">
                           <div className="flex items-center justify-between">
                             <div className="flex-1 min-w-0">
                               <div className="flex items-center mb-1">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full mr-2 ${item.source_type === 'dealer' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full mr-2 ${item.source_type === 'dealer' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' : 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'
                                   }`}>
                                   {item.source_type === 'dealer' ? 'DEALER' : 'COMPETITOR'}
                                 </span>
-                                <h4 className="text-lg font-medium text-blue-600 truncate">
+                                <h4 className="text-lg font-medium text-blue-600 dark:text-blue-400 truncate">
                                   <a
                                     href={item.source_url?.startsWith('http') ? item.source_url : `https://${item.source_url}`}
                                     target="_blank"
@@ -951,7 +951,7 @@ export default function AdminPage() {
                                   </a>
                                 </h4>
                               </div>
-                              <div className="mt-1 flex items-center text-sm text-gray-500">
+                              <div className="mt-1 flex items-center text-sm text-gray-500 dark:text-gray-400">
                                 <span className="truncate mr-4">
                                   Requested by: {item.tenant_name || 'System'}
                                 </span>
@@ -960,23 +960,23 @@ export default function AdminPage() {
                                 </span>
                               </div>
                               {item.notes && (
-                                <div className="mt-2 text-sm text-gray-600 bg-gray-50 p-2 rounded">
+                                <div className="mt-2 text-sm text-gray-600 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 p-2 rounded">
                                   Note: {item.notes}
                                 </div>
                               )}
                             </div>
                             <div className="flex items-center gap-4">
                               <div className="flex flex-col items-end">
-                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                                  item.status === 'in_progress' ? 'bg-blue-100 text-blue-800' :
-                                    item.status === 'active' ? 'bg-green-100 text-green-800' :
-                                      item.status === 'failed' ? 'bg-red-100 text-red-800' :
-                                        'bg-gray-100 text-gray-800'
+                                <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${item.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200' :
+                                  item.status === 'in_progress' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' :
+                                    item.status === 'active' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
+                                      item.status === 'failed' ? 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200' :
+                                        'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
                                   }`}>
                                   {item.status.replace('_', ' ').toUpperCase()}
                                 </span>
                                 {item.assigned_user_name && (
-                                  <span className="text-xs text-gray-500 mt-1">
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                                     Assigned to: {item.assigned_user_name}
                                   </span>
                                 )}
@@ -985,7 +985,7 @@ export default function AdminPage() {
                                 {item.status === 'pending' && (
                                   <button
                                     onClick={() => handleQueueAction('update_status', item.id, { status: 'in_progress' })}
-                                    className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors"
+                                    className="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                     title="Start processing"
                                   >
                                     <Play className="w-5 h-5" />
@@ -994,7 +994,7 @@ export default function AdminPage() {
                                 {item.status === 'in_progress' && (
                                   <button
                                     onClick={() => handleQueueAction('update_status', item.id, { status: 'active' })}
-                                    className="p-2 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors"
+                                    className="p-2 text-green-600 dark:text-green-400 hover:text-green-900 dark:hover:text-green-300 hover:bg-green-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                     title="Mark as complete"
                                   >
                                     <CheckCircle2 className="w-5 h-5" />
@@ -1007,7 +1007,7 @@ export default function AdminPage() {
                                       setSelectedSourceForEdit(item);
                                       setEditSourceModalOpen(true);
                                     }}
-                                    className="p-2 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors"
+                                    className="p-2 text-blue-600 dark:text-blue-400 hover:text-blue-900 dark:hover:text-blue-300 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                     title="Edit source name"
                                   >
                                     <Edit2 className="w-5 h-5" />
@@ -1020,7 +1020,7 @@ export default function AdminPage() {
                                       handleQueueAction('delete', item.id);
                                     }
                                   }}
-                                  className="p-2 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-colors"
+                                  className="p-2 text-red-600 dark:text-red-400 hover:text-red-900 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-gray-700 rounded-lg transition-colors"
                                   title="Delete request"
                                 >
                                   <Trash2 className="w-5 h-5" />
@@ -1040,11 +1040,11 @@ export default function AdminPage() {
               <div className="space-y-4">
                 <div className="flex items-center justify-between gap-4 mb-6">
                   <div className="flex items-center gap-3">
-                    <label className="text-sm font-medium text-gray-700">Status:</label>
+                    <label className="text-sm font-medium text-gray-700 dark:text-gray-300">Status:</label>
                     <select
                       value={supportStatusFilter}
                       onChange={(e) => setSupportStatusFilter(e.target.value as any)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent text-sm"
+                      className="px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-600 dark:focus:ring-blue-400 focus:border-transparent text-sm"
                     >
                       <option value="all">All Tickets</option>
                       <option value="open">Open</option>
@@ -1053,15 +1053,15 @@ export default function AdminPage() {
                     </select>
                   </div>
 
-                  <div className="text-sm text-gray-600">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
                     Total: {supportTickets.length} tickets
                   </div>
                 </div>
 
                 {supportTickets.length === 0 ? (
-                  <div className="text-center py-12 bg-white rounded-lg border border-gray-200">
-                    <MessageSquare className="h-12 w-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">No support tickets found</p>
+                  <div className="text-center py-12 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                    <MessageSquare className="h-12 w-12 text-gray-300 dark:text-gray-600 mx-auto mb-3" />
+                    <p className="text-gray-500 dark:text-gray-400">No support tickets found</p>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -1081,10 +1081,10 @@ export default function AdminPage() {
             {activeTab === 'upload' && (
               <div className="max-w-3xl mx-auto">
                 {uploadError && (
-                  <div className="mb-6 p-4 bg-red-50 border-2 border-red-300 rounded-lg">
+                  <div className="mb-6 p-4 bg-red-50 dark:bg-red-900/30 border-2 border-red-300 dark:border-red-700 rounded-lg">
                     <div className="flex items-start gap-3">
-                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-red-600 text-white flex items-center justify-center text-xs font-bold">!</div>
-                      <p className="text-red-800 font-medium flex-1">{uploadError}</p>
+                      <div className="flex-shrink-0 w-5 h-5 rounded-full bg-red-600 dark:bg-red-700 text-white flex items-center justify-center text-xs font-bold">!</div>
+                      <p className="text-red-800 dark:text-red-200 font-medium flex-1">{uploadError}</p>
                     </div>
                   </div>
                 )}
@@ -1093,7 +1093,7 @@ export default function AdminPage() {
                   <a
                     href="/templates/inventory_upload_template.csv"
                     download="inventory_upload_template.csv"
-                    className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800 font-medium"
+                    className="flex items-center gap-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium"
                   >
                     <Download className="h-4 w-4" />
                     Download CSV Template
@@ -1101,9 +1101,9 @@ export default function AdminPage() {
                 </div>
 
                 <div className="mb-6">
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <h3 className="text-sm font-medium text-blue-900 mb-2">Smart Upload</h3>
-                    <p className="text-sm text-blue-800">
+                  <div className="bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4 mb-4">
+                    <h3 className="text-sm font-medium text-blue-900 dark:text-blue-200 mb-2">Smart Upload</h3>
+                    <p className="text-sm text-blue-800 dark:text-blue-300">
                       Upload any inventory CSV (Dealer or Competitor). The system will automatically detect the website URL
                       and route the data to the correct inventory or competitor database.
                     </p>
@@ -1114,7 +1114,7 @@ export default function AdminPage() {
                 <button
                   onClick={handleUpload}
                   disabled={!csvFile || uploading}
-                  className="w-full px-6 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                  className="w-full px-6 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-600 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
                 >
                   {uploading && <Loader2 className="h-5 w-5 animate-spin" />}
                   {uploading ? 'Processing CSV...' : 'Upload CSV'}
@@ -1125,43 +1125,43 @@ export default function AdminPage() {
             {activeTab === 'history' && (
               <div className="overflow-x-auto">
                 {uploadHistory.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No upload history</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">No upload history</p>
                 ) : (
                   <table className="w-full">
-                    <thead className="bg-gray-50">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
                       <tr>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Filename</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Source</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Uploaded By</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Processed</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">New</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Updated</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Sold</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Filename</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Source</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Uploaded By</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Date</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Processed</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">New</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Updated</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Sold</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase">Status</th>
                       </tr>
                     </thead>
-                    <tbody className="bg-white divide-y divide-gray-200">
+                    <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
                       {uploadHistory.map((upload) => (
-                        <tr key={upload.id} className="hover:bg-gray-50">
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.filename}</td>
+                        <tr key={upload.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{upload.filename}</td>
                           <td className="px-6 py-4 text-sm">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'dealer_inventory' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.scraping_source === 'dealer_inventory' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' : 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'}`}>
                               {upload.scraping_source === 'dealer_inventory' ? 'Dealer' : 'Competitor'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.users?.full_name || 'N/A'}</td>
-                          <td className="px-6 py-4 text-sm text-gray-500">
+                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{upload.users?.full_name || 'N/A'}</td>
+                          <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">
                             {new Date(upload.upload_date).toLocaleString()}
                           </td>
-                          <td className="px-6 py-4 text-sm text-gray-900">{upload.vehicles_processed || 0}</td>
-                          <td className="px-6 py-4 text-sm text-green-600">{upload.vehicles_new || 0}</td>
-                          <td className="px-6 py-4 text-sm text-blue-600">{upload.vehicles_updated || 0}</td>
-                          <td className="px-6 py-4 text-sm text-red-600">{upload.vehicles_sold || 0}</td>
+                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{upload.vehicles_processed || 0}</td>
+                          <td className="px-6 py-4 text-sm text-green-600 dark:text-green-400">{upload.vehicles_new || 0}</td>
+                          <td className="px-6 py-4 text-sm text-blue-600 dark:text-blue-400">{upload.vehicles_updated || 0}</td>
+                          <td className="px-6 py-4 text-sm text-red-600 dark:text-red-400">{upload.vehicles_sold || 0}</td>
                           <td className="px-6 py-4">
-                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 text-green-800' :
-                              upload.status === 'processing' ? 'bg-blue-100 text-blue-800' :
-                                'bg-red-100 text-red-800'
+                            <span className={`px-2 py-1 text-xs font-semibold rounded-full ${upload.status === 'completed' ? 'bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200' :
+                              upload.status === 'processing' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' :
+                                'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
                               }`}>
                               {upload.status.charAt(0).toUpperCase() + upload.status.slice(1)}
                             </span>
@@ -1176,13 +1176,13 @@ export default function AdminPage() {
 
             {activeTab === 'reviews' && isSuperAdmin && (
               <div>
-                <div className="mb-6 pb-6 border-b">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-4">Test Automated Scraper</h3>
+                <div className="mb-6 pb-6 border-b dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Test Automated Scraper</h3>
                   <div className="flex gap-4">
                     <select
                       value={selectedTenantForScrape}
                       onChange={(e) => setSelectedTenantForScrape(e.target.value)}
-                      className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
+                      className="flex-1 px-4 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-600 dark:focus:ring-orange-400 focus:border-transparent"
                     >
                       <option value="">Choose a dealership...</option>
                       {tenants.map((tenant) => (
@@ -1194,16 +1194,16 @@ export default function AdminPage() {
                     <button
                       onClick={handleTestScrape}
                       disabled={!selectedTenantForScrape || scraping}
-                      className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="px-6 py-2 bg-orange-600 dark:bg-orange-700 text-white rounded-lg font-semibold hover:bg-orange-700 dark:hover:bg-orange-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                       {scraping ? 'Scraping...' : 'Test Scrape with Review'}
                     </button>
                   </div>
                 </div>
 
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Pending Reviews</h3>
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Pending Reviews</h3>
                 {pendingReviews.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">No pending reviews</p>
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">No pending reviews</p>
                 ) : (
                   <div className="space-y-4">
                     {pendingReviews.map((review) => {
@@ -1219,13 +1219,13 @@ export default function AdminPage() {
                         : null;
 
                       return (
-                        <div key={review.id} className="border border-gray-200 rounded-lg p-4">
+                        <div key={review.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 bg-white dark:bg-gray-800">
                           <div className="flex justify-between items-start mb-4">
                             <div>
-                              <h4 className="font-medium text-gray-900">{displayName}</h4>
-                              <p className="text-sm text-gray-500">{timestamp}</p>
+                              <h4 className="font-medium text-gray-900 dark:text-white">{displayName}</h4>
+                              <p className="text-sm text-gray-500 dark:text-gray-400">{timestamp}</p>
                               {review.source_url && (
-                                <p className="text-xs text-blue-600 mt-1">
+                                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1">
                                   Source: <a
                                     href={review.source_url.startsWith('http') ? review.source_url : `https://${review.source_url}`}
                                     target="_blank"
@@ -1236,25 +1236,25 @@ export default function AdminPage() {
                                   </a>
                                 </p>
                               )}
-                              <p className="text-sm text-gray-600 mt-1">
+                              <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
                                 {vehiclesFound} vehicles found
                               </p>
                               {durationSeconds !== null && (
-                                <p className="text-xs text-gray-500 mt-1">Duration: {durationSeconds}s</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">Duration: {durationSeconds}s</p>
                               )}
                             </div>
                             <div className="flex gap-2">
                               <button
                                 onClick={() => handleApproveReview(review.id)}
                                 disabled={reviewActionId === review.id}
-                                className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="px-4 py-2 bg-green-600 dark:bg-green-700 text-white rounded-lg text-sm hover:bg-green-700 dark:hover:bg-green-600 transition disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 {reviewActionId === review.id ? 'Approving...' : 'Approve'}
                               </button>
                               <button
                                 onClick={() => handleRejectReview(review.id)}
                                 disabled={reviewActionId === review.id}
-                                className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition disabled:opacity-60 disabled:cursor-not-allowed"
+                                className="px-4 py-2 bg-red-600 dark:bg-red-700 text-white rounded-lg text-sm hover:bg-red-700 dark:hover:bg-red-600 transition disabled:opacity-60 disabled:cursor-not-allowed"
                               >
                                 {reviewActionId === review.id ? 'Rejecting...' : 'Reject'}
                               </button>
@@ -1268,18 +1268,18 @@ export default function AdminPage() {
 
                 <div className="mt-10">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-4">
-                    <h3 className="text-lg font-semibold text-gray-900">Scrape Monitor</h3>
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Scrape Monitor</h3>
                     <div className="flex items-center gap-3">
                       <input
                         type="text"
                         value={scrapeMonitorQuery}
                         onChange={(e) => setScrapeMonitorQuery(e.target.value)}
                         placeholder="Search by name or URL"
-                        className="w-64 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-600"
+                        className="w-64 px-3 py-2 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 dark:focus:ring-orange-400"
                       />
                       <button
                         onClick={loadScrapeMonitor}
-                        className="px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition"
+                        className="px-3 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition"
                       >
                         Refresh
                       </button>
@@ -1287,22 +1287,22 @@ export default function AdminPage() {
                   </div>
 
                   {scrapeMonitorLoading ? (
-                    <div className="text-sm text-gray-500">Loading scrape monitor...</div>
+                    <div className="text-sm text-gray-500 dark:text-gray-400">Loading scrape monitor...</div>
                   ) : scrapeMonitorRows.length === 0 ? (
-                    <p className="text-gray-500 text-center py-6">No scrape history found</p>
+                    <p className="text-gray-500 dark:text-gray-400 text-center py-6">No scrape history found</p>
                   ) : (
-                    <div className="overflow-x-auto bg-white border border-gray-200 rounded-lg">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
+                    <div className="overflow-x-auto bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg">
+                      <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+                        <thead className="bg-gray-50 dark:bg-gray-700">
                           <tr>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">URL</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Vehicles</th>
-                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Scraped</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Source</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">URL</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Vehicles</th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Last Scraped</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white divide-y divide-gray-100">
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-100 dark:divide-gray-700">
                           {scrapeMonitorRows
                             .filter((row) => {
                               const needle = scrapeMonitorQuery.trim().toLowerCase();
@@ -1319,15 +1319,15 @@ export default function AdminPage() {
                                 : 'N/A';
                               return (
                                 <tr key={row.id}>
-                                  <td className="px-6 py-4 text-sm text-gray-900">{displayName}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{displayName}</td>
                                   <td className="px-6 py-4 text-sm">
-                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${row.source_type === 'dealer' ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${row.source_type === 'dealer' ? 'bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200' : 'bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200'}`}>
                                       {row.source_type === 'dealer' ? 'Dealer' : 'Competitor'}
                                     </span>
                                   </td>
-                                  <td className="px-6 py-4 text-sm text-gray-600">{row.source_url || 'N/A'}</td>
-                                  <td className="px-6 py-4 text-sm text-gray-900">{vehicles}</td>
-                                  <td className="px-6 py-4 text-sm text-gray-500">{timestamp}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-600 dark:text-gray-300">{row.source_url || 'N/A'}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">{vehicles}</td>
+                                  <td className="px-6 py-4 text-sm text-gray-500 dark:text-gray-400">{timestamp}</td>
                                 </tr>
                               );
                             })}
@@ -1366,15 +1366,15 @@ export default function AdminPage() {
 
         {/* Upload Success Modal */}
         {showSuccessModal && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6 animate-in fade-in duration-200">
+          <div className="fixed inset-0 bg-black bg-opacity-50 dark:bg-opacity-70 flex items-center justify-center z-50 p-4">
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full p-6 animate-in fade-in duration-200">
               <div className="flex items-start gap-4 mb-6">
                 <div className="flex-shrink-0">
-                  <CheckCircle2 className="h-12 w-12 text-green-500" />
+                  <CheckCircle2 className="h-12 w-12 text-green-500 dark:text-green-400" />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Upload Successful!</h3>
-                  <p className="text-gray-700">{uploadMessage}</p>
+                  <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">Upload Successful!</h3>
+                  <p className="text-gray-700 dark:text-gray-300">{uploadMessage}</p>
                 </div>
               </div>
               <div className="flex flex-col gap-3">
@@ -1384,7 +1384,7 @@ export default function AdminPage() {
                     setUploadMessage('');
                     setUploadError('');
                   }}
-                  className="w-full px-4 py-3 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 transition"
+                  className="w-full px-4 py-3 bg-blue-600 dark:bg-blue-700 text-white rounded-lg font-semibold hover:bg-blue-700 dark:hover:bg-blue-600 transition"
                 >
                   Upload Another File
                 </button>
@@ -1394,7 +1394,7 @@ export default function AdminPage() {
                     setUploadMessage('');
                     setActiveTab('history');
                   }}
-                  className="w-full px-4 py-3 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 transition"
+                  className="w-full px-4 py-3 bg-green-600 dark:bg-green-700 text-white rounded-lg font-semibold hover:bg-green-700 dark:hover:bg-green-600 transition"
                 >
                   View Upload History
                 </button>
@@ -1403,7 +1403,7 @@ export default function AdminPage() {
                     setShowSuccessModal(false);
                     setUploadMessage('');
                   }}
-                  className="w-full px-4 py-3 bg-gray-200 text-gray-700 rounded-lg font-semibold hover:bg-gray-300 transition"
+                  className="w-full px-4 py-3 bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg font-semibold hover:bg-gray-300 dark:hover:bg-gray-600 transition"
                 >
                   Close
                 </button>
@@ -1413,19 +1413,19 @@ export default function AdminPage() {
         )}
       </div>
       {scraping && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm px-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/40 dark:bg-gray-900/70 backdrop-blur-sm px-4">
           <div
             role="status"
             aria-live="polite"
-            className="w-full max-w-sm rounded-2xl bg-white shadow-2xl border border-gray-200 px-5 py-4"
+            className="w-full max-w-sm rounded-2xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-200 dark:border-gray-700 px-5 py-4"
           >
             <div className="flex items-center gap-3">
-              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50">
-                <Loader2 className="h-5 w-5 animate-spin text-blue-600" />
+              <span className="flex h-10 w-10 items-center justify-center rounded-full bg-blue-50 dark:bg-blue-900/30">
+                <Loader2 className="h-5 w-5 animate-spin text-blue-600 dark:text-blue-400" />
               </span>
               <div>
-                <p className="text-sm font-semibold text-gray-900">Scraper running</p>
-                <p className="text-xs text-gray-500">Fetching inventory updates. This can take a minute.</p>
+                <p className="text-sm font-semibold text-gray-900 dark:text-white">Scraper running</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400">Fetching inventory updates. This can take a minute.</p>
               </div>
             </div>
           </div>
