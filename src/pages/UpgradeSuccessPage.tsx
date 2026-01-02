@@ -43,7 +43,7 @@ export default function UpgradeSuccessPage() {
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-800 transition"
                   aria-label="Menu"
                 >
-                  {menuOpen ? <X className="h-6 w-6 dark:text-white" /> : <Menu className="h-6 w-6 dark:text-white" />}
+                  {menuOpen ? <X className="h-6 w-6 text-white" /> : <Menu className="h-6 w-6 text-white" />}
                 </button>
 
                 {menuOpen && (

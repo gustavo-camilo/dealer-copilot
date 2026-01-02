@@ -253,7 +253,7 @@ export default function VINScansPage() {
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                   aria-label="Menu"
                 >
-                  {menuOpen ? <X className="h-6 w-6 dark:text-white" /> : <Menu className="h-6 w-6 dark:text-white" />}
+                  {menuOpen ? <X className="h-6 w-6 text-white" /> : <Menu className="h-6 w-6 text-white" />}
                 </button>
 
                 {/* Navigation Menu */}
@@ -419,7 +419,7 @@ export default function VINScansPage() {
                   onClick={() => setSelectedScan(null)}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg transition"
                 >
-                  <X className="w-6 h-6 dark:text-white" />
+                  <X className="w-6 h-6 text-white" />
                 </button>
               </div>
 

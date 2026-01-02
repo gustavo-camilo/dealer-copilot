@@ -530,7 +530,7 @@ export default function DashboardPage() {
                     onClick={handleCloseModal}
                     className="p-2 hover:bg-gray-100 dark:hover:bg-navy-800 rounded-lg transition"
                   >
-                    <X className="w-6 h-6 text-gray-900 dark:text-white" />
+                    <X className="w-6 h-6 text-white" />
                   </button>
                 </div>
 

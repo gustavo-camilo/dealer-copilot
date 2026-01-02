@@ -519,7 +519,7 @@ export default function CompetitorAnalysisPage() {
                   className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
                   aria-label="Menu"
                 >
-                  {menuOpen ? <X className="h-6 w-6 dark:text-white" /> : <Menu className="h-6 w-6 dark:text-white" />}
+                  {menuOpen ? <X className="h-6 w-6 text-white" /> : <Menu className="h-6 w-6 text-white" />}
                 </button>
 
                 {menuOpen && (

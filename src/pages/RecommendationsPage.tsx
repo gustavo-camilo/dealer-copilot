@@ -544,7 +544,7 @@ export default function RecommendationsPage() {
                   onClick={handleCloseModal}
                   className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
                 >
-                  <X className="w-6 h-6 text-gray-600 dark:text-gray-400" />
+                  <X className="w-6 h-6 text-white" />
                 </button>
               </div>
 

@@ -5,19 +5,19 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Navy blue dark mode palette - darker shades
+        // Navy blue dark mode palette - custom blue shades (lightest to darkest)
         navy: {
-          50: '#f0f4f8',
-          100: '#d9e2ec',
-          200: '#bcccdc',
-          300: '#9fb3c8',
-          400: '#829ab1',
-          500: '#627d98',
-          600: '#486581',
-          700: '#1e293b',  // Darker
-          800: '#0f172a',  // Much darker
-          900: '#020617',  // Almost black - primary dark background
-          950: '#000000',  // Pure black - darker sections/cards
+          50: '#e6f2ff',   // Lightest blue (for very light backgrounds)
+          100: '#cce5ff',  // Very light blue
+          200: '#99ccff',  // Light blue
+          300: '#66b2ff',  // Medium-light blue
+          400: '#3399ff',  // Medium blue
+          500: '#0077b6',  // Bright teal blue (brightest of custom colors)
+          600: '#0f518e',  // Dusk blue
+          700: '#1a3c5b',  // Yale blue
+          800: '#102a43',  // Deep space blue (moved from 900)
+          900: '#0e1c2f',  // New dark background - primary dark background
+          950: '#051627',  // Prussian blue - darkest sections/cards
         },
       },
     },
