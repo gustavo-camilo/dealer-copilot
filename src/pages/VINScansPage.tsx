@@ -2,9 +2,9 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Target, Menu, X, Trash2, AlertCircle, ChevronRight } from 'lucide-react';
+import { Search, Trash2, AlertCircle, ChevronRight } from 'lucide-react';
 import toast from 'react-hot-toast';
-import NavigationMenu from '../components/NavigationMenu';
+import Header from '../components/Header';
 import VINScanResult from '../components/VINScanResult';
 
 interface VINScan {
@@ -149,7 +149,7 @@ export default function VINScansPage() {
     toast.custom((t) => (
       <div
         className={`${t.visible ? 'animate-enter' : 'animate-leave'
-          } max-w-md w-full bg-white dark:bg-gray-800 shadow-lg dark:shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 dark:ring-gray-700`}
+          } max-w-md w-full bg-white dark:bg-navy-900 shadow-lg dark:shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 dark:ring-brand-border-dark`}
       >
         <div className="flex-1 w-0 p-4">
           <div className="flex items-start">
@@ -230,47 +230,15 @@ export default function VINScansPage() {
 
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-gray-950">
+    <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link to="/dashboard" className="flex items-center">
-              <Target className="h-8 w-8 text-blue-900 dark:text-blue-400" />
-              <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Dealer Co-Pilot</span>
-            </Link>
-            <div className="flex items-center space-x-4 relative">
-              <span className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline">{tenant?.name}</span>
-              <Link
-                to="/scan"
-                className="bg-orange-600 dark:bg-orange-700 text-white px-4 py-2 rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 transition hidden md:inline-block"
-              >
-                Scan VIN
-              </Link>
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-                  aria-label="Menu"
-                >
-                  {menuOpen ? <X className="h-6 w-6 text-white" /> : <Menu className="h-6 w-6 text-white" />}
-                </button>
-
-                {/* Navigation Menu */}
-                {menuOpen && (
-                  <NavigationMenu
-                    currentPath={location.pathname}
-                    onClose={() => setMenuOpen(false)}
-                    onSignOut={handleSignOut}
-                    user={user}
-                    tenantName={tenant?.name}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Header
+        user={user}
+        tenant={tenant}
+        signOut={handleSignOut}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="mb-8">
@@ -289,7 +257,7 @@ export default function VINScansPage() {
               placeholder="Search by VIN, make, model, year..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-brand-border-dark rounded-lg bg-white dark:bg-navy-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -307,7 +275,7 @@ export default function VINScansPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : filteredScans.length === 0 ? (
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-12 text-center">
             <AlertCircle className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               {searchQuery ? 'No results found' : 'No VIN scans yet'}
@@ -324,7 +292,7 @@ export default function VINScansPage() {
               <div
                 key={scan.id}
                 onClick={() => setSelectedScan(scan)}
-                className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer"
+                className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer"
               >
                 <div className="flex items-center justify-between gap-4">
                   {/* Left: Vehicle Info */}
@@ -409,11 +377,11 @@ export default function VINScansPage() {
             onClick={() => setSelectedScan(null)}
           >
             <div
-              className="bg-white dark:bg-gray-800 w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
+              className="bg-white dark:bg-navy-900 w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 p-4 md:p-6 flex items-center justify-between z-10">
+              <div className="sticky top-0 bg-white dark:bg-navy-900 border-b border-gray-200 dark:border-brand-border-dark p-4 md:p-6 flex items-center justify-between z-10">
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Scan Details</h2>
                 <button
                   onClick={() => setSelectedScan(null)}

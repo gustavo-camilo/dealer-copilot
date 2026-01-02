@@ -6,9 +6,6 @@ import {
   TrendingUp,
   Trash2,
   RefreshCw,
-  Target,
-  Menu,
-  X,
   DollarSign,
   Gauge,
   BarChart3,
@@ -16,7 +13,7 @@ import {
   Loader2,
   Car,
 } from 'lucide-react';
-import NavigationMenu from '../components/NavigationMenu';
+import Header from '../components/Header';
 import toast, { Toaster } from 'react-hot-toast';
 import { normalizeDomain, ensureHttps } from '../utils/url';
 
@@ -498,44 +495,13 @@ export default function CompetitorAnalysisPage() {
     <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
       <Toaster position="top-right" />
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white dark:bg-brand-topbar-dark border-b border-gray-200 dark:border-brand-border-dark">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link to="/dashboard" className="flex items-center">
-              <Target className="h-8 w-8 text-blue-900 dark:text-blue-400" />
-              <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Dealer Co-Pilot</span>
-            </Link>
-            <div className="flex items-center space-x-4 relative">
-              <span className="text-sm text-gray-600 dark:text-gray-400 hidden md:inline">{tenant?.name}</span>
-              <Link
-                to="/scan"
-                className="bg-orange-600 dark:bg-orange-700 text-white px-4 py-2 rounded-lg hover:bg-orange-700 dark:hover:bg-orange-600 transition hidden md:inline-block"
-              >
-                Scan VIN
-              </Link>
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-800 transition"
-                  aria-label="Menu"
-                >
-                  {menuOpen ? <X className="h-6 w-6 text-white" /> : <Menu className="h-6 w-6 text-white" />}
-                </button>
-
-                {menuOpen && (
-                  <NavigationMenu
-                    currentPath={location.pathname}
-                    onClose={() => setMenuOpen(false)}
-                    onSignOut={handleSignOut}
-                    user={user}
-                    tenantName={tenant?.name}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
+      <Header
+        user={user}
+        tenant={tenant}
+        signOut={handleSignOut}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+      />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
@@ -577,7 +543,7 @@ export default function CompetitorAnalysisPage() {
                 You will receive a notification as soon as the competitor has been analyzed and it's available for you to check.
               </p>
 
-              <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mb-6">
+              <div className="bg-white dark:bg-navy-900 rounded-lg p-6 max-w-md w-full mb-6">
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-3 text-left">While you wait, you can:</h3>
                 <ul className="text-left space-y-2 text-sm text-gray-700 dark:text-gray-300">
                   <li className="flex items-center">
@@ -606,7 +572,7 @@ export default function CompetitorAnalysisPage() {
         ) : (
           <>
             {/* Scan Form */}
-            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
+            <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6 mb-8">
               <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">Add New Competitor</h2>
 
               <div className="flex flex-col gap-4">
@@ -648,7 +614,7 @@ export default function CompetitorAnalysisPage() {
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-blue-400"></div>
               </div>
             ) : combinedList.length === 0 ? (
-              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+              <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-12 text-center">
                 <TrendingUp className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
                 <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">No competitors scanned yet</h3>
                 <p className="text-gray-600 dark:text-gray-400">Enter a competitor URL above to get started</p>
@@ -658,7 +624,7 @@ export default function CompetitorAnalysisPage() {
                 {combinedList.map((item) => (
                   <div
                     key={`${item.type}-${item.id}`}
-                    className={`bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 ${item.type === 'pending' ? 'opacity-75' : ''
+                    className={`bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6 ${item.type === 'pending' ? 'opacity-75' : ''
                       }`}
                   >
                     {/* Header */}
@@ -832,7 +798,7 @@ export default function CompetitorAnalysisPage() {
                         )}
 
                         {/* History Section */}
-                        <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+                        <div className="border-t border-gray-200 dark:border-brand-border-dark pt-3">
                           {subscriptionTier === 'enterprise' ? (
                             <button
                               onClick={() => toggleHistory(item.url)}
