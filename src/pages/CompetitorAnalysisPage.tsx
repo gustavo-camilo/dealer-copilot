@@ -7,16 +7,20 @@ import {
   Trash2,
   RefreshCw,
   Target,
-  Menu,
-  X,
   DollarSign,
   Gauge,
   BarChart3,
   AlertCircle,
   Loader2,
   Car,
+  ChevronRight,
+  ArrowUpRight,
+  Globe,
+  Clock,
+  ExternalLink,
 } from 'lucide-react';
-import NavigationMenu from '../components/NavigationMenu';
+import Header from '../components/Header';
+import GlassCard from '../components/ui/GlassCard';
 import toast, { Toaster } from 'react-hot-toast';
 import { normalizeDomain, ensureHttps } from '../utils/url';
 
@@ -34,9 +38,7 @@ interface CompetitorSnapshot {
   max_mileage: number | null;
   total_inventory_value: number | null;
   top_makes: Record<string, number>;
-  scraping_duration_ms: number | null;
   status: 'success' | 'partial' | 'failed';
-  error_message: string | null;
 }
 
 interface CompetitorHistory {
@@ -51,8 +53,6 @@ export default function CompetitorAnalysisPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const [competitors, setCompetitors] = useState<CompetitorSnapshot[]>([]);
-  const [historyData, setHistoryData] = useState<Record<string, CompetitorHistory[]>>({});
-  const [expandedHistory, setExpandedHistory] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [scanning, setScanning] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -75,824 +75,268 @@ export default function CompetitorAnalysisPage() {
 
   const loadSubscriptionTier = async () => {
     try {
-      const { data, error } = await supabase
-        .from('tenants')
-        .select('subscription_tier')
-        .eq('id', tenant?.id)
-        .single();
-
-      if (error) throw error;
+      const { data } = await supabase.from('tenants').select('subscription_tier').eq('id', tenant?.id).single();
       setSubscriptionTier(data?.subscription_tier || 'starter');
-    } catch (error) {
-      console.error('Error loading subscription tier:', error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const loadPendingRequests = async () => {
     try {
       if (!tenant?.id) return;
-
-      // Query source_registry for competitor sources that haven't been scraped yet
-      // A source is pending if:
-      // 1. It's a competitor source
-      // 2. It hasn't been scraped yet (last_scraped_at is null)
-      // 3. OR there's no snapshot for it yet in inventory_snapshots_unified
-
-      const { data: allCompetitorSources, error: sourcesError } = await supabase
-        .from('source_registry')
-        .select('*')
-        .eq('source_type', 'competitor')
-        .eq('scraping_enabled', true)
-        .order('created_at', { ascending: false });
-
-      if (sourcesError) throw sourcesError;
-
-      // Get all competitor snapshots to check which sources have data
-      const { data: snapshots } = await supabase
-        .from('inventory_snapshots_unified')
-        .select('source_url')
-        .eq('source_type', 'competitor');
-
+      const { data: allCompetitorSources } = await supabase.from('source_registry').select('*').eq('source_type', 'competitor').eq('scraping_enabled', true).order('created_at', { ascending: false });
+      const { data: snapshots } = await supabase.from('inventory_snapshots_unified').select('source_url').eq('source_type', 'competitor');
       const scrapedUrls = new Set((snapshots || []).map(s => s.source_url));
-
-      // Build refresh pending URLs set for UI state
       const refreshPendingSet = new Set<string>();
-
-      // Track refresh pending URLs (for showing alert on existing cards)
-      (allCompetitorSources || []).forEach(source => {
-        if (source.is_refresh_pending === true) {
-          refreshPendingSet.add(source.source_url);
-        }
-      });
-
-      // Filter to show ONLY sources that have never been scraped yet (initial requests)
-      // Do NOT show refresh requests as pending items (they appear as alerts on existing cards)
-      const pending = (allCompetitorSources || [])
-        .filter(source => {
-          const hasSnapshot = scrapedUrls.has(source.source_url);
-          const isPendingRefresh = source.is_refresh_pending === true;
-
-          // Only show in pending list if: never scraped AND not a refresh request
-          return !hasSnapshot && !isPendingRefresh;
-        })
-        .map(source => ({
-          id: source.id,
-          competitor_url: source.source_url,
-          competitor_name: source.source_name,
-          created_at: source.created_at,
-          status: 'pending',
-          refresh_requested_at: source.refresh_requested_at
-        }));
-
+      (allCompetitorSources || []).forEach(source => { if (source.is_refresh_pending === true) refreshPendingSet.add(source.source_url); });
+      const pending = (allCompetitorSources || []).filter(source => !scrapedUrls.has(source.source_url) && source.is_refresh_pending !== true).map(source => ({ id: source.id, competitor_url: source.source_url, competitor_name: source.source_name, created_at: source.created_at, status: 'pending' }));
       setPendingRequests(pending);
       setRefreshPendingUrls(refreshPendingSet);
-    } catch (error) {
-      console.error('Error loading pending requests:', error);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const loadCompetitors = async () => {
     try {
       setLoading(true);
-
-      if (!tenant?.id) {
-        setCompetitors([]);
-        return;
-      }
-
-      // Load snapshots from inventory_snapshots_unified for competitor sources
-      // We need to find competitors that this tenant has requested
-      // First, get the source_urls from source_registry that are competitors
-      const { data: competitorSources, error: sourcesError } = await supabase
-        .from('source_registry')
-        .select('source_url, source_name')
-        .eq('source_type', 'competitor');
-
-      if (sourcesError) throw sourcesError;
-
-      if (!competitorSources || competitorSources.length === 0) {
-        setCompetitors([]);
-        setLoading(false);
-        return;
-      }
-
-      const competitorUrls = competitorSources.map(s => s.source_url);
-
-      // Create a map of source_url to source_name for quick lookup
-      const sourceNameMap = new Map<string, string>();
-      competitorSources.forEach(source => {
-        if (source.source_name) {
-          sourceNameMap.set(source.source_url, source.source_name);
-        }
-      });
-
-      // Now get the latest snapshots for these competitors
-      const { data, error } = await supabase
-        .from('inventory_snapshots_unified')
-        .select('*')
-        .eq('source_type', 'competitor')
-        .in('source_url', competitorUrls)
-        .order('scanned_at', { ascending: false });
-
+      if (!tenant?.id) return;
+      const { data: competitorSources } = await supabase.from('source_registry').select('source_url, source_name').eq('source_type', 'competitor');
+      if (!competitorSources || competitorSources.length === 0) { setCompetitors([]); return; }
+      const sourceNameMap = new Map(competitorSources.map(s => [s.source_url, s.source_name]));
+      const { data, error } = await supabase.from('inventory_snapshots_unified').select('*').eq('source_type', 'competitor').in('source_url', competitorSources.map(s => s.source_url)).order('scanned_at', { ascending: false });
       if (error) throw error;
-
-      // Transform to match the expected CompetitorSnapshot interface
-      // Use source_name from source_registry (freshly edited) instead of snapshot (old data)
-      const transformed = (data || []).map(snapshot => ({
-        id: snapshot.id,
-        competitor_url: snapshot.source_url,
-        competitor_name: sourceNameMap.get(snapshot.source_url) || snapshot.source_name,
-        scanned_at: snapshot.scanned_at,
-        vehicle_count: snapshot.vehicle_count,
-        avg_price: snapshot.avg_price,
-        min_price: snapshot.min_price,
-        max_price: snapshot.max_price,
-        avg_mileage: snapshot.avg_mileage,
-        min_mileage: snapshot.min_mileage,
-        max_mileage: snapshot.max_mileage,
-        total_inventory_value: snapshot.total_inventory_value,
-        top_makes: snapshot.make_distribution || {},
-        scraping_duration_ms: null,
-        status: snapshot.status as 'success' | 'partial' | 'failed',
-        error_message: null
-      }));
-
-      // Group by source_url and keep only the latest snapshot for each
-      // Since data is already sorted by scanned_at DESC, the first occurrence is the latest
-      const latestSnapshots = new Map<string, any>();
-      transformed.forEach(snapshot => {
-        if (!latestSnapshots.has(snapshot.competitor_url)) {
-          // Only set if we haven't seen this URL yet (first = latest due to DESC order)
-          latestSnapshots.set(snapshot.competitor_url, snapshot);
+      const latestSnapshots = new Map();
+      (data || []).forEach(snapshot => {
+        if (!latestSnapshots.has(snapshot.source_url)) {
+          latestSnapshots.set(snapshot.source_url, {
+            id: snapshot.id, competitor_url: snapshot.source_url, competitor_name: sourceNameMap.get(snapshot.source_url) || snapshot.source_name,
+            scanned_at: snapshot.scanned_at, vehicle_count: snapshot.vehicle_count, avg_price: snapshot.avg_price, min_price: snapshot.min_price, max_price: snapshot.max_price,
+            avg_mileage: snapshot.avg_mileage, min_mileage: snapshot.min_mileage, max_mileage: snapshot.max_mileage, total_inventory_value: snapshot.total_inventory_value,
+            top_makes: snapshot.make_distribution || {}, status: snapshot.status
+          });
         }
       });
-
       setCompetitors(Array.from(latestSnapshots.values()));
-    } catch (error) {
-      console.error('Error loading competitors:', error);
-      setError('Failed to load competitors');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadHistory = async (competitorUrl: string) => {
-    try {
-      const { data, error } = await supabase
-        .from('inventory_snapshots_unified')
-        .select('id, scanned_at, vehicle_count, avg_price')
-        .eq('source_url', competitorUrl)
-        .eq('source_type', 'competitor')
-        .order('scanned_at', { ascending: false })
-        .limit(10);
-
-      if (error) throw error;
-
-      setHistoryData((prev) => ({
-        ...prev,
-        [competitorUrl]: data || [],
-      }));
-    } catch (error) {
-      console.error('Error loading history:', error);
-    }
+    } catch (e) { console.error(e); setError('Failed to load intel data'); } finally { setLoading(false); }
   };
 
   const handleAddToWaitingList = async () => {
-    if (!newCompetitorUrl.trim()) {
-      setError('Please enter a competitor URL');
-      return;
-    }
-
-    if (!tenant?.id) {
-      setError('No tenant ID found');
-      return;
-    }
-
+    if (!newCompetitorUrl.trim() || !tenant?.id) return;
     try {
-      setAddingToQueue(true);
-      setError(null);
-
+      setAddingToQueue(true); setError(null);
       const cleanDomain = normalizeDomain(newCompetitorUrl);
-
-      // Check if source already exists
-      const { data: existingSource } = await supabase
-        .from('source_registry')
-        .select('*')
-        .eq('source_url', cleanDomain)
-        .maybeSingle();
-
-      if (existingSource) {
-        setError('This competitor is already in the system');
-        toast.error('This competitor is already in the system');
-        setAddingToQueue(false);
-        return;
-      }
-
-      // Add to source_registry as a competitor
-      const { error: insertError } = await supabase
-        .from('source_registry')
-        .insert({
-          source_url: cleanDomain,
-          source_type: 'competitor',
-          tenant_id: null, // Competitors are global
-          source_name: cleanDomain,
-          scraping_enabled: true,
-        });
-
+      const { data: existingSource } = await supabase.from('source_registry').select('*').eq('source_url', cleanDomain).maybeSingle();
+      if (existingSource) { toast.error('This sector is already being monitored'); setAddingToQueue(false); return; }
+      const { error: insertError } = await supabase.from('source_registry').insert({ source_url: cleanDomain, source_type: 'competitor', source_name: cleanDomain, scraping_enabled: true });
       if (insertError) throw insertError;
-
       setSubmissionSuccess(true);
-      loadPendingRequests(); // Reload pending requests
-
-      // Clear form
+      await loadPendingRequests();
       setNewCompetitorUrl('');
-      toast.success('Competitor added to analysis queue');
-    } catch (error) {
-      console.error('Error adding to queue:', error);
-      setError(error instanceof Error ? error.message : 'Failed to add competitor request');
-      toast.error('Failed to add competitor request');
-    } finally {
-      setAddingToQueue(false);
-    }
+      toast.success('Competitor locked into analysis queue');
+    } catch (e: any) { toast.error(e.message); } finally { setAddingToQueue(false); }
   };
 
-  const handleScanCompetitor = async (url?: string, name?: string) => {
-    const competitorUrl = url || newCompetitorUrl;
-    const competitorName = name;
-
-    if (!competitorUrl.trim()) {
-      setError('Please enter a competitor URL');
-      return;
-    }
-
+  const handleScanCompetitor = async (url: string) => {
     try {
       setScanning(true);
-      setError(null);
-
-      const cleanDomain = normalizeDomain(competitorUrl);
-
-      // Check if source exists in source_registry
-      const { data: existingSource, error: checkError } = await supabase
-        .from('source_registry')
-        .select('*')
-        .eq('source_url', cleanDomain)
-        .maybeSingle();
-
-      if (checkError) throw checkError;
-
-      if (!existingSource) {
-        // This shouldn't happen for refresh - user probably meant to add new competitor
-        setError('Competitor not found. Please add it first using "Request Analysis".');
-        return;
-      }
-
-      // Update existing source to mark refresh as pending
-      const { error: updateError } = await supabase
-        .from('source_registry')
-        .update({
-          is_refresh_pending: true,
-          refresh_requested_at: new Date().toISOString(),
-          refresh_requested_by: user?.id,
-          status: 'pending', // Set as pending to show in admin queue
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', existingSource.id);
-
-      if (updateError) throw updateError;
-
-      toast.success('Refresh requested! You\'ll be notified when the update is ready.');
-
-      // Reload data to show pending state
-      await loadCompetitors();
+      const cleanDomain = normalizeDomain(url);
+      const { data: existingSource } = await supabase.from('source_registry').select('*').eq('source_url', cleanDomain).maybeSingle();
+      if (!existingSource) return;
+      await supabase.from('source_registry').update({ is_refresh_pending: true, refresh_requested_at: new Date().toISOString(), refresh_requested_by: user?.id, status: 'pending' }).eq('id', existingSource.id);
+      toast.success('Telemetry refresh initiated');
       await loadPendingRequests();
-    } catch (error) {
-      console.error('Error requesting refresh:', error);
-      setError(error instanceof Error ? error.message : 'Failed to request refresh');
-      toast.error('Failed to request refresh');
-    } finally {
-      setScanning(false);
-    }
+    } catch (e) { console.error(e); } finally { setScanning(false); }
   };
 
-  const handleDeleteCompetitor = async (id: string) => {
-    const deletePromise = new Promise(async (resolve, reject) => {
-      if (!tenant?.id) {
-        reject(new Error('No tenant ID found'));
-        return;
-      }
-
-      try {
-        // Delete from inventory_snapshots_unified
-        const { error } = await supabase
-          .from('inventory_snapshots_unified')
-          .delete()
-          .eq('id', id);
-
-        if (error) throw error;
-
-        await loadCompetitors();
-        resolve('Competitor snapshot');
-      } catch (error) {
-        console.error('Error deleting competitor:', error);
-        reject(error);
-      }
-    });
-
-    toast.promise(
-      deletePromise,
-      {
-        loading: 'Deleting competitor snapshot...',
-        success: 'Competitor snapshot deleted successfully',
-        error: (err) => `Failed to delete: ${err.message || 'Unknown error'}`,
-      }
-    );
+  const formatCurrency = (v: number | null) => v === null ? 'N/A' : new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
+  const formatNumber = (v: number | null) => v === null ? 'N/A' : v.toLocaleString();
+  const formatDate = (s: string) => {
+    const d = new Date(s);
+    const diff = Math.floor((Date.now() - d.getTime()) / 60000);
+    if (diff < 60) return `${diff}m ago`;
+    if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
-  const toggleHistory = (competitorUrl: string) => {
-    if (subscriptionTier !== 'enterprise') {
-      // Redirect to upgrade page
-      navigate('/upgrade');
-      return;
-    }
-
-    if (expandedHistory === competitorUrl) {
-      setExpandedHistory(null);
-    } else {
-      setExpandedHistory(competitorUrl);
-      if (!historyData[competitorUrl]) {
-        loadHistory(competitorUrl);
-      }
-    }
-  };
-
-  const formatCurrency = (value: number | null) => {
-    if (value === null) return 'N/A';
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const formatNumber = (value: number | null) => {
-    if (value === null) return 'N/A';
-    return value.toLocaleString();
-  };
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
-
-    if (diffMins < 60) {
-      return `${diffMins} minute${diffMins !== 1 ? 's' : ''} ago`;
-    } else if (diffHours < 24) {
-      return `${diffHours} hour${diffHours !== 1 ? 's' : ''} ago`;
-    } else if (diffDays < 7) {
-      return `${diffDays} day${diffDays !== 1 ? 's' : ''} ago`;
-    } else {
-      return date.toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric',
-        year: 'numeric',
-      });
-    }
-  };
-
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      navigate('/signin');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  // Combine pending requests and completed snapshots
   const combinedList = [
-    ...pendingRequests.map(req => ({
-      type: 'pending' as const,
-      id: req.id,
-      url: req.competitor_url,
-      name: req.competitor_name,
-      date: req.created_at,
-      status: req.status,
-      data: null as CompetitorSnapshot | null
-    })),
-    ...competitors.map(comp => ({
-      type: 'completed' as const,
-      id: comp.id,
-      url: comp.competitor_url,
-      name: comp.competitor_name,
-      date: comp.scanned_at,
-      status: 'completed',
-      data: comp
-    }))
+    ...pendingRequests.map(req => ({ type: 'pending' as const, id: req.id, url: req.competitor_url, name: req.competitor_name, date: req.created_at, data: null })),
+    ...competitors.map(comp => ({ type: 'completed' as const, id: comp.id, url: comp.competitor_url, name: comp.competitor_name, date: comp.scanned_at, data: comp }))
   ].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
       <Toaster position="top-right" />
-      {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <Link to="/dashboard" className="flex items-center">
-              <Target className="h-8 w-8 text-blue-900" />
-              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
-            </Link>
-            <div className="flex items-center space-x-4 relative">
-              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
-              <Link
-                to="/scan"
-                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
-              >
-                Scan VIN
-              </Link>
-              <div className="relative">
-                <button
-                  onClick={() => setMenuOpen(!menuOpen)}
-                  className="p-2 rounded-lg hover:bg-gray-100 transition"
-                  aria-label="Menu"
-                >
-                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-                </button>
-
-                {menuOpen && (
-                  <NavigationMenu
-                    currentPath={location.pathname}
-                    onClose={() => setMenuOpen(false)}
-                    onSignOut={handleSignOut}
-                    user={user}
-                    tenantName={tenant?.name}
-                  />
-                )}
-              </div>
-            </div>
-          </div>
-        </div>
+      {/* Mesh Gradient Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 dark:bg-primary-500/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-500/10 dark:bg-secondary-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Competitor Intelligence</h1>
-          <p className="text-gray-600">
-            Analyze competitor inventory to stay competitive
+      <Header user={user} tenant={tenant} signOut={signOut} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+
+      <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
+        {/* Page Header */}
+        <div className="mb-12">
+          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
+            Competitor <span className="text-primary-500">Intelligence</span>
+          </h1>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">
+            Real-time market delta & inventory positioning matrix
           </p>
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-6 bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-sm text-red-800">{error}</p>
-            </div>
-            <button
-              onClick={() => setError(null)}
-              className="ml-auto text-red-600 hover:text-red-800"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
-        )}
-
-        {/* Processing State */}
         {submissionSuccess ? (
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-8 mb-8 text-center">
-            <div className="flex flex-col items-center">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-                <RefreshCw className="h-8 w-8 text-blue-600 animate-spin" />
+          <div className="flex items-center justify-center py-10">
+            <GlassCard className="max-w-xl w-full p-12 text-center">
+              <div className="relative inline-block mb-8">
+                <div className="absolute inset-0 bg-primary-500/20 blur-2xl rounded-full" />
+                <div className="relative bg-primary-500 p-5 rounded-3xl shadow-glow-primary">
+                  <Clock className="h-10 w-10 text-white animate-pulse" />
+                </div>
               </div>
-              <h2 className="text-2xl font-bold text-blue-900 mb-2">
-                Competitor Analysis Requested
+              <h2 className="text-3xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter uppercase italic">
+                Analysis <span className="text-primary-500">Scheduled</span>
               </h2>
-              <p className="text-blue-800 mb-4 max-w-lg mx-auto">
-                Your request has been added to the queue. There are other dealerships in front.
-                You will receive a notification as soon as the competitor has been analyzed and it's available for you to check.
+              <p className="text-sm font-bold text-slate-500 leading-relaxed mb-10">
+                Domain locked into scraping protocol. Telemetry will be available shortly.
               </p>
-
-              <div className="bg-white rounded-lg p-6 max-w-md w-full mb-6">
-                <h3 className="font-semibold text-gray-900 mb-3 text-left">While you wait, you can:</h3>
-                <ul className="text-left space-y-2 text-sm text-gray-700">
-                  <li className="flex items-center">
-                    <span className="text-green-600 mr-2">✓</span>
-                    <span><Link to="/scan" className="text-blue-600 hover:underline">Scan VINs</Link> for purchase recommendations</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-green-600 mr-2">✓</span>
-                    <span>Check your <Link to="/inventory" className="text-blue-600 hover:underline">current inventory</Link> performance</span>
-                  </li>
-                  <li className="flex items-center">
-                    <span className="text-green-600 mr-2">✓</span>
-                    <span>Explore the <Link to="/dashboard" className="text-blue-600 hover:underline">dashboard</Link></span>
-                  </li>
-                </ul>
-              </div>
-
-              <button
-                onClick={() => setSubmissionSuccess(false)}
-                className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-              >
-                Analyze Another Competitor
+              <button onClick={() => setSubmissionSuccess(false)} className="w-full bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-black uppercase tracking-widest text-xs hover:shadow-glow-primary transition-all">
+                Monitor Another Surface
               </button>
-            </div>
+            </GlassCard>
           </div>
         ) : (
           <>
-            {/* Scan Form */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-8">
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Add New Competitor</h2>
-
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-1">
-                    <input
-                      type="url"
-                      placeholder="Competitor website URL (e.g., https://competitor.com)"
-                      value={newCompetitorUrl}
-                      onChange={(e) => setNewCompetitorUrl(e.target.value)}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      disabled={scanning || addingToQueue}
-                    />
-                  </div>
-                  <button
-                    onClick={handleAddToWaitingList}
-                    disabled={addingToQueue || scanning || !newCompetitorUrl.trim()}
-                    className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap"
-                  >
-                    {addingToQueue ? (
-                      <>
-                        <Loader2 className="w-5 h-5 animate-spin" />
-                        Requesting...
-                      </>
-                    ) : (
-                      <>
-                        <TrendingUp className="w-5 h-5" />
-                        Request Analysis
-                      </>
-                    )}
-                  </button>
+            {/* Intel Grid Input */}
+            <GlassCard className="p-8 mb-12">
+              <div className="flex flex-col md:flex-row gap-4">
+                <div className="flex-1 relative group">
+                  <Globe className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors w-5 h-5" />
+                  <input
+                    type="url"
+                    placeholder="ENTER TARGET DOMAIN (E.G. TARGETMOTOR.COM)..."
+                    value={newCompetitorUrl}
+                    onChange={(e) => setNewCompetitorUrl(e.target.value)}
+                    className="w-full pl-14 pr-4 py-5 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-[10px] font-black tracking-widest uppercase outline-none focus:ring-2 focus:ring-primary-500 transition-all text-slate-900 dark:text-white"
+                  />
                 </div>
+                <button
+                  onClick={handleAddToWaitingList}
+                  disabled={addingToQueue || !newCompetitorUrl.trim()}
+                  className="px-10 py-5 bg-primary-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:shadow-glow-primary transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg shadow-primary-500/20"
+                >
+                  {addingToQueue ? <Loader2 className="w-4 h-4 animate-spin" /> : <TrendingUp className="w-4 h-4" />}
+                  Request Analysis
+                </button>
               </div>
-            </div>
+            </GlassCard>
 
-            {/* Unified Competitors List */}
             {loading ? (
-              <div className="flex justify-center items-center py-12">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+              <div className="flex justify-center items-center py-20">
+                <Loader2 className="w-12 h-12 text-primary-500 animate-spin" />
               </div>
             ) : combinedList.length === 0 ? (
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-                <TrendingUp className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-medium text-gray-900 mb-2">No competitors scanned yet</h3>
-                <p className="text-gray-600">Enter a competitor URL above to get started</p>
-              </div>
+              <GlassCard className="p-20 text-center">
+                <Target className="w-16 h-16 text-slate-200 dark:text-white/10 mx-auto mb-6" />
+                <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">Intelligence Matrix Empty</h3>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-2">Deploy target domains to begin baseline tracking</p>
+              </GlassCard>
             ) : (
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {combinedList.map((item) => (
-                  <div
-                    key={`${item.type}-${item.id}`}
-                    className={`bg-white rounded-lg shadow-sm border border-gray-200 p-6 ${item.type === 'pending' ? 'opacity-75' : ''
-                      }`}
-                  >
-                    {/* Header */}
-                    <div className="flex items-start justify-between mb-4">
+                  <GlassCard key={`${item.type}-${item.id}`} className={`p-8 group ${item.type === 'pending' ? 'border-primary-500/30' : 'border-slate-200/50 dark:border-white/5'}`}>
+                    <div className="flex items-start justify-between mb-8">
                       <div className="flex-1">
-                        <h3 className="text-lg font-semibold text-gray-900">
-                          {item.name || (() => {
-                            try {
-                              return item.url ? new URL(item.url).hostname : 'Unknown Competitor';
-                            } catch {
-                              return item.url || 'Unknown Competitor';
-                            }
-                          })()}
-                        </h3>
-                        {item.url && (
-                          <a
-                            href={ensureHttps(item.url)}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline break-all"
-                          >
-                            {item.url}
-                          </a>
-                        )}
-                        <p className="text-xs text-gray-500 mt-1">
-                          {item.type === 'pending' ? 'Requested' : 'Scanned'} {formatDate(item.date)}
-                        </p>
-
-                        {/* Show pending refresh alert if applicable */}
-                        {item.type === 'completed' && refreshPendingUrls.has(item.url) && (
-                          <div className="mt-2 px-3 py-2 bg-yellow-50 border border-yellow-200 rounded-lg flex items-start gap-2">
-                            <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0 mt-0.5" />
-                            <p className="text-xs text-yellow-800">
-                              Update requested. It'll be processed soon.
-                            </p>
-                          </div>
-                        )}
+                        <div className="flex items-center gap-3 mb-1">
+                          <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">{item.name || item.url}</h3>
+                          {item.type === 'pending' && <span className="px-2 py-1 bg-primary-500 text-white text-[8px] font-black uppercase tracking-widest rounded-lg animate-pulse">Pending</span>}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                          <Globe size={12} className="text-primary-500" />
+                          <a href={ensureHttps(item.url)} target="_blank" className="hover:text-primary-500 transition-colors truncate">{item.url}</a>
+                        </div>
+                        <div className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em] mt-3 flex items-center gap-2">
+                          <Clock size={10} /> {item.type === 'pending' ? 'Requested' : 'Last Scanned'} {formatDate(item.date)}
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 ml-4">
-                        {item.type === 'pending' ? (
-                          <span className="px-3 py-1 bg-yellow-100 text-yellow-800 text-xs font-medium rounded-full uppercase flex items-center gap-1">
-                            <Loader2 className="w-3 h-3 animate-spin" />
-                            {item.status.replace('_', ' ')}
-                          </span>
-                        ) : (
-                          <button
-                            onClick={() => handleScanCompetitor(item.url, item.name || undefined)}
-                            disabled={scanning || refreshPendingUrls.has(item.url)}
-                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-                            title={refreshPendingUrls.has(item.url) ? "Update pending" : "Request update"}
-                          >
-                            <RefreshCw className={`w-5 h-5 ${refreshPendingUrls.has(item.url) ? 'animate-spin' : ''}`} />
+
+                      <div className="flex gap-2">
+                        {item.type === 'completed' && (
+                          <button onClick={() => handleScanCompetitor(item.url)} className="p-3 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-primary-500 hover:bg-primary-500/10 rounded-2xl transition-all">
+                            <RefreshCw size={18} className={refreshPendingUrls.has(item.url) ? 'animate-spin' : ''} />
                           </button>
                         )}
+                        <button className="p-3 bg-slate-50 dark:bg-white/5 text-slate-400 hover:text-primary-500 hover:bg-primary-500/10 rounded-2xl transition-all">
+                          <ChevronRight size={18} />
+                        </button>
                       </div>
                     </div>
 
-                    {/* Stats Grid */}
                     {item.type === 'pending' ? (
-                      <div className="bg-gray-50 rounded-lg p-8 text-center border border-dashed border-gray-300">
-                        <p className="text-gray-500 text-sm">
-                          Analysis in progress...
-                          <br />
-                          We'll notify you when it's ready.
-                        </p>
+                      <div className="bg-slate-50 dark:bg-black/20 rounded-2xl p-8 text-center border border-dashed border-slate-200 dark:border-white/10">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Initial Sector Verification in Progress...</p>
                       </div>
                     ) : item.data && (
-                      <div className="space-y-3">
-                        {/* Vehicle Count & Total Value */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div className="bg-blue-50 rounded-lg p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Car className="w-4 h-4 text-blue-600" />
-                              <span className="text-xs text-gray-600">Total Vehicles</span>
-                            </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(item.data.vehicle_count)}
-                            </div>
+                      <div className="space-y-6">
+                        <div className="grid grid-cols-2 gap-4">
+                          <div className="bg-primary-500/5 dark:bg-primary-500/10 rounded-2xl p-5 border border-primary-500/10">
+                            <div className="text-[8px] font-black uppercase tracking-widest text-primary-500 mb-1">Active Fleet</div>
+                            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{formatNumber(item.data.vehicle_count)}</div>
                           </div>
-                          <div className="bg-green-50 rounded-lg p-3">
-                            <div className="flex items-center gap-2 mb-1">
-                              <DollarSign className="w-4 h-4 text-green-600" />
-                              <span className="text-xs text-gray-600">Total Value</span>
-                            </div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatCurrency(item.data.total_inventory_value)}
-                            </div>
+                          <div className="bg-secondary-500/5 dark:bg-secondary-500/10 rounded-2xl p-5 border border-secondary-500/10">
+                            <div className="text-[8px] font-black uppercase tracking-widest text-secondary-500 mb-1">Portfolio Value</div>
+                            <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{formatCurrency(item.data.total_inventory_value)}</div>
                           </div>
                         </div>
 
-                        {/* Price Range */}
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <BarChart3 className="w-4 h-4 text-gray-600" />
-                            <span className="text-xs font-medium text-gray-600">Price Range</span>
-                          </div>
-
-                          {/* Average Price - Prominent */}
-                          <div className="mb-2">
-                            <div className="text-xs text-gray-500 mb-0.5">Average</div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatCurrency(item.data.avg_price)}
+                        <div className="grid grid-cols-2 gap-6 p-6 bg-slate-50/50 dark:bg-white/5 rounded-2xl border border-slate-100 dark:border-white/5">
+                          <div>
+                            <div className="flex items-center gap-2 mb-4">
+                              <BarChart3 className="w-3 h-3 text-primary-500" />
+                              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Pricing Delta</span>
                             </div>
-                          </div>
-
-                          {/* Min/Max - Smaller Below */}
-                          <div className="flex items-center gap-4 text-xs">
-                            <div>
-                              <span className="text-gray-500">Min: </span>
-                              <span className="font-semibold text-gray-700">
-                                {formatCurrency(item.data.min_price)}
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Max: </span>
-                              <span className="font-semibold text-gray-700">
-                                {formatCurrency(item.data.max_price)}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Mileage Range */}
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <div className="flex items-center gap-2 mb-2">
-                            <Gauge className="w-4 h-4 text-gray-600" />
-                            <span className="text-xs font-medium text-gray-600">Mileage Range</span>
-                          </div>
-
-                          {/* Average Mileage - Prominent */}
-                          <div className="mb-2">
-                            <div className="text-xs text-gray-500 mb-0.5">Average</div>
-                            <div className="text-2xl font-bold text-gray-900">
-                              {formatNumber(item.data.avg_mileage)} mi
-                            </div>
-                          </div>
-
-                          {/* Min/Max - Smaller Below */}
-                          <div className="flex items-center gap-4 text-xs">
-                            <div>
-                              <span className="text-gray-500">Min: </span>
-                              <span className="font-semibold text-gray-700">
-                                {formatNumber(item.data.min_mileage)} mi
-                              </span>
-                            </div>
-                            <div>
-                              <span className="text-gray-500">Max: </span>
-                              <span className="font-semibold text-gray-700">
-                                {formatNumber(item.data.max_mileage)} mi
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Top Makes */}
-                        {Object.keys(item.data.top_makes).length > 0 && (
-                          <div className="bg-gray-50 rounded-lg p-3">
-                            <div className="text-xs font-medium text-gray-600 mb-2">Top Brands</div>
-                            <div className="space-y-1">
-                              {Object.entries(item.data.top_makes)
-                                .sort(([, countA], [, countB]) => (countB as number) - (countA as number))
-                                .slice(0, 5)
-                                .map(([make, count]) => (
-                                  <div key={make} className="flex items-center justify-between text-sm">
-                                    <span className="text-gray-700">{make}</span>
-                                    <span className="font-semibold text-gray-900">({count})</span>
-                                  </div>
-                                ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* History Section */}
-                        <div className="border-t border-gray-200 pt-3">
-                          {subscriptionTier === 'enterprise' ? (
-                            <button
-                              onClick={() => toggleHistory(item.url)}
-                              className="w-full flex items-center justify-between px-3 py-2 bg-blue-50 hover:bg-blue-100 rounded-lg transition text-sm font-medium text-blue-700"
-                            >
-                              <span>View Scan History</span>
-                              <TrendingUp className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <Link
-                              to="/upgrade"
-                              className="w-full flex items-center justify-between px-3 py-2 bg-gray-100 hover:bg-gray-200 rounded-lg transition text-sm font-medium text-gray-600"
-                            >
-                              <span>Scan History (Enterprise Feature)</span>
-                              <AlertCircle className="w-4 h-4" />
-                            </Link>
-                          )}
-
-                          {/* History Data (Enterprise only) */}
-                          {subscriptionTier === 'enterprise' && expandedHistory === item.url && (
-                            <div className="mt-3 space-y-2">
-                              {historyData[item.url]?.length > 0 ? (
-                                <>
-                                  <div className="text-xs font-medium text-gray-600 mb-2">Recent Scans</div>
-                                  {historyData[item.url].map((history) => (
-                                    <div
-                                      key={history.id}
-                                      className="flex items-center justify-between text-xs bg-white rounded p-2 border border-gray-200"
-                                    >
-                                      <span className="text-gray-600">
-                                        {formatDate(history.scanned_at)}
-                                      </span>
-                                      <div className="flex items-center gap-3">
-                                        <span className="text-gray-700">
-                                          {history.vehicle_count} vehicles
-                                        </span>
-                                        <span className="font-semibold text-gray-900">
-                                          {formatCurrency(history.avg_price)} avg
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))}
-                                  <button
-                                    onClick={() => navigate(`/competitor-history/${item.id}`)}
-                                    className="w-full text-xs text-blue-600 hover:text-blue-800 mt-2"
-                                  >
-                                    View Detailed History →
-                                  </button>
-                                </>
-                              ) : (
-                                <div className="text-xs text-gray-500 text-center py-2">
-                                  No history available yet
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Mean</div>
+                                <div className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(item.data.avg_price)}</div>
+                              </div>
+                              <div className="flex justify-between">
+                                <div>
+                                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Floor</div>
+                                  <div className="text-[10px] font-black text-slate-600 dark:text-slate-300">{formatCurrency(item.data.min_price)}</div>
                                 </div>
-                              )}
+                                <div className="text-right">
+                                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Ceiling</div>
+                                  <div className="text-[10px] font-black text-slate-600 dark:text-slate-300">{formatCurrency(item.data.max_price)}</div>
+                                </div>
+                              </div>
                             </div>
-                          )}
+                          </div>
+
+                          <div className="border-l border-slate-200 dark:border-white/10 pl-6">
+                            <div className="flex items-center gap-2 mb-4">
+                              <Gauge className="w-3 h-3 text-primary-500" />
+                              <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">Mileage Index</span>
+                            </div>
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Mean</div>
+                                <div className="text-sm font-black text-slate-900 dark:text-white">{formatNumber(item.data.avg_mileage)} <span className="text-[8px] opacity-40">MI</span></div>
+                              </div>
+                              <div className="flex justify-between">
+                                <div>
+                                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Min</div>
+                                  <div className="text-[10px] font-black text-slate-600 dark:text-slate-300">{formatNumber(item.data.min_mileage)}</div>
+                                </div>
+                                <div className="text-right">
+                                  <div className="text-[8px] font-bold text-slate-400 uppercase mb-1">Max</div>
+                                  <div className="text-[10px] font-black text-slate-600 dark:text-slate-300">{formatNumber(item.data.max_mileage)}</div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     )}
-                  </div>
+                  </GlassCard>
                 ))}
               </div>
             )}

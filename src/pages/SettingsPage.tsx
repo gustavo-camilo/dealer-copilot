@@ -2,11 +2,11 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Target, Menu, X, Trash2, Plus } from 'lucide-react';
-import NavigationMenu from '../components/NavigationMenu';
+import { Target, Trash2, Plus, Building2, Globe, MapPin, Mail, Phone, DollarSign, Percent, Calendar, Shield, Save, RefreshCw, Loader2, ChevronRight } from 'lucide-react';
 import Header from '../components/Header';
+import GlassCard from '../components/ui/GlassCard';
 import { normalizeDomain } from '../utils/url';
-import { TenantCostSettings, AuctionFeeThreshold, AuctionSource } from '../types/database';
+import { TenantCostSettings, AuctionSource } from '../types/database';
 
 const DEFAULT_COST_SETTINGS: TenantCostSettings = {
   auction_fee_thresholds: [
@@ -47,33 +47,20 @@ export default function SettingsPage() {
   const [newAuctionName, setNewAuctionName] = useState('');
   const [addingAuction, setAddingAuction] = useState(false);
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      navigate('/signin');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
   useEffect(() => {
     if (tenant) {
-      // Load tenant data
       setDealershipName(tenant.name || '');
       setWebsiteUrl(tenant.website_url || '');
       setContactEmail(tenant.contact_email || '');
       setContactPhone(tenant.contact_phone || '');
 
-      // Check if we have a separate zip_code field first (new schema)
       if (tenant.zip_code) {
         setZipCode(tenant.zip_code);
       }
 
-      // Parse location if it exists (format: "City, State (ZipCode)" or "City, State")
       if (tenant.location) {
         const zipMatch = tenant.location.match(/\((\d{5})\)$/);
         if (zipMatch) {
-          // Only set ZIP from location if we don't have it in the separate field
           if (!tenant.zip_code) {
             setZipCode(zipMatch[1]);
           }
@@ -87,7 +74,6 @@ export default function SettingsPage() {
         }
       }
 
-      // Load cost settings
       if (tenant.cost_settings) {
         setCostSettings({
           ...DEFAULT_COST_SETTINGS,
@@ -95,14 +81,12 @@ export default function SettingsPage() {
         });
       }
 
-      // Load auction sources
       loadAuctionSources();
     }
   }, [tenant]);
 
   const loadAuctionSources = async () => {
     if (!tenant?.id) return;
-
     try {
       const { data, error } = await supabase
         .from('auction_sources')
@@ -111,7 +95,6 @@ export default function SettingsPage() {
         .order('display_order', { ascending: true });
 
       if (error) throw error;
-
       setAuctionSources(data || []);
     } catch (error: any) {
       console.error('Error loading auction sources:', error);
@@ -119,14 +102,8 @@ export default function SettingsPage() {
   };
 
   const handleAddAuctionSource = async () => {
-    if (!newAuctionName.trim()) {
-      setMessage('Error: Please enter an auction name');
-      return;
-    }
-
+    if (!newAuctionName.trim()) return;
     setAddingAuction(true);
-    setMessage('');
-
     try {
       const maxOrder = auctionSources.length > 0
         ? Math.max(...auctionSources.map(a => a.display_order))
@@ -140,16 +117,10 @@ export default function SettingsPage() {
           display_order: maxOrder + 1,
         });
 
-      if (error) {
-        if (error.code === '23505') { // Unique constraint violation
-          throw new Error('This auction source already exists');
-        }
-        throw error;
-      }
-
-      setMessage('Auction source added successfully!');
+      if (error) throw error;
       setNewAuctionName('');
       loadAuctionSources();
+      setMessage('Source integrated successfully');
       setTimeout(() => setMessage(''), 3000);
     } catch (error: any) {
       console.error('Error adding auction source:', error);
@@ -160,20 +131,15 @@ export default function SettingsPage() {
   };
 
   const handleDeleteAuctionSource = async (id: string, name: string) => {
-    if (!confirm(`Are you sure you want to remove "${name}"? This cannot be undone.`)) {
-      return;
-    }
-
+    if (!confirm(`Are you sure you want to remove "${name}"?`)) return;
     try {
       const { error } = await supabase
         .from('auction_sources')
         .delete()
         .eq('id', id);
-
       if (error) throw error;
-
-      setMessage('Auction source removed successfully!');
       loadAuctionSources();
+      setMessage('Source removed');
       setTimeout(() => setMessage(''), 3000);
     } catch (error: any) {
       console.error('Error deleting auction source:', error);
@@ -182,522 +148,299 @@ export default function SettingsPage() {
   };
 
   const handleZipCodeLookup = async (zip: string) => {
-    if (zip.length !== 5 || !/^\d{5}$/.test(zip)) {
-      setZipCodeError('Please enter a valid 5-digit ZIP code');
-      return;
-    }
-
+    if (zip.length !== 5) return;
     setZipCodeLoading(true);
-    setZipCodeError('');
-
     try {
-      // Use Zippopotam.us API (free, no API key required)
       const response = await fetch(`https://api.zippopotam.us/us/${zip}`);
-
-      if (!response.ok) {
-        throw new Error('ZIP code not found');
-      }
-
+      if (!response.ok) throw new Error('ZIP not found');
       const data = await response.json();
-
-      if (data.places && data.places.length > 0) {
-        const place = data.places[0];
-        setCity(place['place name']);
-        setState(place['state abbreviation']);
-        setZipCodeError('');
-      } else {
-        throw new Error('ZIP code not found');
+      if (data.places?.[0]) {
+        setCity(data.places[0]['place name']);
+        setState(data.places[0]['state abbreviation']);
       }
     } catch (error) {
-      console.error('ZIP code lookup error:', error);
-      setZipCodeError('Invalid ZIP code or unable to lookup location');
-      setCity('');
-      setState('');
+      console.error(error);
     } finally {
       setZipCodeLoading(false);
     }
   };
 
-  const handleZipCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const zip = e.target.value.replace(/\D/g, '').slice(0, 5);
-    setZipCode(zip);
-    setZipCodeError('');
-
-    // Auto-lookup when 5 digits are entered
-    if (zip.length === 5) {
-      handleZipCodeLookup(zip);
-    } else {
-      // Clear city/state if zip is incomplete
-      setCity('');
-      setState('');
-    }
-  };
-
-  const handleSaveCostSettings = async (e: React.FormEvent) => {
+  const handleSaveAll = async (e: React.FormEvent) => {
     e.preventDefault();
     setSaving(true);
     setMessage('');
-
     try {
-      const { error } = await supabase
-        .from('tenants')
-        .update({
-          cost_settings: costSettings,
-        })
-        .eq('id', tenant?.id);
+      const location = zipCode && city && state ? `${city}, ${state} (${zipCode})` : city && state ? `${city}, ${state}` : '';
 
-      if (error) throw error;
-
-      setMessage('Cost settings saved successfully!');
-      setTimeout(() => setMessage(''), 3000);
-    } catch (error: any) {
-      console.error('Error saving cost settings:', error);
-      setMessage(`Error: ${error.message}`);
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleSaveProfile = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSaving(true);
-    setMessage('');
-
-    try {
-      // Format location as "City, State (ZipCode)" for backwards compatibility
-      const location = zipCode && city && state
-        ? `${city}, ${state} (${zipCode})`
-        : city && state
-          ? `${city}, ${state}`
-          : '';
-
-      const { error } = await supabase
+      const { error: tenantError } = await supabase
         .from('tenants')
         .update({
           website_url: normalizeDomain(websiteUrl),
           location,
-          zip_code: zipCode || null, // Save ZIP to separate field as well
+          zip_code: zipCode || null,
           contact_phone: contactPhone,
+          cost_settings: costSettings,
         })
         .eq('id', tenant?.id);
 
-      if (error) throw error;
-
-      setMessage('Profile updated successfully!');
-      setTimeout(() => setMessage(''), 3000);
+      if (tenantError) throw tenantError;
+      setMessage('Tactical parameters updated successfully');
+      setTimeout(() => setMessage(''), 4000);
     } catch (error: any) {
-      console.error('Error saving profile:', error);
-      setMessage(`Error: ${error.message}`);
+      setMessage(`Update failed: ${error.message}`);
     } finally {
       setSaving(false);
     }
   };
 
-  if (!tenant) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  const handleSignOut = async () => {
+    try { await signOut(); navigate('/signin'); } catch (e) { console.error(e); }
+  };
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <Header
-        user={user}
-        tenant={tenant}
-        signOut={handleSignOut}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-      />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
+      {/* Mesh Gradient Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 dark:bg-primary-500/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-500/10 dark:bg-secondary-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
+      </div>
 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-3xl font-bold text-gray-900 mb-8">Settings</h1>
+      <Header user={user} tenant={tenant} signOut={handleSignOut} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
 
-        {message && (
-          <div className={`mb-6 p-4 rounded-lg ${message.includes('Error')
-            ? 'bg-red-50 border border-red-200 text-red-800'
-            : 'bg-green-50 border border-green-200 text-green-800'
-            }`}>
-            {message}
+      <div className="max-w-5xl mx-auto px-6 py-12 relative z-10">
+        <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 mb-12">
+          <div>
+            <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
+              System <span className="text-primary-500">Parameters</span>
+            </h1>
+            <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">
+              Configure baseline operations & intelligence matrix
+            </p>
           </div>
-        )}
 
-        {/* Dealership Profile */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Dealership Profile</h2>
-
-          <form onSubmit={handleSaveProfile} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Dealership Name</label>
-              <input
-                type="text"
-                value={dealershipName}
-                disabled
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 cursor-not-allowed"
-              />
-              <p className="text-xs text-gray-500 mt-1">Contact support to change dealership name</p>
+          {message && (
+            <div className={`px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest animate-in fade-in slide-in-from-top-2 ${message.includes('Error') || message.includes('failed')
+                ? 'bg-red-500/10 text-red-500 border border-red-500/20'
+                : 'bg-primary-500/10 text-primary-500 border border-primary-500/20'
+              }`}>
+              {message}
             </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Website URL</label>
-              <input
-                type="url"
-                value={websiteUrl}
-                onChange={(e) => setWebsiteUrl(e.target.value)}
-                onBlur={(e) => setWebsiteUrl(normalizeDomain(e.target.value))}
-                placeholder="yourdealership.com"
-                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-              />
-              <p className="text-xs text-gray-500 mt-1">Changing this will trigger a new scan of your website's inventory.</p>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">ZIP Code</label>
-              <input
-                type="text"
-                value={zipCode}
-                onChange={handleZipCodeChange}
-                placeholder="12345"
-                maxLength={5}
-                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-              />
-              {zipCodeLoading && (
-                <p className="text-xs text-blue-600 mt-1">Looking up location...</p>
-              )}
-              {zipCodeError && (
-                <p className="text-xs text-red-600 mt-1">{zipCodeError}</p>
-              )}
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
-                <input
-                  type="text"
-                  value={city}
-                  onChange={(e) => setCity(e.target.value)}
-                  placeholder="City"
-                  className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400"
-                  readOnly={zipCodeLoading}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">State</label>
-                <input
-                  type="text"
-                  value={state}
-                  onChange={(e) => setState(e.target.value)}
-                  placeholder="State"
-                  maxLength={2}
-                  className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 uppercase"
-                  readOnly={zipCodeLoading}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Contact Email</label>
-              <input
-                type="email"
-                value={contactEmail}
-                disabled
-                className="w-full px-4 py-2 bg-gray-50 border border-gray-300 rounded-lg text-gray-900 cursor-not-allowed"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">Contact Phone</label>
-              <input
-                type="tel"
-                value={contactPhone}
-                onChange={(e) => setContactPhone(e.target.value)}
-                placeholder="(555) 123-4567"
-                className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-              />
-            </div>
-
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-6 py-2 bg-orange-600 text-white hover:bg-orange-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {saving ? 'Saving...' : 'Save Profile'}
-            </button>
-          </form>
+          )}
         </div>
 
-        {/* Cost Settings */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Default Cost Settings</h2>
-          <p className="text-sm text-gray-600 mb-6">
-            These values will be used as defaults when analyzing vehicles. You can override them for individual vehicles.
-          </p>
+        <form onSubmit={handleSaveAll} className="space-y-8">
+          {/* Main Configuration Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {/* Identity & Communications */}
+            <div className="space-y-8">
+              <GlassCard className="p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2 bg-primary-500/10 rounded-xl">
+                    <Building2 size={20} className="text-primary-500" />
+                  </div>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Identity Hub</h2>
+                </div>
 
-          <form onSubmit={handleSaveCostSettings} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="md:col-span-2">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Auction Fee Thresholds</label>
-                <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                  <div className="grid grid-cols-12 gap-4 mb-2 text-xs font-medium text-gray-500 uppercase">
-                    <div className="col-span-4">Min Price</div>
-                    <div className="col-span-4">Max Price</div>
-                    <div className="col-span-3">Fee</div>
-                    <div className="col-span-1"></div>
+                <div className="space-y-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Registry Name</label>
+                    <div className="relative group">
+                      <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                      <input type="text" value={dealershipName} disabled className="w-full pl-12 pr-4 py-4 bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-500 font-bold outline-none cursor-not-allowed" />
+                    </div>
                   </div>
 
-                  {costSettings.auction_fee_thresholds?.map((threshold, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-4 mb-3 items-center">
-                      <div className="col-span-4 relative">
-                        <span className="absolute left-3 top-2 text-gray-500">$</span>
-                        <input
-                          type="number"
-                          value={threshold.min_price}
-                          onChange={(e) => {
-                            const newThresholds = [...(costSettings.auction_fee_thresholds || [])];
-                            newThresholds[index].min_price = Number(e.target.value);
-                            setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
-                          }}
-                          className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded text-sm"
-                        />
-                      </div>
-                      <div className="col-span-4 relative">
-                        <span className="absolute left-3 top-2 text-gray-500">$</span>
-                        <input
-                          type="number"
-                          value={threshold.max_price}
-                          onChange={(e) => {
-                            const newThresholds = [...(costSettings.auction_fee_thresholds || [])];
-                            newThresholds[index].max_price = Number(e.target.value);
-                            setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
-                          }}
-                          className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded text-sm"
-                        />
-                      </div>
-                      <div className="col-span-3 relative">
-                        <span className="absolute left-3 top-2 text-gray-500">$</span>
-                        <input
-                          type="number"
-                          value={threshold.fee}
-                          onChange={(e) => {
-                            const newThresholds = [...(costSettings.auction_fee_thresholds || [])];
-                            newThresholds[index].fee = Number(e.target.value);
-                            setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
-                          }}
-                          className="w-full pl-6 pr-3 py-1.5 border border-gray-300 rounded text-sm"
-                        />
-                      </div>
-                      <div className="col-span-1 text-right">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            const newThresholds = costSettings.auction_fee_thresholds.filter((_, i) => i !== index);
-                            setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
-                          }}
-                          className="text-red-500 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Primary Website</label>
+                    <div className="relative group">
+                      <Globe className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary-500" />
+                      <input type="url" value={websiteUrl} onChange={(e) => setWebsiteUrl(e.target.value)} onBlur={(e) => setWebsiteUrl(normalizeDomain(e.target.value))} className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all" placeholder="nexusmotors.com" />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Grid Zone (ZIP)</label>
+                      <input type="text" value={zipCode} onChange={(e) => { const z = e.target.value.replace(/\D/g, '').slice(0, 5); setZipCode(z); if (z.length === 5) handleZipCodeLookup(z); }} className="w-full px-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all" placeholder="90210" />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Sector (City/State)</label>
+                      <div className="w-full px-4 py-4 bg-slate-100 dark:bg-black/40 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-500 font-bold flex items-center gap-2">
+                        {zipCodeLoading ? <Loader2 size={14} className="animate-spin" /> : <MapPin size={14} />}
+                        <span className="truncate">{city ? `${city}, ${state}` : 'Waiting for ZIP...'}</span>
                       </div>
                     </div>
-                  ))}
+                  </div>
 
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const newThresholds = [...(costSettings.auction_fee_thresholds || [])];
-                      newThresholds.push({ min_price: 0, max_price: 999999, fee: 0 });
-                      setCostSettings({ ...costSettings, auction_fee_thresholds: newThresholds });
-                    }}
-                    className="mt-2 flex items-center text-sm text-blue-600 hover:text-blue-800"
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Threshold
-                  </button>
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Comm Link (Phone)</label>
+                    <div className="relative group">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary-500" />
+                      <input type="tel" value={contactPhone} onChange={(e) => setContactPhone(e.target.value)} className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-primary-500 outline-none transition-all" placeholder="(555) 000-0000" />
+                    </div>
+                  </div>
                 </div>
-              </div>
+              </GlassCard>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Reconditioning Cost ($)</label>
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={costSettings.reconditioning_cost}
-                  onChange={(e) => setCostSettings({ ...costSettings, reconditioning_cost: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                />
-              </div>
+              {/* Auction Sources */}
+              <GlassCard className="p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2 bg-secondary-500/10 rounded-xl">
+                    <RefreshCw size={20} className="text-secondary-500" />
+                  </div>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Supply Vectors</h2>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Transport Cost ($)</label>
-                <input
-                  type="number"
-                  step="1"
-                  min="0"
-                  value={costSettings.transport_cost}
-                  onChange={(e) => setCostSettings({ ...costSettings, transport_cost: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Floor Plan Rate (%)</label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={costSettings.floor_plan_rate}
-                  onChange={(e) => setCostSettings({ ...costSettings, floor_plan_rate: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Target Margin (%)</label>
-                <input
-                  type="number"
-                  step="0.1"
-                  min="0"
-                  value={costSettings.target_margin_percent}
-                  onChange={(e) => setCostSettings({ ...costSettings, target_margin_percent: parseFloat(e.target.value) || 0 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Target Days to Sale</label>
-                <input
-                  type="number"
-                  step="1"
-                  min="1"
-                  value={costSettings.target_days_to_sale}
-                  onChange={(e) => setCostSettings({ ...costSettings, target_days_to_sale: parseInt(e.target.value) || 1 })}
-                  className="w-full px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                />
-              </div>
-            </div>
-
-            <div className="flex gap-4">
-              <button
-                type="submit"
-                disabled={saving}
-                className="px-6 py-2 bg-orange-600 text-white hover:bg-orange-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {saving ? 'Saving...' : 'Save Cost Settings'}
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setCostSettings(DEFAULT_COST_SETTINGS)}
-                className="px-6 py-2 bg-gray-500 text-white hover:bg-gray-600 rounded-lg font-medium transition"
-              >
-                Reset to Defaults
-              </button>
-            </div>
-          </form>
-        </div>
-
-        {/* Auction Sources Management */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Auction Sources</h2>
-          <p className="text-sm text-gray-600 mb-6">
-            Manage the auction sources where you buy vehicles. These will appear as options when adding comments to vehicles.
-          </p>
-
-          {/* Add New Auction Source */}
-          <div className="mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">Add New Auction Source</label>
-            <div className="flex gap-2">
-              <input
-                type="text"
-                value={newAuctionName}
-                onChange={(e) => setNewAuctionName(e.target.value)}
-                onKeyPress={(e) => e.key === 'Enter' && handleAddAuctionSource()}
-                placeholder="e.g., CarMax, ADESA, Local Auction"
-                className="flex-1 px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-900 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-600 focus:border-transparent"
-                disabled={addingAuction}
-              />
-              <button
-                onClick={handleAddAuctionSource}
-                disabled={addingAuction || !newAuctionName.trim()}
-                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white hover:bg-blue-700 rounded-lg font-medium transition disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Plus className="h-4 w-4" />
-                {addingAuction ? 'Adding...' : 'Add'}
-              </button>
-            </div>
-          </div>
-
-          {/* Auction Sources List */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Current Auction Sources</label>
-            {auctionSources.length === 0 ? (
-              <div className="text-sm text-gray-500 text-center py-4 bg-gray-50 rounded-lg border border-gray-200">
-                No auction sources configured yet. Add one above to get started.
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {auctionSources.map((source) => (
-                  <div
-                    key={source.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200 hover:bg-gray-100 transition"
-                  >
-                    <span className="font-medium text-gray-900">{source.name}</span>
-                    <button
-                      onClick={() => handleDeleteAuctionSource(source.id, source.name)}
-                      className="text-red-600 hover:text-red-800 p-1 hover:bg-red-50 rounded transition"
-                      title="Remove auction source"
-                    >
-                      <Trash2 className="h-4 w-4" />
+                <div className="space-y-6">
+                  <div className="flex gap-2">
+                    <input type="text" value={newAuctionName} onChange={(e) => setNewAuctionName(e.target.value)} className="flex-1 px-4 py-3 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-xs font-bold text-slate-900 dark:text-white outline-none focus:ring-2 focus:ring-secondary-500" placeholder="New supply unit name..." />
+                    <button type="button" onClick={handleAddAuctionSource} disabled={addingAuction || !newAuctionName.trim()} className="px-4 py-3 bg-secondary-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:shadow-glow-secondary disabled:opacity-50 transition-all">
+                      {addingAuction ? 'Linking...' : 'Link'}
                     </button>
                   </div>
-                ))}
-              </div>
-            )}
+
+                  <div className="space-y-2">
+                    {auctionSources.map((source) => (
+                      <div key={source.id} className="flex items-center justify-between p-4 bg-slate-50 dark:bg-white/5 border border-slate-100 dark:border-white/5 rounded-2xl group transition-all hover:bg-slate-100 dark:hover:bg-white/10">
+                        <span className="text-xs font-black uppercase text-slate-600 dark:text-slate-400 tracking-tight">{source.name}</span>
+                        <button type="button" onClick={() => handleDeleteAuctionSource(source.id, source.name)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors">
+                          <Trash2 size={14} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </GlassCard>
+            </div>
+
+            {/* Financial Parameters */}
+            <div className="space-y-8">
+              <GlassCard className="p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2 bg-primary-500/10 rounded-xl">
+                    <DollarSign size={20} className="text-primary-500" />
+                  </div>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Margin Matrix</h2>
+                </div>
+
+                <div className="space-y-6">
+                  {/* Auction Fees Stepper */}
+                  <div className="space-y-3">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Tactical Fee Brackets</label>
+                    <div className="space-y-2">
+                      {costSettings.auction_fee_thresholds?.map((t, idx) => (
+                        <div key={idx} className="grid grid-cols-12 gap-2 items-center">
+                          <div className="col-span-11 grid grid-cols-3 gap-2">
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">$</span>
+                              <input type="number" value={t.min_price} onChange={(e) => { const n = [...costSettings.auction_fee_thresholds]; n[idx].min_price = Number(e.target.value); setCostSettings({ ...costSettings, auction_fee_thresholds: n }); }} className="w-full pl-5 pr-2 py-2 bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5 rounded-xl text-xs font-bold text-slate-900 dark:text-white" />
+                            </div>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400">$</span>
+                              <input type="number" value={t.max_price} onChange={(e) => { const n = [...costSettings.auction_fee_thresholds]; n[idx].max_price = Number(e.target.value); setCostSettings({ ...costSettings, auction_fee_thresholds: n }); }} className="w-full pl-5 pr-2 py-2 bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5 rounded-xl text-xs font-bold text-slate-900 dark:text-white" />
+                            </div>
+                            <div className="relative">
+                              <span className="absolute left-2 top-1/2 -translate-y-1/2 text-[10px] text-primary-500">+</span>
+                              <input type="number" value={t.fee} onChange={(e) => { const n = [...costSettings.auction_fee_thresholds]; n[idx].fee = Number(e.target.value); setCostSettings({ ...costSettings, auction_fee_thresholds: n }); }} className="w-full pl-5 pr-2 py-2 bg-slate-50 dark:bg-black/20 border border-slate-100 dark:border-white/5 rounded-xl text-xs font-black text-primary-500" />
+                            </div>
+                          </div>
+                          <div className="col-span-1 text-center">
+                            <button type="button" onClick={() => setCostSettings({ ...costSettings, auction_fee_thresholds: costSettings.auction_fee_thresholds.filter((_, i) => i !== idx) })} className="text-slate-400 hover:text-red-500 transition-colors">
+                              <Trash2 size={12} />
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                      <button type="button" onClick={() => setCostSettings({ ...costSettings, auction_fee_thresholds: [...costSettings.auction_fee_thresholds, { min_price: 0, max_price: 99999, fee: 0 }] })} className="w-full py-2 bg-primary-500/5 hover:bg-primary-500/10 text-primary-500 text-[10px] font-black uppercase tracking-widest rounded-xl transition-all border border-dashed border-primary-500/20 mt-2">
+                        Deploy New Bracket
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Recon Unit ($)</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-3 w-3" />
+                        <input type="number" value={costSettings.reconditioning_cost} onChange={(e) => setCostSettings({ ...costSettings, reconditioning_cost: Number(e.target.value) })} className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-bold outline-none" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Logistic Unit ($)</label>
+                      <div className="relative">
+                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-3 w-3" />
+                        <input type="number" value={costSettings.transport_cost} onChange={(e) => setCostSettings({ ...costSettings, transport_cost: Number(e.target.value) })} className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-bold outline-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Floor Rate (%)</label>
+                      <div className="relative">
+                        <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-3 w-3" />
+                        <input type="number" step="0.01" value={costSettings.floor_plan_rate} onChange={(e) => setCostSettings({ ...costSettings, floor_plan_rate: Number(e.target.value) })} className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-bold outline-none" />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Target Yield (%)</label>
+                      <div className="relative">
+                        <Percent className="absolute left-4 top-1/2 -translate-y-1/2 text-primary-500 h-3 w-3" />
+                        <input type="number" step="0.1" value={costSettings.target_margin_percent} onChange={(e) => setCostSettings({ ...costSettings, target_margin_percent: Number(e.target.value) })} className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-primary-500 font-orange font-black outline-none" />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Strategic Days to Sale</label>
+                    <div className="relative">
+                      <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 h-3 w-3" />
+                      <input type="number" value={costSettings.target_days_to_sale} onChange={(e) => setCostSettings({ ...costSettings, target_days_to_sale: Number(e.target.value) })} className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-bold outline-none" />
+                    </div>
+                  </div>
+                </div>
+              </GlassCard>
+
+              {/* License & Metrics */}
+              <GlassCard className="p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2 bg-primary-500/10 rounded-xl">
+                    <Shield size={20} className="text-primary-500" />
+                  </div>
+                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-900 dark:text-white">Authorization</h2>
+                </div>
+
+                <div className="space-y-4">
+                  {[
+                    { label: 'Intelligence Tier', value: tenant.plan_type || 'Free', primary: true },
+                    { label: 'Operational Status', value: tenant.status || 'Active', color: tenant.status === 'active' ? 'text-green-500' : 'text-yellow-500' },
+                    { label: 'Pilot Capacity', value: tenant.max_users || 3 },
+                    { label: 'Registry Ceiling', value: `${tenant.max_vehicles || 100} units` },
+                  ].map((stat, i) => (
+                    <div key={i} className="flex justify-between items-center py-2 border-b border-slate-100 dark:border-white/5 last:border-0">
+                      <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{stat.label}</span>
+                      <span className={`text-xs font-black uppercase tracking-tight ${stat.color || (stat.primary ? 'text-primary-500' : 'text-slate-900 dark:text-white')}`}>
+                        {stat.value}
+                      </span>
+                    </div>
+                  ))}
+                  <Link to="/upgrade" className="mt-4 w-full py-3 bg-primary-500 text-white text-[10px] font-black uppercase tracking-widest rounded-xl hover:shadow-glow-primary transition-all text-center flex items-center justify-center gap-2 group">
+                    Scale Infrastructure
+                    <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  </Link>
+                </div>
+              </GlassCard>
+            </div>
           </div>
-        </div>
 
-        {/* Subscription Info */}
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">Subscription</h2>
-
-          <div className="space-y-3">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Current Plan:</span>
-              <span className="font-semibold text-gray-900 capitalize">{tenant.plan_type || 'Free'}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Status:</span>
-              <span className={`font-semibold capitalize ${tenant.status === 'active' ? 'text-green-600' :
-                tenant.status === 'trial' ? 'text-yellow-600' :
-                  'text-red-600'
-                }`}>
-                {tenant.status || 'Unknown'}
-              </span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Max Users:</span>
-              <span className="font-semibold text-gray-900">{tenant.max_users || 3}</span>
-            </div>
-            <div className="flex justify-between">
-              <span className="text-gray-600">Max Vehicles:</span>
-              <span className="font-semibold text-gray-900">{tenant.max_vehicles || 100}</span>
-            </div>
+          {/* Action Bar */}
+          <div className="sticky bottom-8 z-40 px-4">
+            <button type="submit" disabled={saving} className="w-full max-w-md mx-auto block bg-slate-900 dark:bg-white text-white dark:text-slate-900 py-4 rounded-2xl font-black uppercase tracking-[0.2em] text-xs shadow-2xl hover:shadow-glow-primary transition-all disabled:opacity-50 flex items-center justify-center gap-3 group">
+              {saving ? <Loader2 className="animate-spin" size={18} /> : <Save size={18} className="group-hover:scale-110 transition-transform" />}
+              Commit Parameters
+            </button>
           </div>
-
-          <Link
-            to="/upgrade"
-            className="mt-6 block w-full text-center px-6 py-3 bg-orange-600 text-white hover:bg-orange-700 rounded-lg font-semibold transition"
-          >
-            Upgrade Plan
-          </Link>
-        </div>
+        </form>
       </div>
     </div>
   );

@@ -13,31 +13,27 @@ import {
   Trash2,
   AlertCircle,
   TrendingDown,
+  Loader2,
+  Calendar,
+  Sparkles,
 } from 'lucide-react';
-import toast from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
+import GlassCard from '../components/ui/GlassCard';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 
 interface Recommendation {
   id: string;
   vin: string;
-  decoded_data: {
-    year: number;
-    make: string;
-    model: string;
-    trim?: string;
-  };
+  decoded_data: { year: number; make: string; model: string; trim?: string; };
   created_at: string;
   recommendation: 'buy' | 'caution' | 'pass';
   confidence_score: number;
   estimated_profit: number | null;
   max_bid_suggestion: number | null;
   market_data: any;
-  match_reasoning: Array<{
-    type: 'positive' | 'negative' | 'neutral';
-    message: string;
-  }>;
+  match_reasoning: Array<{ type: 'positive' | 'negative' | 'neutral'; message: string; }>;
   custom_recon_cost: number | null;
   custom_transport_cost: number | null;
   custom_max_bid: number | null;
@@ -60,486 +56,223 @@ export default function RecommendationsPage() {
   const [isEditingCosts, setIsEditingCosts] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
   const scanResultRef = useRef<{ saveCosts: () => void }>(null);
-
-  const handleCloseModal = () => {
-    if (isEditingCosts) {
-      setShowConfirmDialog(true);
-    } else {
-      setSelectedRec(null);
-      setIsEditingCosts(false);
-    }
-  };
-
-  const confirmCloseModal = () => {
-    setSelectedRec(null);
-    setIsEditingCosts(false);
-    setShowConfirmDialog(false);
-  };
+  const [stats, setStats] = useState({ buy: 0, caution: 0, pass: 0, avgConfidence: 0, potentialProfit: 0 });
 
   const observerTarget = useRef<HTMLDivElement>(null);
-  const [stats, setStats] = useState({
-    buy: 0,
-    caution: 0,
-    pass: 0,
-    avgConfidence: 0,
-    potentialProfit: 0,
-  });
 
-  // Load recommendations with pagination
-  const loadRecommendations = useCallback(
-    async (pageNum: number, append = false) => {
-      if (!user?.tenant_id) return;
-
-      try {
-        const fromRow = pageNum * PAGE_SIZE;
-        const toRow = fromRow + PAGE_SIZE - 1;
-
-        const { data, error } = await supabase
-          .from('vin_scans')
-          .select('*')
-          .eq('tenant_id', user.tenant_id)
-          .not('recommendation', 'is', null)
-          .order('created_at', { ascending: false })
-          .range(fromRow, toRow);
-
-        if (error) throw error;
-
-        if (data) {
-          if (append) {
-            setRecommendations((prev) => [...prev, ...data]);
-          } else {
-            setRecommendations(data);
-          }
-          setHasMore(data.length === PAGE_SIZE);
-
-          // Calculate stats (only on initial load)
-          if (!append) {
-            const buy = data.filter((r) => r.recommendation === 'buy').length;
-            const caution = data.filter((r) => r.recommendation === 'caution').length;
-            const pass = data.filter((r) => r.recommendation === 'pass').length;
-            const avgConfidence =
-              data.reduce((sum, r) => sum + r.confidence_score, 0) / (data.length || 1);
-            const potentialProfit = data
-              .filter((r) => r.recommendation === 'buy' && r.confidence_score >= 70)
-              .reduce((sum, r) => sum + (r.estimated_profit || 0), 0);
-
-            setStats({
-              buy,
-              caution,
-              pass,
-              avgConfidence,
-              potentialProfit,
-            });
-          }
+  const loadRecommendations = useCallback(async (pageNum: number, append = false) => {
+    if (!user?.tenant_id) return;
+    try {
+      const fromRow = pageNum * PAGE_SIZE;
+      const toRow = fromRow + PAGE_SIZE - 1;
+      const { data, error } = await supabase.from('vin_scans').select('*').eq('tenant_id', user.tenant_id).not('recommendation', 'is', null).order('created_at', { ascending: false }).range(fromRow, toRow);
+      if (error) throw error;
+      if (data) {
+        if (append) setRecommendations(prev => [...prev, ...data]);
+        else {
+          setRecommendations(data);
+          const buy = data.filter(r => r.recommendation === 'buy').length;
+          const caution = data.filter(r => r.recommendation === 'caution').length;
+          const pass = data.filter(r => r.recommendation === 'pass').length;
+          const avgConfidence = data.reduce((sum, r) => sum + r.confidence_score, 0) / (data.length || 1);
+          const potentialProfit = data.filter(r => r.recommendation === 'buy' && r.confidence_score >= 70).reduce((sum, r) => sum + (r.estimated_profit || 0), 0);
+          setStats({ buy, caution, pass, avgConfidence, potentialProfit });
         }
-      } catch (error) {
-        console.error('Error loading recommendations:', error);
-      } finally {
-        setLoading(false);
+        setHasMore(data.length === PAGE_SIZE);
       }
-    },
-    [user?.tenant_id]
-  );
+    } catch (e) { console.error(e); } finally { setLoading(false); }
+  }, [user?.tenant_id]);
 
-  // Initial load
+  useEffect(() => { loadRecommendations(0); }, [loadRecommendations]);
+
   useEffect(() => {
-    loadRecommendations(0);
-  }, [loadRecommendations]);
-
-  // Filter recommendations
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredRecommendations(recommendations);
-      return;
-    }
-
     const query = searchQuery.toLowerCase();
-    const filtered = recommendations.filter(
-      (r) =>
-        r.vin.toLowerCase().includes(query) ||
-        r.decoded_data.make.toLowerCase().includes(query) ||
-        r.decoded_data.model.toLowerCase().includes(query) ||
-        `${r.decoded_data.year}`.includes(query) ||
-        (r.decoded_data.trim && r.decoded_data.trim.toLowerCase().includes(query))
-    );
-    setFilteredRecommendations(filtered);
+    setFilteredRecommendations(searchQuery.trim() ? recommendations.filter(r => r.vin.toLowerCase().includes(query) || r.decoded_data.make.toLowerCase().includes(query) || r.decoded_data.model.toLowerCase().includes(query) || `${r.decoded_data.year}`.includes(query)) : recommendations);
   }, [searchQuery, recommendations]);
 
-  // Infinite scroll observer
   useEffect(() => {
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loading) {
-          const nextPage = page + 1;
-          setPage(nextPage);
-          loadRecommendations(nextPage, true);
-        }
-      },
-      { threshold: 0.1 }
-    );
-
-    const currentTarget = observerTarget.current;
-    if (currentTarget) {
-      observer.observe(currentTarget);
-    }
-
-    return () => {
-      if (currentTarget) {
-        observer.unobserve(currentTarget);
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting && hasMore && !loading) {
+        const nextPage = page + 1;
+        setPage(nextPage);
+        loadRecommendations(nextPage, true);
       }
-    };
+    }, { threshold: 0.1 });
+    if (observerTarget.current) observer.observe(observerTarget.current);
+    return () => observer.disconnect();
   }, [hasMore, loading, page, loadRecommendations]);
 
-  const handleSignOut = async () => {
-    try {
-      await signOut();
-      navigate('/signin');
-    } catch (error) {
-      console.error('Error signing out:', error);
-    }
-  };
-
-  const formatVehicleName = (name: string) => {
-    if (!name) return '';
-    // Special case for BMW
-    if (name.toUpperCase() === 'BMW') return 'BMW';
-
-    // Capitalize first letter of each word
-    return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-  };
+  const handleCloseModal = () => isEditingCosts ? setShowConfirmDialog(true) : setSelectedRec(null);
 
   const handleDeleteScan = async (e: React.MouseEvent, scanId: string) => {
-    e.stopPropagation(); // Prevent opening the modal
-
-    toast.custom((t) => (
-      <div
-        className={`${t.visible ? 'animate-enter' : 'animate-leave'
-          } max-w-md w-full bg-white shadow-lg rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5`}
-      >
-        <div className="flex-1 w-0 p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0 pt-0.5">
-              <div className="h-10 w-10 rounded-full bg-red-100 flex items-center justify-center">
-                <Trash2 className="h-6 w-6 text-red-600" />
-              </div>
-            </div>
-            <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-gray-900">
-                Delete Scan?
-              </p>
-              <p className="mt-1 text-sm text-gray-500">
-                Are you sure you want to delete this scan? This action cannot be undone.
-              </p>
-            </div>
-          </div>
-        </div>
-        <div className="flex border-l border-gray-200">
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              try {
-                const { error } = await supabase
-                  .from('vin_scans')
-                  .delete()
-                  .eq('id', scanId);
-
-                if (error) throw error;
-
-                // Remove from local state
-                setRecommendations(recommendations.filter(s => s.id !== scanId));
-                setFilteredRecommendations(filteredRecommendations.filter(s => s.id !== scanId));
-                toast.success('Scan deleted successfully');
-              } catch (error) {
-                console.error('Error deleting scan:', error);
-                toast.error('Failed to delete scan');
-              }
-            }}
-            className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-red-600 hover:text-red-500 focus:outline-none focus:ring-2 focus:ring-red-500"
-          >
-            Delete
-          </button>
-        </div>
-        <div className="flex border-l border-gray-200">
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="w-full border border-transparent rounded-none p-4 flex items-center justify-center text-sm font-medium text-gray-600 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Cancel
-          </button>
-        </div>
-      </div>
-    ), {
-      duration: 5000,
-    });
+    e.stopPropagation();
+    if (!confirm('Purge this analysis record from the registry?')) return;
+    try {
+      const { error } = await supabase.from('vin_scans').delete().eq('id', scanId);
+      if (error) throw error;
+      setRecommendations(recommendations.filter(s => s.id !== scanId));
+      toast.success('Record purged');
+    } catch (e) { toast.error('Purge failed'); }
   };
 
-  const getRecommendationBadge = (recommendation: string) => {
-    const badges = {
-      buy: 'bg-green-100 text-green-800',
-      caution: 'bg-yellow-100 text-yellow-800',
-      pass: 'bg-red-100 text-red-800',
-    };
-
-    return badges[recommendation as keyof typeof badges];
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
+  const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <Header
-        user={user}
-        tenant={tenant}
-        signOut={handleSignOut}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
-      />
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
+      <Toaster position="top-right" />
+      {/* Mesh Gradient Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 dark:bg-primary-500/20 rounded-full blur-[120px] animate-pulse" />
+        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-500/10 dark:bg-secondary-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
+      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">VIN Scan Recommendations</h1>
-          <p className="text-gray-600">
-            View all your scanned VINs with AI-powered buying recommendations
+      <Header user={user} tenant={tenant} signOut={signOut} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
+
+      <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
+        <div className="mb-12">
+          <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
+            Acquisition <span className="text-primary-500">Registry</span>
+          </h1>
+          <p className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em] mt-2">
+            Historical analysis & AI-driven buy/pass intelligence archives
           </p>
         </div>
 
-        {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <ThumbsUp className="w-5 h-5 text-green-600" />
-              <span className="text-sm text-gray-600">Buy</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.buy}</div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <AlertTriangle className="w-5 h-5 text-yellow-600" />
-              <span className="text-sm text-gray-600">Caution</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.caution}</div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <TrendingDown className="w-5 h-5 text-red-600" />
-              <span className="text-sm text-gray-600">Pass</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">{stats.pass}</div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <Target className="w-5 h-5 text-blue-600" />
-              <span className="text-sm text-gray-600">Avg Confidence</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">
-              {stats.avgConfidence.toFixed(0)}%
-            </div>
-          </div>
-
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
-            <div className="flex items-center gap-3 mb-2">
-              <DollarSign className="w-5 h-5 text-purple-600" />
-              <span className="text-sm text-gray-600">Potential Profit</span>
-            </div>
-            <div className="text-2xl font-bold text-gray-900">
-              {formatCurrency(stats.potentialProfit)}
-            </div>
-          </div>
+        {/* Metrics Grid */}
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4 mb-10">
+          {[
+            { label: 'Green Locked', value: stats.buy, icon: ThumbsUp, color: 'text-primary-500' },
+            { label: 'Warning Phase', value: stats.caution, icon: AlertTriangle, color: 'text-secondary-500' },
+            { label: 'Rejected Protocol', value: stats.pass, icon: TrendingDown, color: 'text-red-500' },
+            { label: 'Confidence Index', value: `${stats.avgConfidence.toFixed(0)}%`, icon: Target, color: 'text-blue-500' },
+            { label: 'Portfolio Alpha', value: formatCurrency(stats.potentialProfit), icon: DollarSign, color: 'text-purple-500' },
+          ].map((stat, i) => (
+            <GlassCard key={i} className="p-6">
+              <div className="flex items-center gap-3 mb-2">
+                <stat.icon size={12} className={stat.color} />
+                <span className="text-[8px] font-black uppercase tracking-widest text-slate-400">{stat.label}</span>
+              </div>
+              <div className="text-xl font-black text-slate-900 dark:text-white tracking-tight">{stat.value}</div>
+            </GlassCard>
+          ))}
         </div>
 
-        {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+        {/* Action Filters */}
+        <GlassCard className="p-4 mb-8">
+          <div className="relative group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-primary-500 transition-colors w-4 h-4" />
             <input
               type="text"
-              placeholder="Search by VIN, make, model, year..."
+              placeholder="SCAN REGISTRY BY VIN OR ASSET NAME..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-[10px] font-black tracking-widest uppercase outline-none focus:ring-2 focus:ring-primary-500 transition-all text-slate-900 dark:text-white"
             />
           </div>
-        </div>
+        </GlassCard>
 
-        {/* Results Count */}
-        {searchQuery && (
-          <div className="mb-4 text-sm text-gray-600">
-            Found {filteredRecommendations.length} result{filteredRecommendations.length !== 1 ? 's' : ''}
-          </div>
-        )}
-
-        {/* Recommendations List */}
+        {/* Registry Feed */}
         {loading && recommendations.length === 0 ? (
-          <div className="flex justify-center items-center py-12">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+          <div className="flex justify-center items-center py-20">
+            <Loader2 className="w-12 h-12 text-primary-500 animate-spin" />
           </div>
         ) : filteredRecommendations.length === 0 ? (
-          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
-            <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
-              {searchQuery ? 'No results found' : 'No VIN scans yet'}
-            </h3>
-            <p className="text-gray-600">
-              {searchQuery
-                ? 'Try adjusting your search terms'
-                : 'Start scanning VINs to see recommendations here'}
-            </p>
-          </div>
+          <GlassCard className="p-20 text-center">
+            <AlertCircle className="w-16 h-16 text-slate-200 dark:text-white/10 mx-auto mb-6" />
+            <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">Registry Null Phase</h3>
+            <p className="text-xs font-bold text-slate-500 uppercase tracking-widest mt-2">Injection required to build historical dataset</p>
+          </GlassCard>
         ) : (
-          <div className="space-y-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
             {filteredRecommendations.map((rec) => (
-              <div
+              <GlassCard
                 key={rec.id}
                 onClick={() => setSelectedRec(rec)}
-                className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 hover:shadow-md transition cursor-pointer"
+                className="group border-slate-200/50 dark:border-white/5 hover:border-primary-500/50 dark:hover:border-primary-500/50 transition-all duration-300 cursor-pointer p-6"
               >
-                <div className="flex items-center justify-between gap-4">
-                  {/* Left: Vehicle Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-gray-900 truncate">
-                        {rec.decoded_data.year} {formatVehicleName(rec.decoded_data.make)} {formatVehicleName(rec.decoded_data.model)}
-                      </h3>
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(rec.recommendation)} flex-shrink-0`}>
-                        {rec.recommendation.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600">
-                      <span className="hidden sm:inline">Max Bid: {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}</span>
-                      <span className={`hidden sm:inline font-medium ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                        Profit: {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
-                      </span>
-                    </div>
+                <div className="flex items-start justify-between mb-6">
+                  <div className="flex-1">
+                    <h3 className="text-lg font-black text-slate-900 dark:text-white tracking-tighter uppercase italic line-clamp-1">{rec.decoded_data.year} {rec.decoded_data.make} {rec.decoded_data.model}</h3>
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">VIN: {rec.vin}</div>
                   </div>
+                  <button onClick={(e) => handleDeleteScan(e, rec.id)} className="p-2 text-slate-300 hover:text-red-500 transition-colors">
+                    <Trash2 size={16} />
+                  </button>
+                </div>
 
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedRec(rec);
-                      }}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition flex-shrink-0"
-                      title="View Details"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteScan(e, rec.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition flex-shrink-0"
-                      title="Delete Scan"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                <div className="flex items-center justify-between mb-8 pb-6 border-b border-slate-100 dark:border-white/5">
+                  <span className={`px-4 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] shadow-lg ${rec.recommendation === 'buy' ? 'bg-primary-500 text-white shadow-primary-500/20' :
+                      rec.recommendation === 'caution' ? 'bg-secondary-500 text-white shadow-secondary-500/20' :
+                        'bg-red-500 text-white shadow-red-500/20'
+                    }`}>
+                    {rec.recommendation} protocol
+                  </span>
+                  <div className="text-right">
+                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Confidence Score</div>
+                    <div className="text-lg font-black text-slate-900 dark:text-white tracking-tight">{rec.confidence_score}%</div>
                   </div>
                 </div>
 
-                {/* Mobile: Show financial info */}
-                <div className="mt-3 pt-3 border-t border-gray-100 flex gap-4 text-sm sm:hidden">
-                  <div>
-                    <span className="text-gray-500">Max Bid:</span>
-                    <span className="ml-1 font-semibold text-blue-600">
-                      {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}
-                    </span>
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-4">
+                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1.5">
+                      <Target size={10} className="text-primary-500" /> Max Entry
+                    </div>
+                    <div className="text-sm font-black text-slate-900 dark:text-white">{formatCurrency(rec.max_bid_suggestion || 0)}</div>
                   </div>
-                  <div>
-                    <span className="text-gray-500">Profit:</span>
-                    <span className={`ml-1 font-semibold ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600'}`}>
-                      {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
-                    </span>
+                  <div className="bg-slate-50 dark:bg-white/5 rounded-2xl p-4">
+                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1 flex items-center gap-1.5">
+                      <Sparkles size={10} className="text-secondary-500" /> Est. Profit
+                    </div>
+                    <div className="text-sm font-black text-primary-500">{formatCurrency(rec.estimated_profit || 0)}</div>
                   </div>
                 </div>
-              </div>
+
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-slate-400 group-hover:text-primary-500 transition-colors">
+                  <span className="flex items-center gap-2"><Calendar size={12} /> {new Date(rec.created_at).toLocaleDateString()}</span>
+                  <span className="flex items-center gap-1">Open Protocol <ChevronRight size={14} /></span>
+                </div>
+              </GlassCard>
             ))}
-
-            {/* Infinite Scroll Trigger */}
-            {hasMore && !searchQuery && (
-              <div ref={observerTarget} className="py-8 text-center">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-                <p className="text-sm text-gray-500 mt-2">Loading more...</p>
-              </div>
-            )}
-
-            {/* End of Results */}
-            {!hasMore && recommendations.length > 0 && !searchQuery && (
-              <div className="py-8 text-center text-sm text-gray-500">
-                You've reached the end of your scan history
-              </div>
-            )}
           </div>
         )}
 
-        {/* Details Modal */}
+        {/* Intersection Trigger */}
+        {hasMore && !searchQuery && <div ref={observerTarget} className="h-20" />}
+
+        {/* Modal Protocol */}
         {selectedRec && (
-          <div
-            className="fixed inset-0 bg-gray-900 bg-opacity-50 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-            onClick={handleCloseModal}
-          >
-            <div
-              className="bg-white w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="sticky top-0 bg-white border-b border-gray-200 p-4 md:p-6 flex items-center justify-between z-10">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900">Scan Details</h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition"
-                >
-                  <X className="w-6 h-6" />
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6" onClick={handleCloseModal}>
+            <div className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm transition-opacity" />
+            <GlassCard className="w-full max-w-5xl max-h-[90vh] overflow-y-auto relative animate-in fade-in zoom-in duration-300 shadow-2xl p-0" onClick={e => e.stopPropagation()}>
+              <div className="sticky top-0 z-20 bg-white/50 dark:bg-slate-900/50 backdrop-blur-xl border-b border-slate-200 dark:border-white/5 p-6 flex items-center justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tighter italic">Scan Protocol <span className="text-primary-500">Analysis</span></h2>
+                  <div className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mt-1">Registry Record: {selectedRec.id}</div>
+                </div>
+                <button onClick={handleCloseModal} className="p-3 hover:bg-slate-100 dark:hover:bg-white/5 rounded-2xl transition-all">
+                  <X size={24} className="text-slate-400" />
                 </button>
               </div>
 
               <VINScanResult
                 scanData={{
-                  id: selectedRec.id,
-                  decoded_data: selectedRec.decoded_data,
-                  market_data: selectedRec.market_data,
-                  recommendation: selectedRec.recommendation,
-                  confidence_score: selectedRec.confidence_score,
-                  match_reasoning: selectedRec.match_reasoning,
-                  estimated_profit: selectedRec.estimated_profit,
-                  max_bid_suggestion: selectedRec.max_bid_suggestion,
-                  custom_recon_cost: selectedRec.custom_recon_cost,
-                  custom_transport_cost: selectedRec.custom_transport_cost,
-                  custom_max_bid: selectedRec.custom_max_bid,
-                  custom_market_price: selectedRec.custom_market_price,
+                  id: selectedRec.id, decoded_data: selectedRec.decoded_data, market_data: selectedRec.market_data,
+                  recommendation: selectedRec.recommendation, confidence_score: selectedRec.confidence_score, match_reasoning: selectedRec.match_reasoning,
+                  estimated_profit: selectedRec.estimated_profit, max_bid_suggestion: selectedRec.max_bid_suggestion,
+                  custom_recon_cost: selectedRec.custom_recon_cost, custom_transport_cost: selectedRec.custom_transport_cost,
+                  custom_max_bid: selectedRec.custom_max_bid, custom_market_price: selectedRec.custom_market_price,
                 }}
-                isModal={true}
-                tenantZipCode={tenant?.zip_code}
-                onClose={handleCloseModal}
-                onEditStatusChange={setIsEditingCosts}
-                onOutsideClick={() => setShowConfirmDialog(true)}
-                ref={scanResultRef}
-                isEditing={isEditingCosts}
+                isModal={true} tenantZipCode={tenant?.zip_code} onClose={handleCloseModal} onEditStatusChange={setIsEditingCosts} onOutsideClick={() => setShowConfirmDialog(true)} ref={scanResultRef} isEditing={isEditingCosts}
               />
-            </div>
+            </GlassCard>
           </div>
         )}
 
         <ConfirmationDialog
-          isOpen={showConfirmDialog}
-          onConfirm={confirmCloseModal}
-          onCancel={() => {
-            scanResultRef.current?.saveCosts();
-            setIsEditingCosts(false);
-            setShowConfirmDialog(false);
-          }}
-          confirmLabel="Discard & Leave"
-          cancelLabel="Save and Stay"
-          message="You have unsaved changes in the profit calculator. How would you like to proceed?"
+          isOpen={showConfirmDialog} onConfirm={() => { setSelectedRec(null); setIsEditingCosts(false); setShowConfirmDialog(false); }}
+          onCancel={() => { scanResultRef.current?.saveCosts(); setIsEditingCosts(false); setShowConfirmDialog(false); }}
+          confirmLabel="Discard Matrix Updates" cancelLabel="Commit Protocols" message="Unsaved cost telemetry calibration detected. Terminate protocol session?"
         />
       </div>
     </div>
