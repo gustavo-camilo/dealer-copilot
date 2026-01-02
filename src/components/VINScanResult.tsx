@@ -1,24 +1,41 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, Car, Target, ShieldCheck, Database, TrendingUp, AlertTriangle, X } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
 import { VehicleCommentSection } from './VehicleCommentSection';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
-import GlassCard from './ui/GlassCard';
 
+// Helper function to simplify body types to Sedan, SUV, Pickup, or hide if not matching
 function getSimplifiedBodyType(bodyType: string | undefined): string {
     if (!bodyType) return '';
+
     const normalized = bodyType.toLowerCase();
-    if (normalized.includes('sedan') || normalized.includes('coupe')) return 'Sedan';
-    if (normalized.includes('suv') || normalized.includes('crossover') || normalized.includes('wagon') || normalized.includes('mpv') || normalized.includes('van') || normalized.includes('minivan')) return 'SUV';
-    if (normalized.includes('pickup') || normalized.includes('truck')) return 'Pickup';
+
+    // Map to Sedan
+    if (normalized.includes('sedan') || normalized.includes('coupe')) {
+        return 'Sedan';
+    }
+
+    // Map to SUV
+    if (normalized.includes('suv') || normalized.includes('crossover') ||
+        normalized.includes('wagon') || normalized.includes('mpv') ||
+        normalized.includes('van') || normalized.includes('minivan')) {
+        return 'SUV';
+    }
+
+    // Map to Pickup
+    if (normalized.includes('pickup') || normalized.includes('truck')) {
+        return 'Pickup';
+    }
+
+    // If doesn't match any category, return empty string (hide it)
     return '';
 }
 
 interface VINScanResultProps {
     scanData: {
-        id?: string;
+        id?: string; // scan_id
         decoded_data: any;
         market_data: any;
         recommendation: 'buy' | 'caution' | 'pass';
@@ -27,7 +44,7 @@ interface VINScanResultProps {
         estimated_profit: number | null;
         max_bid_suggestion: number | null;
         estimated_days_to_sale?: number | null;
-        radius?: number;
+        radius?: number; // The radius used for the search
         custom_recon_cost?: number | null;
         custom_transport_cost?: number | null;
         custom_max_bid?: number | null;
@@ -36,21 +53,34 @@ interface VINScanResultProps {
     onClose?: () => void;
     onScanAnother?: () => void;
     isModal?: boolean;
-    costSettings?: any;
+    costSettings?: any; // Pass cost settings if available
     tenantZipCode?: string | null;
-    onRescan?: (radius: number) => Promise<void>;
+    onRescan?: (radius: number) => Promise<void>; // NEW: Handler for expanding search
     onEditStatusChange?: (isEditing: boolean) => void;
     onOutsideClick?: () => void;
     isEditing?: boolean;
 }
 
 const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(({
-    scanData, onClose, onScanAnother, isModal = false, costSettings, tenantZipCode, onRescan, onEditStatusChange, onOutsideClick, isEditing = false,
+    scanData,
+    onClose,
+    onScanAnother,
+    isModal = false,
+    costSettings,
+    tenantZipCode,
+    onRescan,
+    onEditStatusChange,
+    onOutsideClick,
+    isEditing = false,
 }, ref) => {
     const { user } = useAuth();
     const calculatorRef = useRef<{ save: () => void }>(null);
 
-    useImperativeHandle(ref, () => ({ saveCosts: () => { calculatorRef.current?.save(); } }));
+    useImperativeHandle(ref, () => ({
+        saveCosts: () => {
+            calculatorRef.current?.save();
+        }
+    }));
     const [reportLoading, setReportLoading] = useState(false);
     const [reportSuccess, setReportSuccess] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -58,211 +88,440 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     const [isExpandingSearch, setIsExpandingSearch] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [currentRecommendation, setCurrentRecommendation] = useState(scanData.recommendation);
-
     const handleSaveCosts = async (costs: { recon: number; transport: number; maxBid: number; marketPrice: number }) => {
         if (!scanData.id) return;
+
         setIsSaving(true);
         try {
-            await supabase.from('vin_scans').update({ custom_recon_cost: costs.recon, custom_transport_cost: costs.transport, custom_max_bid: costs.maxBid, custom_market_price: costs.marketPrice, costs_edited: true }).eq('id', scanData.id);
-            toast.success('Cost matrix calibrated');
-        } catch (e) { toast.error('Calibration failed'); } finally { setIsSaving(false); }
+            const { error: saveError } = await supabase
+                .from('vin_scans')
+                .update({
+                    custom_recon_cost: costs.recon,
+                    custom_transport_cost: costs.transport,
+                    custom_max_bid: costs.maxBid,
+                    custom_market_price: costs.marketPrice,
+                    costs_edited: true,
+                })
+                .eq('id', scanData.id);
+
+            if (saveError) throw saveError;
+            toast.success('Costs saved successfully');
+        } catch (error) {
+            console.error('Error saving custom costs:', error);
+            toast.error('Failed to save costs');
+        } finally {
+            setIsSaving(false);
+        }
     };
 
-    useEffect(() => { setCurrentRecommendation(scanData.recommendation); }, [scanData.recommendation]);
+    useEffect(() => {
+        setCurrentRecommendation(scanData.recommendation);
+    }, [scanData.recommendation]);
 
     const handleUpdateRecommendation = async (newRec: 'buy' | 'caution' | 'pass') => {
         if (!scanData.id) return;
+
         setIsSaving(true);
         try {
             setCurrentRecommendation(newRec);
-            await supabase.from('vin_scans').update({ recommendation: newRec }).eq('id', scanData.id);
-            toast.success(`Protocol ${newRec.toUpperCase()} activated`);
-        } catch (e) { toast.error('Protocol update failed'); setCurrentRecommendation(scanData.recommendation); } finally { setIsSaving(false); }
+            const { error: updateError } = await supabase
+                .from('vin_scans')
+                .update({ recommendation: newRec })
+                .eq('id', scanData.id);
+
+            if (updateError) throw updateError;
+            toast.success(`Recommendation changed to ${newRec.toUpperCase()}`);
+        } catch (err: any) {
+            console.error('Error updating recommendation:', err);
+            toast.error('Failed to update recommendation');
+            setCurrentRecommendation(scanData.recommendation);
+        } finally {
+            setIsSaving(false);
+        }
     };
 
     const handleReportMissingData = async () => {
         if (!scanData?.decoded_data) return;
+
         setReportLoading(true);
         try {
             const { SupportService } = await import('../services/support');
-            await SupportService.createTicket({ type: 'missing_market_data', subject: `Missing Pricing: ${scanData.decoded_data.year} ${scanData.decoded_data.make} ${scanData.decoded_data.model}`, details: { vin: scanData.decoded_data.vin || '', decoded_data: scanData.decoded_data, mileage: scanData.decoded_data.mileage }, priority: 'medium' });
+            await SupportService.createTicket({
+                type: 'missing_market_data',
+                subject: `Missing Pricing: ${scanData.decoded_data.year} ${scanData.decoded_data.make} ${scanData.decoded_data.model}`,
+                details: {
+                    vin: scanData.decoded_data.vin || '', // Assuming VIN is in decoded_data or passed separately. It's usually in decoded_data.
+                    decoded_data: scanData.decoded_data,
+                    mileage: scanData.decoded_data.mileage
+                },
+                priority: 'medium'
+            });
             setReportSuccess(true);
-        } catch (e) { setError('Support ticket injection failed'); } finally { setReportLoading(false); }
+        } catch (err) {
+            console.error('Failed to report issue:', err);
+            setError('Failed to submit report. Please try again.');
+        } finally {
+            setReportLoading(false);
+        }
     };
 
     const handleExpandSearch = async () => {
         if (!onRescan) return;
-        setIsExpandingSearch(true); setError(null);
-        try { await onRescan(500); } catch (e) { setError('Search expansion failed'); } finally { setIsExpandingSearch(false); }
+
+        setIsExpandingSearch(true);
+        setError(null);
+        try {
+            await onRescan(500); // Expand to 500 miles
+        } catch (err) {
+            console.error('Failed to expand search:', err);
+            setError('Failed to expand search. Please try again.');
+        } finally {
+            setIsExpandingSearch(false);
+        }
     };
 
-    const defaultCostSettings = costSettings || { auction_fee_thresholds: [{ min_price: 0, max_price: 5000, fee: 200 }, { min_price: 5000, max_price: 10000, fee: 350 }, { min_price: 10000, max_price: 999999, fee: 500 }], reconditioning_cost: 800, transport_cost: 150 };
-
-    const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
+    // Default cost settings if not provided (though ideally they should be passed)
+    const defaultCostSettings = costSettings || {
+        auction_fee_thresholds: [
+            { min_price: 0, max_price: 5000, fee: 200 },
+            { min_price: 5000, max_price: 10000, fee: 350 },
+            { min_price: 10000, max_price: 999999, fee: 500 },
+        ],
+        reconditioning_cost: 800,
+        transport_cost: 150,
+    };
 
     return (
-        <div className={`bg-transparent ${isModal ? 'p-0' : 'min-h-screen py-12'}`}>
-            <div className={`${isModal ? 'p-8' : 'max-w-5xl mx-auto px-6'}`}>
-                {/* Asset Identity Card */}
-                <GlassCard className="p-8 mb-8 overflow-hidden relative">
-                    <div className="absolute top-0 right-0 p-8 opacity-5">
-                        <Car size={180} />
-                    </div>
-                    <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+        <div className={`bg-gray-50 ${isModal ? 'p-0' : 'min-h-screen'}`}>
+            <div className={`${isModal ? '' : 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}`}>
+                {/* Vehicle Header */}
+                <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 mb-6">
+                    <div className="flex items-center justify-between mb-4">
                         <div>
-                            <div className="flex items-center gap-3 mb-2">
-                                <Database size={14} className="text-primary-500" />
-                                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">Validated Registry Entry</span>
-                            </div>
-                            <h2 className="text-3xl md:text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">
-                                {scanData.decoded_data.year} {scanData.decoded_data.make} <span className="text-primary-500">{scanData.decoded_data.model}</span>
+                            <h2 className="text-2xl font-bold text-gray-900">
+                                {scanData.decoded_data.year} {scanData.decoded_data.make} {scanData.decoded_data.model}
                             </h2>
-                            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest mt-2">
-                                {scanData.decoded_data.trim || 'Standard Protocol'} {getSimplifiedBodyType(scanData.decoded_data.body_type) && ` • ${getSimplifiedBodyType(scanData.decoded_data.body_type)}`}
+                            <p className="text-gray-600">
+                                {scanData.decoded_data.trim}
+                                {scanData.decoded_data.trim && getSimplifiedBodyType(scanData.decoded_data.body_type) && ' • '}
+                                {getSimplifiedBodyType(scanData.decoded_data.body_type)}
                             </p>
+                            {/* If VIN is available in decoded_data, show it. Otherwise it might be in the parent object but we didn't pass it explicitly in the interface above except inside decoded_data potentially */}
+                            {/* We can assume decoded_data has what we need or pass vin separately if needed. For now, let's rely on what's there. */}
                         </div>
-
-                        <div className="flex flex-col items-end gap-4 min-w-[240px]">
-                            <div className="text-right">
-                                <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Acquisition Protocol</div>
+                        <div className="flex flex-col items-end">
+                            <div className="relative group">
                                 <select
                                     value={currentRecommendation || ''}
-                                    onChange={(e) => handleUpdateRecommendation(e.target.value as any)}
-                                    className={`w-full appearance-none px-6 py-3 rounded-2xl font-black uppercase tracking-widest text-[10px] border-2 transition-all cursor-pointer text-center
-                                    ${currentRecommendation === 'buy' ? 'bg-primary-500 border-primary-500 text-white shadow-glow-primary' :
-                                            currentRecommendation === 'caution' ? 'bg-secondary-500 border-secondary-500 text-white shadow-glow-secondary' :
-                                                'bg-red-500 border-red-500 text-white shadow-red-500/20'}`}
+                                    onChange={(e) => handleUpdateRecommendation(e.target.value as 'buy' | 'caution' | 'pass')}
+                                    disabled={isSaving}
+                                    className={`appearance-none px-4 py-2.5 pr-10 rounded-xl font-bold transition-all focus:ring-2 focus:ring-indigo-500 cursor-pointer border-2
+                                        ${currentRecommendation === 'buy' ? 'bg-green-100 border-green-200 text-green-800 hover:bg-green-200' :
+                                            currentRecommendation === 'caution' ? 'bg-yellow-100 border-yellow-200 text-yellow-800 hover:bg-yellow-200' :
+                                                'bg-red-100 border-red-200 text-red-800 hover:bg-red-200'}`}
                                 >
-                                    <option value="buy">🟢 Buy Protocol</option>
-                                    <option value="caution">🟡 Caution Protocol</option>
-                                    <option value="pass">🔴 Pass Protocol</option>
+                                    <option value="buy" className="bg-white text-green-800">🟢 Buy</option>
+                                    <option value="caution" className="bg-white text-yellow-800">🟡 Caution</option>
+                                    <option value="pass" className="bg-white text-red-800">🔴 Pass</option>
                                 </select>
-                            </div>
-                            <div className="text-right">
-                                <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Confidence Matrix</div>
-                                <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{scanData.confidence_score}%</div>
+                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                    {isSaving ? (
+                                        <Loader2 className="h-4 w-4 animate-spin opacity-50" />
+                                    ) : (
+                                        <ChevronDownIcon className={`h-5 w-5 ${currentRecommendation === 'buy' ? 'text-green-600' :
+                                            currentRecommendation === 'caution' ? 'text-yellow-600' :
+                                                'text-red-600'
+                                            }`} />
+                                    )}
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-8 mt-12 pt-8 border-t border-slate-100 dark:border-white/5">
-                        {[
-                            { label: 'Odometer Index', value: scanData.decoded_data.mileage ? `${scanData.decoded_data.mileage.toLocaleString()} mi` : 'N/A' },
-                            { label: 'Registry Status', value: scanData.decoded_data.title_status || 'Unverified' },
-                            { label: 'Ownership History', value: scanData.decoded_data.owner_count?.toString() || 'N/A' },
-                            { label: 'Incident Registry', value: scanData.decoded_data.accident_count?.toString() || '0' },
-                        ].map((stat, i) => (
-                            <div key={i}>
-                                <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-2">{stat.label}</div>
-                                <div className="text-sm font-black text-slate-900 dark:text-white uppercase italic">{stat.value}</div>
-                            </div>
-                        ))}
-                    </div>
-                </GlassCard>
-
-                <div className="grid lg:grid-cols-3 gap-8 mb-8">
-                    {/* Market Delta Card */}
-                    <GlassCard className="lg:col-span-1 p-6 border-primary-500/20">
-                        <div className="flex items-center gap-3 mb-6">
-                            <TrendingUp size={16} className="text-primary-500" />
-                            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-900 dark:text-white italic">Market Delta</h4>
-                        </div>
-                        {scanData.market_data ? (
-                            <div className="space-y-6">
-                                <div>
-                                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Mean Retail</div>
-                                    <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{formatCurrency(scanData.market_data.averagePrice)}</div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div>
-                                        <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Floor</div>
-                                        <div className="text-[10px] font-black text-slate-600 dark:text-slate-300">{formatCurrency(scanData.market_data.minPrice)}</div>
-                                    </div>
-                                    <div>
-                                        <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Ceiling</div>
-                                        <div className="text-[10px] font-black text-slate-600 dark:text-slate-300">{formatCurrency(scanData.market_data.maxPrice)}</div>
-                                    </div>
-                                </div>
-                                <div className="pt-4 border-t border-slate-100 dark:border-white/5">
-                                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Search Radius</div>
-                                    <div className="text-[10px] font-black text-primary-500">{scanData.market_data.radius || 100} MILES</div>
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="py-8 text-center bg-yellow-500/5 rounded-2xl border border-dashed border-yellow-500/20">
-                                <AlertTriangle size={24} className="text-yellow-500 mx-auto mb-3" />
-                                <div className="text-[8px] font-black uppercase tracking-widest text-yellow-500">Telemetry Missing</div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        {scanData.decoded_data.mileage && (
+                            <div>
+                                <p className="text-gray-600">Mileage</p>
+                                <p className="font-semibold">{scanData.decoded_data.mileage.toLocaleString()} mi</p>
                             </div>
                         )}
-                    </GlassCard>
-
-                    {/* Reasoning Protocol */}
-                    <div className="lg:col-span-2">
-                        <GlassCard className="h-full p-6">
-                            <button onClick={() => setReasoningExpanded(!reasoningExpanded)} className="w-full flex items-center justify-between mb-6 group">
-                                <div className="flex items-center gap-3">
-                                    <ShieldCheck size={16} className="text-secondary-500" />
-                                    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-900 dark:text-white italic">Decision Reasoning</h4>
-                                </div>
-                                <ChevronDown className={`text-slate-400 group-hover:text-primary-500 transition-all ${reasoningExpanded ? 'rotate-180' : ''}`} />
-                            </button>
-
-                            <div className={`space-y-4 ${reasoningExpanded ? '' : 'max-h-[160px] overflow-hidden relative'}`}>
-                                {!reasoningExpanded && <div className="absolute inset-x-0 bottom-0 h-10 bg-gradient-to-t from-white/50 dark:from-slate-900/50 to-transparent z-10" />}
-                                {scanData.match_reasoning?.length > 0 ? (
-                                    scanData.match_reasoning.map((reason: any, idx: number) => (
-                                        <div key={idx} className="flex gap-4 p-4 bg-slate-50 dark:bg-white/5 rounded-2xl items-center border border-slate-100 dark:border-white/5">
-                                            {reason.type === 'positive' ? <CheckCircle size={14} className="text-primary-500 shrink-0" /> : <AlertCircle size={14} className="text-secondary-500 shrink-0" />}
-                                            <span className="text-[10px] font-bold text-slate-600 dark:text-slate-300 uppercase tracking-widest leading-relaxed">{reason.message}</span>
-                                        </div>
-                                    ))
-                                ) : (
-                                    <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 p-4 border border-dashed border-slate-200 dark:border-white/10 rounded-2xl text-center">Protocol reasoning not available</div>
-                                )}
+                        <div>
+                            <p className="text-gray-600">Title Status</p>
+                            <p className="font-semibold capitalize">{scanData.decoded_data.title_status || 'Unknown'}</p>
+                        </div>
+                        {scanData.decoded_data.owner_count !== undefined && (
+                            <div>
+                                <p className="text-gray-600">Owners</p>
+                                <p className="font-semibold">{scanData.decoded_data.owner_count}</p>
                             </div>
-                        </GlassCard>
+                        )}
+                        {scanData.decoded_data.accident_count !== undefined && (
+                            <div>
+                                <p className="text-gray-600">Accidents</p>
+                                <p className="font-semibold">{scanData.decoded_data.accident_count}</p>
+                            </div>
+                        )}
+                        {scanData.estimated_days_to_sale !== undefined && (
+                            <div>
+                                <p className="text-gray-600">Est. Days to Sale</p>
+                                <p className="font-semibold">{scanData.estimated_days_to_sale ? `${scanData.estimated_days_to_sale} days` : 'N/A'}</p>
+                            </div>
+                        )}
                     </div>
                 </div>
 
-                {/* Profit Protocol Injection */}
-                <div className="mb-8">
-                    <ProfitCalculator
-                        ref={calculatorRef} maxBidSuggestion={scanData.max_bid_suggestion || 0} marketPrice={scanData.market_data?.averagePrice || 0}
-                        initialMaxBid={scanData.custom_max_bid || undefined} initialRecon={scanData.custom_recon_cost || undefined}
-                        initialTransport={scanData.custom_transport_cost || undefined} initialMarketPrice={scanData.custom_market_price || undefined}
-                        auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []} defaultRecon={defaultCostSettings.reconditioning_cost}
-                        defaultTransport={defaultCostSettings.transport_cost} onCostsChange={() => { }} onSave={handleSaveCosts}
-                        onEditStatusChange={onEditStatusChange} onOutsideClick={onOutsideClick} isSaving={isSaving} isEditing={isEditing}
-                    />
-                </div>
+                {/* Market Context - Moved up */}
+                {scanData.market_data ? (
+                    <>
+                        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+                            <h4 className="font-semibold text-blue-900 mb-2">📊 Market Context</h4>
+                            <div className="text-sm text-blue-800 space-y-1">
+                                <p>
+                                    • Average Market Price: ${scanData.market_data.averagePrice.toLocaleString()} {scanData.market_data.dataSource === 'estimated' ? '(estimated)' : ''}
+                                </p>
+                                <p>
+                                    • Price Range: ${scanData.market_data.minPrice.toLocaleString()} - $
+                                    {scanData.market_data.maxPrice.toLocaleString()}
+                                </p>
+                                <p>
+                                    • Cheapest Listing: ${scanData.market_data.minPrice.toLocaleString()} (Within {scanData.market_data.radius || 100} Miles)
+                                </p>
+                            </div>
+                        </div>
 
-                {/* Comments Protocol */}
-                {scanData.id && user?.tenant_id && (
-                    <GlassCard className="p-8 mb-8">
-                        <VehicleCommentSection vinScanId={scanData.id} tenantId={user.tenant_id} />
-                    </GlassCard>
+                        {/* Show warning and expand button if limited data */}
+                        {scanData.market_data.listingsCount < 5 && onRescan && (scanData.market_data.radius || scanData.radius || 0) < 500 && (
+                            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+                                <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1">
+                                        <h4 className="font-semibold text-yellow-900 mb-1">⚠️ Limited Market Data</h4>
+                                        <p className="text-sm text-yellow-800">
+                                            Found only {scanData.market_data.listingsCount} listing(s) within {scanData.market_data.radius || scanData.radius || 100} miles.
+                                            Expand to 500 miles for more results?
+                                        </p>
+                                    </div>
+                                    <button
+                                        onClick={handleExpandSearch}
+                                        disabled={isExpandingSearch}
+                                        className="bg-yellow-600 text-white px-4 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center whitespace-nowrap"
+                                    >
+                                        {isExpandingSearch ? (
+                                            <>
+                                                <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                                                Searching...
+                                            </>
+                                        ) : (
+                                            'Expand Search to 500 Miles'
+                                        )}
+                                    </button>
+                                </div>
+
+                                {/* Show individual listings when <5 found */}
+                                {scanData.market_data.listings && scanData.market_data.listings.length > 0 && (
+                                    <div className="mt-4 pt-4 border-t border-yellow-300">
+                                        <p className="font-semibold text-sm text-yellow-900 mb-2">Available Listings:</p>
+                                        <div className="space-y-2">
+                                            {scanData.market_data.listings.slice(0, 3).map((listing: any, idx: number) => (
+                                                <div key={idx} className="bg-white border border-yellow-200 rounded p-3 text-sm">
+                                                    <div className="font-semibold text-gray-900">
+                                                        {listing.title || `${scanData.decoded_data.year} ${scanData.decoded_data.make} ${scanData.decoded_data.model}`}
+                                                    </div>
+                                                    <div className="text-gray-600 mt-1">
+                                                        ${listing.price?.toLocaleString()} • {listing.miles?.toLocaleString()} mi
+                                                        {listing.distance && ` • ${Math.round(listing.distance)} mi away`}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {error && (
+                                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                                        {error}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 mb-6 text-center">
+                        <AlertCircle className="h-12 w-12 text-yellow-600 mx-auto mb-3" />
+
+                        {!tenantZipCode ? (
+                            <>
+                                <h3 className="text-lg font-bold text-yellow-900 mb-2">Missing ZIP Code</h3>
+                                <p className="text-yellow-800 mb-6">
+                                    Please configure your location in <a href="/settings" className="underline font-bold hover:text-yellow-900">Settings</a> to get accurate market data.
+                                </p>
+                            </>
+                        ) : (
+                            <>
+                                <h3 className="text-lg font-bold text-yellow-900 mb-2">Market Data Unavailable</h3>
+                                <p className="text-yellow-800 mb-6">
+                                    We couldn't find any market data for this specific vehicle configuration in your area.
+                                    This can happen with rare trims or very new inventory.
+                                </p>
+
+                                {/* Show expand button if onRescan available and not already expanded */}
+                                {onRescan && !isExpandingSearch && (scanData.market_data?.radius || scanData.radius || 0) < 500 && (
+                                    <button
+                                        onClick={handleExpandSearch}
+                                        className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto mb-4"
+                                    >
+                                        Expand Search to 500 Miles
+                                    </button>
+                                )}
+
+                                {isExpandingSearch && (
+                                    <div className="flex items-center justify-center mb-4">
+                                        <Loader2 className="h-8 w-8 animate-spin text-yellow-600" />
+                                        <span className="ml-2 text-yellow-800">Searching wider area...</span>
+                                    </div>
+                                )}
+
+                                {reportSuccess ? (
+                                    <div className="bg-green-100 text-green-800 p-4 rounded-lg flex items-center justify-center">
+                                        <CheckCircle className="h-5 w-5 mr-2" />
+                                        Report submitted successfully! Our team will investigate.
+                                    </div>
+                                ) : (
+                                    // Only show report button if search was already expanded to 500 miles OR if onRescan is not available
+                                    ((scanData.market_data?.radius || scanData.radius || 0) >= 500 || !onRescan) && (
+                                        <button
+                                            onClick={handleReportMissingData}
+                                            disabled={reportLoading}
+                                            className="bg-yellow-600 text-white px-6 py-2 rounded-lg hover:bg-yellow-700 transition flex items-center justify-center mx-auto"
+                                        >
+                                            {reportLoading ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : null}
+                                            Report Missing Data to Support
+                                        </button>
+                                    )
+                                )}
+                                {error && (
+                                    <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                                        {error}
+                                    </div>
+                                )}
+                            </>
+                        )}
+                    </div>
                 )}
 
-                {/* Action Protocols */}
-                <div className="flex gap-4">
+                {/* Profit Calculator */}
+                <ProfitCalculator
+                    ref={calculatorRef}
+                    maxBidSuggestion={scanData.max_bid_suggestion || 0}
+                    marketPrice={scanData.market_data?.averagePrice || 0}
+                    initialMaxBid={scanData.custom_max_bid || undefined}
+                    initialRecon={scanData.custom_recon_cost || undefined}
+                    initialTransport={scanData.custom_transport_cost || undefined}
+                    initialMarketPrice={scanData.custom_market_price || undefined}
+                    auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
+                    defaultRecon={defaultCostSettings.reconditioning_cost}
+                    defaultTransport={defaultCostSettings.transport_cost}
+                    onCostsChange={() => {
+                        // We no longer auto-save here
+                    }}
+                    onSave={handleSaveCosts}
+                    onEditStatusChange={onEditStatusChange}
+                    onOutsideClick={onOutsideClick}
+                    isSaving={isSaving}
+                    isEditing={isEditing}
+                />
+
+                {/* Match Reasoning - Moved to bottom with collapsible */}
+                {scanData.market_data && scanData.match_reasoning && scanData.match_reasoning.length > 0 && (
+                    <div className="mt-6">
+                        <button
+                            onClick={() => setReasoningExpanded(!reasoningExpanded)}
+                            className={`w-full rounded-lg p-4 text-left transition-colors ${scanData.recommendation === 'buy'
+                                ? 'bg-green-50 border border-green-200 hover:bg-green-100'
+                                : scanData.recommendation === 'caution'
+                                    ? 'bg-yellow-50 border border-yellow-200 hover:bg-yellow-100'
+                                    : 'bg-red-50 border border-red-200 hover:bg-red-100'
+                                }`}
+                        >
+                            <div className="flex items-center justify-between">
+                                <h3 className="font-bold text-gray-900">
+                                    {scanData.recommendation === 'buy' && '✅ Why This is a Strong Match'}
+                                    {scanData.recommendation === 'caution' && '⚠️ Why Caution is Advised'}
+                                    {scanData.recommendation === 'pass' && '❌ Why You Should Pass'}
+                                </h3>
+                                {reasoningExpanded ? (
+                                    <ChevronUp className="h-5 w-5 text-gray-600" />
+                                ) : (
+                                    <ChevronDown className="h-5 w-5 text-gray-600" />
+                                )}
+                            </div>
+                        </button>
+                        {reasoningExpanded && (
+                            <div
+                                className={`rounded-b-lg p-4 border-x border-b ${scanData.recommendation === 'buy'
+                                    ? 'bg-green-50 border-green-200'
+                                    : scanData.recommendation === 'caution'
+                                        ? 'bg-yellow-50 border-yellow-200'
+                                        : 'bg-red-50 border-red-200'
+                                    }`}
+                            >
+                                <div className="space-y-2">
+                                    {scanData.match_reasoning.map((reason: any, index: number) => (
+                                        <div key={index} className="flex items-start">
+                                            {reason.type === 'positive' ? (
+                                                <CheckCircle className="h-5 w-5 text-green-600 mr-2 flex-shrink-0 mt-0.5" />
+                                            ) : reason.type === 'negative' ? (
+                                                <AlertCircle className="h-5 w-5 text-red-600 mr-2 flex-shrink-0 mt-0.5" />
+                                            ) : (
+                                                <AlertCircle className="h-5 w-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
+                                            )}
+                                            <span className="text-gray-700">{reason.message}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Comments & Auction Source */}
+                {scanData.id && user?.tenant_id && (
+                    <div className="mt-6">
+                        <VehicleCommentSection
+                            vinScanId={scanData.id}
+                            tenantId={user.tenant_id}
+                        />
+                    </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-4 mt-6">
                     {onScanAnother && (
-                        <button onClick={onScanAnother} className="flex-1 py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:shadow-glow-primary transition-all">
-                            Scan Another Asset
+                        <button
+                            onClick={onScanAnother}
+                            className="flex-1 border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition"
+                        >
+                            Scan Another VIN
                         </button>
                     )}
                     {!isModal && (
-                        <button onClick={() => window.location.href = '/recommendations'} className="flex-1 py-5 bg-primary-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:shadow-glow-primary transition-all shadow-lg shadow-primary-500/20">
-                            Registry Archives
-                        </button>
+                        onClose ? (
+                            <button
+                                onClick={onClose}
+                                className="flex-1 bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
+                            >
+                                Close
+                            </button>
+                        ) : (
+                            <button
+                                onClick={() => window.location.href = '/recommendations'} // Redirect to recommendations page
+                                className="flex-1 bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
+                            >
+                                View All Recommendations
+                            </button>
+                        )
                     )}
                 </div>
             </div>
-            {/* Modal Specific Header/Close */}
-            {isModal && (
-                <button onClick={onClose} className="absolute top-6 right-6 p-3 bg-slate-100 dark:bg-white/5 rounded-2xl text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all z-50">
-                    <X size={20} />
-                </button>
-            )}
         </div>
     );
 });

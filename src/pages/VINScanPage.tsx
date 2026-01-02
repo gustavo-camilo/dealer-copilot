@@ -2,17 +2,17 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useBlocker } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Target, Loader2, ChevronRight, Hash, Gauge, ArrowRight, ShieldCheck, Database, LayoutDashboard } from 'lucide-react';
+import { Target, Loader2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { decodeVIN, enrichDecodedData } from '../services/vinDecoder';
 import { getMarketPricing, calculateMaxBid } from '../services/marketPricing';
 import { generateRecommendation } from '../services/recommendationEngine';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
-import GlassCard from '../components/ui/GlassCard';
 import ConfirmationDialog from '../components/ConfirmationDialog';
 import { SalesRecord, TenantCostSettings } from '../types/database';
 
+// Default cost settings if tenant hasn't configured them
 const DEFAULT_COST_SETTINGS: TenantCostSettings = {
   auction_fee_thresholds: [
     { min_price: 0, max_price: 5000, fee: 200 },
@@ -49,54 +49,174 @@ export default function VINScanPage() {
     setPendingReset(false);
   };
 
+  // Handle browser refresh/close
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
-      if (isEditingCosts) { e.preventDefault(); e.returnValue = ''; }
+      if (isEditingCosts) {
+        e.preventDefault();
+        e.returnValue = '';
+      }
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
     return () => window.removeEventListener('beforeunload', handleBeforeUnload);
   }, [isEditingCosts]);
 
-  const blocker = useBlocker(({ currentLocation, nextLocation }) => isEditingCosts && currentLocation.pathname !== nextLocation.pathname);
+  // Handle in-app navigation
+  const blocker = useBlocker(
+    ({ currentLocation, nextLocation }) =>
+      isEditingCosts && currentLocation.pathname !== nextLocation.pathname
+  );
 
-  const handleConfirmNavigation = () => { if (blocker.state === 'blocked') blocker.proceed?.(); };
-  const handleCancelNavigation = () => { if (blocker.state === 'blocked') { scanResultRef.current?.saveCosts(); setIsEditingCosts(false); blocker.reset?.(); } };
+  const handleConfirmNavigation = () => {
+    if (blocker.state === 'blocked') {
+      blocker.proceed?.();
+    }
+  };
+
+  const handleCancelNavigation = () => {
+    if (blocker.state === 'blocked') {
+      scanResultRef.current?.saveCosts();
+      setIsEditingCosts(false);
+      blocker.reset?.();
+    }
+  };
 
   const costSettings = tenant?.cost_settings || DEFAULT_COST_SETTINGS;
 
-  const handleSignOut = async () => { try { await signOut(); navigate('/signin'); } catch (e) { console.error(e); } };
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+
 
   const handleScan = async (customRadius?: number) => {
     if (!vin || !user?.tenant_id) return;
+
     setLoading(true);
     setError(null);
+
     try {
+      // Step 1: Decode VIN
       const decodedResult = await decodeVIN(vin);
+
       if (!decodedResult.success || !decodedResult.data) {
         setError(decodedResult.error || 'Failed to decode VIN');
         setLoading(false);
         return;
       }
-      const enrichedData = enrichDecodedData(decodedResult.data, { mileage: mileage ? parseInt(mileage) : undefined });
+
+      // Enrich with user-provided mileage
+      const enrichedData = enrichDecodedData(decodedResult.data, {
+        mileage: mileage ? parseInt(mileage) : undefined,
+      });
+
+      // Step 2: Get market pricing
+      // Enforce tenant zip code
       if (!tenant?.zip_code) {
-        setError(<span>Missing ZIP Code. Please configure location in <Link to="/settings" className="underline font-black hover:text-primary-500">Settings</Link></span> as any);
+        setError(
+          <span>
+            Missing ZIP Code. Please configure your location in{' '}
+            <Link to="/settings" className="underline font-bold hover:text-red-900">
+              Settings
+            </Link>{' '}
+            to get accurate market data.
+          </span> as any
+        );
         setLoading(false);
         return;
       }
-      const marketData = await getMarketPricing(enrichedData, tenant.zip_code, customRadius || 100);
-      const { data: salesHistory } = await supabase.from('sales_records').select('*').eq('tenant_id', user.tenant_id).order('sale_date', { ascending: false }).limit(100);
-      const salesRecords: SalesRecord[] = salesHistory || [];
-      const maxBid = marketData ? calculateMaxBid(marketData.averagePrice, costSettings.target_margin_percent, costSettings.auction_fee_thresholds || [], costSettings.reconditioning_cost, costSettings.transport_cost) : 0;
-      const recommendation = await generateRecommendation(enrichedData, marketData, salesRecords, maxBid, costSettings.target_margin_percent);
-      const { data: scanData } = await supabase.from('vin_scans').insert({
-        tenant_id: user.tenant_id, user_id: user.id, vin, decoded_data: enrichedData, recommendation: recommendation.recommendation, confidence_score: recommendation.confidenceScore, match_reasoning: recommendation.matchReasons, estimated_profit: recommendation.estimatedProfit, max_bid_suggestion: recommendation.maxBidSuggestion, market_data: marketData, saved_to_bid_list: false, costs_edited: false,
-      }).select().single();
 
+      const marketData = await getMarketPricing(enrichedData, tenant.zip_code, customRadius || 100);
+
+      // If no market data, we still proceed but with limited info
+      if (!marketData) {
+        console.warn('Market data unavailable, proceeding with limited analysis');
+      }
+
+      // Step 3: Get dealer's sales history for this vehicle type
+      const { data: salesHistory, error: salesError } = await supabase
+        .from('sales_records')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .order('sale_date', { ascending: false })
+        .limit(100);
+
+      if (salesError) {
+        console.error('Error fetching sales history:', salesError);
+      }
+
+      const salesRecords: SalesRecord[] = salesHistory || [];
+
+      // Step 4: Calculate max bid
+      const maxBid = marketData ? calculateMaxBid(
+        marketData.averagePrice,
+        costSettings.target_margin_percent,
+        costSettings.auction_fee_thresholds || [],
+        costSettings.reconditioning_cost,
+        costSettings.transport_cost
+      ) : 0;
+
+      // Step 5: Generate recommendation
+      const recommendation = await generateRecommendation(
+        enrichedData,
+        marketData,
+        salesRecords,
+        maxBid,
+        costSettings.target_margin_percent
+      );
+
+      // Step 6: Save scan to database
+      const { data: scanData, error: scanError } = await supabase
+        .from('vin_scans')
+        .insert({
+          tenant_id: user.tenant_id,
+          user_id: user.id,
+          vin: vin,
+          decoded_data: enrichedData,
+          recommendation: recommendation.recommendation,
+          confidence_score: recommendation.confidenceScore,
+          match_reasoning: recommendation.matchReasons,
+          estimated_profit: recommendation.estimatedProfit,
+          max_bid_suggestion: recommendation.maxBidSuggestion,
+          market_data: marketData, // Save market data for history
+          saved_to_bid_list: false,
+          // Initialize custom costs as null - will be set if user edits
+          custom_auction_fee_percent: null,
+          custom_recon_cost: null,
+          custom_transport_cost: null,
+          custom_max_bid: null,
+          custom_market_price: null,
+          costs_edited: false,
+        })
+        .select()
+        .single();
+
+      if (scanError) {
+        console.error('Error saving scan:', scanError);
+        // Don't fail the whole process if save fails
+      }
+
+      // Display results
       setResult({
-        decoded_data: enrichedData, recommendation: recommendation.recommendation, confidence_score: recommendation.confidenceScore, match_reasoning: recommendation.matchReasons, estimated_profit: recommendation.estimatedProfit, max_bid_suggestion: recommendation.maxBidSuggestion, estimated_days_to_sale: recommendation.estimatedDaysToSale, market_data: marketData, scan_id: scanData?.id, radius: customRadius || 100,
+        decoded_data: enrichedData,
+        recommendation: recommendation.recommendation,
+        confidence_score: recommendation.confidenceScore,
+        match_reasoning: recommendation.matchReasons,
+        estimated_profit: recommendation.estimatedProfit,
+        max_bid_suggestion: recommendation.maxBidSuggestion,
+        estimated_days_to_sale: recommendation.estimatedDaysToSale,
+        market_data: marketData,
+        scan_id: scanData?.id,
+        radius: customRadius || 100,
       });
-    } catch (e: any) {
-      setError(e.message || 'Analysis encountered a matrix error');
+    } catch (error) {
+      console.error('Error scanning VIN:', error);
+      setError(error instanceof Error ? error.message : 'An unexpected error occurred');
     } finally {
       setLoading(false);
     }
@@ -104,162 +224,254 @@ export default function VINScanPage() {
 
   const handleRescan = async (radius: number) => {
     if (!result?.decoded_data || !user?.tenant_id || !tenant?.zip_code) return;
-    setLoading(true);
-    try {
-      const marketData = await getMarketPricing(result.decoded_data, tenant.zip_code, radius);
-      const maxBid = marketData ? calculateMaxBid(marketData.averagePrice, costSettings.target_margin_percent, costSettings.auction_fee_thresholds || [], costSettings.reconditioning_cost, costSettings.transport_cost) : 0;
-      const { data: salesHistory } = await supabase.from('sales_records').select('*').eq('tenant_id', user.tenant_id).order('sale_date', { ascending: false }).limit(100);
-      const recommendation = await generateRecommendation(result.decoded_data, marketData, salesHistory || [], maxBid, costSettings.target_margin_percent);
 
+    setLoading(true);
+
+    try {
+      // Re-fetch market data with new radius
+      const marketData = await getMarketPricing(result.decoded_data, tenant.zip_code, radius);
+
+      // Recalculate max bid with new market data
+      const maxBid = marketData ? calculateMaxBid(
+        marketData.averagePrice,
+        costSettings.target_margin_percent,
+        costSettings.auction_fee_thresholds || [],
+        costSettings.reconditioning_cost,
+        costSettings.transport_cost
+      ) : 0;
+
+      // Fetch sales history again for recommendation
+      const { data: salesHistory } = await supabase
+        .from('sales_records')
+        .select('*')
+        .eq('tenant_id', user.tenant_id)
+        .order('sale_date', { ascending: false })
+        .limit(100);
+
+      const salesRecords: SalesRecord[] = salesHistory || [];
+
+      // Re-generate recommendation with new market data
+      const recommendation = await generateRecommendation(
+        result.decoded_data,
+        marketData,
+        salesRecords,
+        maxBid,
+        costSettings.target_margin_percent
+      );
+
+      // If expansion returns NO results but we ALREADY HAD results, 
+      // something probably went wrong with the wider search (API limit or error).
+      // We should keep the previous results instead of showing nothing.
       if ((!marketData || marketData.listingsCount === 0) && result.market_data?.listingsCount > 0) {
-        toast.error(`No additional telemetry units found within ${radius}mi.`);
-        setResult({ ...result, radius });
+        toast.error(`No additional vehicles found within ${radius} miles. Keeping previous results.`);
+        setResult({
+          ...result,
+          radius: radius, // Mark as expanded so we don't ask again
+        });
         setLoading(false);
         return;
       }
-      setResult({ ...result, market_data: marketData, max_bid_suggestion: recommendation.maxBidSuggestion, estimated_profit: recommendation.estimatedProfit, recommendation: recommendation.recommendation, confidence_score: recommendation.confidenceScore, match_reasoning: recommendation.matchReasons, estimated_days_to_sale: recommendation.estimatedDaysToSale, radius });
+
+      // Update result with new market data
+      setResult({
+        ...result,
+        market_data: marketData,
+        max_bid_suggestion: recommendation.maxBidSuggestion,
+        estimated_profit: recommendation.estimatedProfit,
+        recommendation: recommendation.recommendation,
+        confidence_score: recommendation.confidenceScore,
+        match_reasoning: recommendation.matchReasons,
+        estimated_days_to_sale: recommendation.estimatedDaysToSale,
+        radius: radius,
+      });
+
+      // Update database with new market data if scan_id exists
       if (result.scan_id) {
-        await supabase.from('vin_scans').update({ market_data: marketData, max_bid_suggestion: recommendation.maxBidSuggestion, estimated_profit: recommendation.estimatedProfit, recommendation: recommendation.recommendation, confidence_score: recommendation.confidenceScore, match_reasoning: recommendation.matchReasons }).eq('id', result.scan_id);
+        await supabase
+          .from('vin_scans')
+          .update({
+            market_data: marketData,
+            max_bid_suggestion: recommendation.maxBidSuggestion,
+            estimated_profit: recommendation.estimatedProfit,
+            recommendation: recommendation.recommendation,
+            confidence_score: recommendation.confidenceScore,
+            match_reasoning: recommendation.matchReasons,
+          })
+          .eq('id', result.scan_id);
       }
-    } catch (e) { console.error(e); } finally { setLoading(false); }
+    } catch (error) {
+      console.error('Error rescanning with expanded radius:', error);
+    } finally {
+      setLoading(false);
+    }
   };
 
   if (result) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
-        <Header user={user} tenant={tenant} signOut={handleSignOut} menuOpen={menuOpen} setMenuOpen={setMenuOpen} onScanVinClick={() => { if (isEditingCosts) setPendingReset(true); else resetScan(); }} />
+      <div className="min-h-screen bg-gray-50">
+        {/* Header */}
+        <Header
+          user={user}
+          tenant={tenant}
+          signOut={handleSignOut}
+          menuOpen={menuOpen}
+          setMenuOpen={setMenuOpen}
+          onScanVinClick={() => {
+            if (isEditingCosts) {
+              setPendingReset(true);
+            } else {
+              resetScan();
+            }
+          }}
+        />
+
         <VINScanResult
           scanData={{
-            id: result.scan_id, decoded_data: result.decoded_data, market_data: result.market_data, recommendation: result.recommendation, confidence_score: result.confidence_score, match_reasoning: result.match_reasoning, estimated_profit: result.estimated_profit, max_bid_suggestion: result.max_bid_suggestion, estimated_days_to_sale: result.estimated_days_to_sale, radius: result.radius,
-            custom_recon_cost: result.custom_recon_cost, custom_transport_cost: result.custom_transport_cost, custom_max_bid: result.custom_max_bid, custom_market_price: result.custom_market_price,
+            id: result.scan_id,
+            decoded_data: result.decoded_data,
+            market_data: result.market_data,
+            recommendation: result.recommendation,
+            confidence_score: result.confidence_score,
+            match_reasoning: result.match_reasoning,
+            estimated_profit: result.estimated_profit,
+            max_bid_suggestion: result.max_bid_suggestion,
+            estimated_days_to_sale: result.estimated_days_to_sale,
+            radius: result.radius,
+            custom_recon_cost: result.custom_recon_cost,
+            custom_transport_cost: result.custom_transport_cost,
+            custom_max_bid: result.custom_max_bid,
+            custom_market_price: result.custom_market_price,
           }}
-          costSettings={costSettings} tenantZipCode={tenant?.zip_code} onRescan={handleRescan} onScanAnother={() => { setResult(null); setVin(''); setMileage(''); setError(null); setIsEditingCosts(false); }} onEditStatusChange={setIsEditingCosts} onOutsideClick={() => setPendingReset(true)} ref={scanResultRef} isEditing={isEditingCosts}
+          costSettings={costSettings}
+          tenantZipCode={tenant?.zip_code}
+          onRescan={handleRescan}
+          onScanAnother={() => {
+            setResult(null);
+            setVin('');
+            setMileage('');
+            setError(null);
+            setIsEditingCosts(false);
+          }}
+          onEditStatusChange={setIsEditingCosts}
+          onOutsideClick={() => setPendingReset(true)}
+          ref={scanResultRef}
+          isEditing={isEditingCosts}
         />
-        <ConfirmationDialog isOpen={blocker.state === 'blocked'} onConfirm={handleConfirmNavigation} onCancel={handleCancelNavigation} confirmLabel="Abandon & Discard" cancelLabel="Commit & Stay" />
-        <ConfirmationDialog isOpen={pendingReset} onConfirm={resetScan} onCancel={() => { scanResultRef.current?.saveCosts(); setIsEditingCosts(false); setPendingReset(false); }} confirmLabel="Discard & Scan New" cancelLabel="Commit & Stay" message="Uncommitted tactical cost parameters detected. Discard data set?" />
+
+        {/* Navigation Warning Dialog */}
+        <ConfirmationDialog
+          isOpen={blocker.state === 'blocked'}
+          onConfirm={handleConfirmNavigation}
+          onCancel={handleCancelNavigation}
+          confirmLabel="Leave & Discard"
+          cancelLabel="Save and Stay"
+        />
+
+        {/* Discard Changes Warning Dialog (for clicks and resets) */}
+        <ConfirmationDialog
+          isOpen={pendingReset}
+          onConfirm={resetScan}
+          onCancel={() => {
+            scanResultRef.current?.saveCosts();
+            setIsEditingCosts(false);
+            setPendingReset(false);
+          }}
+          confirmLabel="Discard & Scan Another"
+          cancelLabel="Save and Stay"
+          message="You have unsaved changes in the profit calculator. How would you like to proceed?"
+        />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
-      {/* Mesh Gradient Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 dark:bg-primary-500/20 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-500/10 dark:bg-secondary-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <Header
+        user={user}
+        tenant={tenant}
+        signOut={handleSignOut}
+        menuOpen={menuOpen}
+        setMenuOpen={setMenuOpen}
+        onScanVinClick={() => {
+          if (isEditingCosts) {
+            setPendingReset(true);
+          } else {
+            resetScan();
+          }
+        }}
+      />
 
-      <Header user={user} tenant={tenant} signOut={handleSignOut} menuOpen={menuOpen} setMenuOpen={setMenuOpen} onScanVinClick={() => { if (isEditingCosts) setPendingReset(true); else resetScan(); }} />
-
-      <div className="flex-1 flex flex-col items-center justify-center px-6 py-20 relative z-10">
-        <div className="max-w-xl w-full text-center">
-          <div className="mb-12">
-            <div className="relative inline-block mb-8">
-              <div className="absolute inset-0 bg-primary-500/20 blur-2xl rounded-full" />
-              <div className="relative bg-primary-500 p-5 rounded-3xl shadow-glow-primary">
-                <Target className="h-10 w-10 text-white" />
-              </div>
+      <div className="flex-1 flex items-center justify-center px-4 py-12">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Target className="h-8 w-8 text-blue-900" />
             </div>
-            <h1 className="text-4xl sm:text-5xl font-black text-slate-900 dark:text-white mb-4 tracking-tighter uppercase italic">
-              Tactical <span className="text-primary-500">Analysis</span>
-            </h1>
-            <p className="text-xs font-black text-slate-500 uppercase tracking-widest max-w-sm mx-auto leading-relaxed">
-              Inject VIN telemetry for real-time buy/pass intelligence guidace
+            <h2 className="text-3xl font-bold text-gray-900">Scan VIN</h2>
+            <p className="text-gray-600 mt-2">
+              Enter a VIN to get instant AI-powered buy/no-buy guidance
             </p>
           </div>
 
-          <GlassCard className="p-8 sm:p-12">
-            <div className="space-y-6">
-              {error && (
-                <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-[10px] font-black uppercase tracking-widest text-left flex items-start gap-3">
-                  <AlertCircle size={16} className="shrink-0" />
-                  {error}
-                </div>
-              )}
-
-              <div className="space-y-2 text-left">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Asset Serial (VIN)</label>
-                <div className="relative group">
-                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
-                  <input
-                    type="text"
-                    value={vin}
-                    onChange={(e) => setVin(e.target.value.toUpperCase())}
-                    placeholder="1HGCV1F3..."
-                    maxLength={17}
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-mono font-bold focus:ring-2 focus:ring-primary-500 transition-all outline-none"
-                    disabled={loading}
-                  />
-                </div>
+          <div className="bg-white rounded-lg shadow-sm p-8">
+            {error && (
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-800 text-sm">
+                {error}
               </div>
+            )}
 
-              <div className="space-y-2 text-left">
-                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 ml-1">Wear Factor (Mileage)</label>
-                <div className="relative group">
-                  <Gauge className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400 group-focus-within:text-primary-500 transition-colors" />
-                  <input
-                    type="number"
-                    value={mileage}
-                    onChange={(e) => setMileage(e.target.value)}
-                    placeholder="e.g. 45000"
-                    className="w-full pl-12 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-slate-900 dark:text-white font-bold focus:ring-2 focus:ring-primary-500 transition-all outline-none"
-                    disabled={loading}
-                  />
-                </div>
-              </div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Vehicle Identification Number (VIN)
+            </label>
+            <input
+              type="text"
+              value={vin}
+              onChange={(e) => setVin(e.target.value.toUpperCase())}
+              placeholder="1HGCV1F30LA012345"
+              maxLength={17}
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 mb-4 font-mono"
+              disabled={loading}
+            />
+            <p className="text-xs text-gray-500 mb-4">Enter 17-character VIN number</p>
 
-              <button
-                onClick={() => handleScan()}
-                disabled={vin.length !== 17 || loading}
-                className="w-full bg-primary-500 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs hover:shadow-glow-primary transition-all disabled:opacity-50 flex items-center justify-center gap-3 shadow-lg shadow-primary-500/20 group"
-              >
-                {loading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Target className="h-5 w-5 group-hover:scale-110 transition-transform" />}
-                {loading ? 'Synthesizing...' : 'Execute Analysis'}
-              </button>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Mileage (optional)
+            </label>
+            <input
+              type="number"
+              value={mileage}
+              onChange={(e) => setMileage(e.target.value)}
+              placeholder="e.g., 45000"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 mb-4"
+              disabled={loading}
+            />
+            <p className="text-xs text-gray-500 mb-6">
+              Providing mileage improves accuracy of recommendations
+            </p>
 
-              <div className="pt-8 border-t border-slate-100 dark:border-white/5 grid grid-cols-2 gap-4">
-                {[
-                  { icon: ShieldCheck, text: 'Confidence Score' },
-                  { icon: Database, text: 'Market Delta' },
-                  { icon: DollarSign, text: 'Profit Matrix' },
-                  { icon: LayoutDashboard, text: 'Competitor Intel' },
-                ].map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 opacity-50">
-                    <item.icon size={12} className="text-primary-500" />
-                    <span className="text-[9px] font-black uppercase tracking-widest text-slate-500">{item.text}</span>
-                  </div>
-                ))}
-              </div>
+            <button
+              onClick={() => handleScan()}
+              disabled={vin.length !== 17 || loading}
+              className="w-full bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+            >
+              {loading && <Loader2 className="h-5 w-5 animate-spin" />}
+              {loading ? 'Analyzing Vehicle...' : 'Analyze Vehicle'}
+            </button>
+
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg text-sm text-gray-600">
+              <p className="font-semibold mb-2">What you'll get:</p>
+              <ul className="space-y-1">
+                <li>✓ Complete vehicle decode and specifications</li>
+                <li>✓ Market pricing analysis</li>
+                <li>✓ Buy/Caution/Pass recommendation</li>
+                <li>✓ Profit calculator with your costs</li>
+                <li>✓ AI-powered confidence score</li>
+              </ul>
             </div>
-          </GlassCard>
-
-          <Link to="/dashboard" className="inline-flex items-center gap-2 mt-8 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary-500 transition-colors">
-            <ArrowRight size={14} className="rotate-180" />
-            Abort to Deck
-          </Link>
+          </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function AlertCircle(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <line x1="12" y1="8" x2="12" y2="12" />
-      <line x1="12" y1="16" x2="12.01" y2="16" />
-    </svg>
   );
 }

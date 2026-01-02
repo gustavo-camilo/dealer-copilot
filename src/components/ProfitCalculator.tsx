@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { Edit2, Loader2, RotateCcw, Save, DollarSign, BarChart3, Gauge, Target, TrendingDown } from 'lucide-react';
+import { Edit2, Loader2, RotateCcw, Save } from 'lucide-react';
 
 import { AuctionFeeThreshold } from '../types/database';
 import { calculateAuctionFee } from '../services/marketPricing';
@@ -64,32 +64,65 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
   useImperativeHandle(ref, () => ({
     save: () => {
       if (onSave) {
-        onSave({ recon: reconCost, transport: transportCost, maxBid, marketPrice });
+        onSave({
+          recon: reconCost,
+          transport: transportCost,
+          maxBid,
+          marketPrice
+        });
       }
-      setIsEditing(false);
+      setIsEditing(false); // Reset to view mode after save
     }
   }), [onSave, reconCost, transportCost, maxBid, marketPrice]);
 
-  useEffect(() => { if (isEditingProp !== undefined) setIsEditing(isEditingProp); }, [isEditingProp]);
-  useEffect(() => { if (onEditStatusChange) onEditStatusChange(isEditing); }, [isEditing, onEditStatusChange]);
+  // Sync isEditing with prop
+  useEffect(() => {
+    if (isEditingProp !== undefined) {
+      setIsEditing(isEditingProp);
+    }
+  }, [isEditingProp]);
 
+  // Notify parent of isEditing change
+  useEffect(() => {
+    if (onEditStatusChange) {
+      onEditStatusChange(isEditing);
+    }
+  }, [isEditing, onEditStatusChange]);
+
+  // Handle click away
   useEffect(() => {
     const handleClickAway = (event: MouseEvent) => {
       if (isEditing && containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        if (onOutsideClick) onOutsideClick();
+        if (onOutsideClick) {
+          onOutsideClick();
+        }
       }
     };
+
     document.addEventListener('mousedown', handleClickAway);
-    return () => document.removeEventListener('mousedown', handleClickAway);
+    return () => {
+      document.removeEventListener('mousedown', handleClickAway);
+    };
   }, [isEditing]);
 
+  // Calculate auction fee (use custom if set, otherwise calculate from thresholds based on current maxBid)
   const calculatedAuctionFee = calculateAuctionFee(maxBid, auctionFeeThresholds);
   const auctionFee = customAuctionFee !== null ? customAuctionFee : calculatedAuctionFee;
-  const costsEdited = maxBid !== defaultMaxBid || customAuctionFee !== null || reconCost !== defaultRecon || transportCost !== defaultTransport || marketPrice !== defaultMarketPrice;
+
+  // Track if any costs were edited
+  const costsEdited =
+    maxBid !== defaultMaxBid ||
+    customAuctionFee !== null ||
+    reconCost !== defaultRecon ||
+    transportCost !== defaultTransport ||
+    marketPrice !== defaultMarketPrice;
+
+  // Calculate derived values
   const totalCost = maxBid + auctionFee + reconCost + transportCost;
   const estimatedProfit = marketPrice - totalCost;
   const profitMargin = totalCost > 0 ? ((estimatedProfit / totalCost) * 100) : 0;
 
+  // Reset to defaults
   const resetToDefaults = () => {
     setMaxBid(defaultMaxBid);
     setCustomAuctionFee(null);
@@ -98,111 +131,192 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
     setMarketPrice(defaultMarketPrice);
   };
 
+  // Notify parent of cost changes
   useEffect(() => {
     if (onCostsChange) {
-      onCostsChange({ auctionFee, recon: reconCost, transport: transportCost, maxBid, marketPrice, totalCost, estimatedProfit, costsEdited });
+      onCostsChange({
+        auctionFee: auctionFee, // Pass the actual fee amount
+        recon: reconCost,
+        transport: transportCost,
+        maxBid,
+        marketPrice,
+        totalCost,
+        estimatedProfit,
+        costsEdited,
+      });
     }
   }, [maxBid, auctionFee, reconCost, transportCost, marketPrice, totalCost, estimatedProfit, costsEdited, onCostsChange]);
 
-  const formatCurrency = (v: number) => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(v);
-
   return (
-    <div ref={containerRef} className="bg-white/50 dark:bg-black/20 backdrop-blur-xl rounded-3xl border border-slate-200/50 dark:border-white/5 overflow-hidden">
-      <div className="p-8 border-b border-slate-100 dark:border-white/5 flex justify-between items-center">
-        <div className="flex items-center gap-4">
-          <div className="p-3 bg-primary-500/10 rounded-2xl">
-            <DollarSign size={20} className="text-primary-500" />
-          </div>
-          <h3 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">Financial <span className="text-primary-500">Calculator</span></h3>
+    <div ref={containerRef} className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="flex justify-between items-center mb-4">
+        <div className="flex items-center gap-2">
+          <h3 className="font-bold text-gray-900">💰 Profit Calculator</h3>
+          {costsEdited && (
+            <span className="px-2 py-0.5 bg-yellow-100 text-yellow-800 text-xs font-medium rounded">
+              Edited
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-3">
-          {isSaving && <div className="flex items-center gap-2 text-[8px] font-black uppercase text-primary-500 animate-pulse"><Loader2 size={12} className="animate-spin" /> Syncing...</div>}
-          <div className="flex bg-slate-100 dark:bg-white/5 p-1.5 rounded-2xl gap-1">
-            <button onClick={() => { if (isEditing && onSave) onSave({ recon: reconCost, transport: transportCost, maxBid, marketPrice }); setIsEditing(!isEditing); }} className={`p-2.5 rounded-xl transition-all ${isEditing ? 'bg-primary-500 text-white shadow-glow-primary' : 'text-slate-400 hover:text-slate-600 dark:hover:text-white'}`}>
-              {isEditing ? <Save size={16} /> : <Edit2 size={16} />}
+          {isSaving && (
+            <div className="flex items-center gap-1.5 text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-[10px] items-center">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              <span>Saving...</span>
+            </div>
+          )}
+          {costsEdited && (
+            <button
+              onClick={resetToDefaults}
+              className="p-1.5 text-gray-500 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors"
+              title="Reset to Defaults"
+            >
+              <RotateCcw className="h-4 w-4" />
             </button>
-            {costsEdited && (
-              <button onClick={resetToDefaults} className="p-2.5 rounded-xl text-slate-400 hover:text-secondary-500 transition-all">
-                <RotateCcw size={16} />
-              </button>
+          )}
+          <button
+            onClick={() => {
+              if (isEditing && onSave) {
+                onSave({
+                  recon: reconCost,
+                  transport: transportCost,
+                  maxBid,
+                  marketPrice
+                });
+              }
+              setIsEditing(!isEditing);
+            }}
+            className={`text-sm flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${isEditing
+              ? 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+              : 'text-blue-900 hover:text-blue-700 hover:bg-blue-50'
+              }`}
+          >
+            {isEditing ? (
+              <Save className="h-4 w-4" />
+            ) : (
+              <Edit2 className="h-4 w-4" />
             )}
-          </div>
+            <span className="font-semibold">{isEditing ? 'Save' : 'Edit'}</span>
+          </button>
         </div>
       </div>
 
-      <div className="p-8 grid md:grid-cols-2 gap-12">
-        <div className="space-y-6">
-          {[
-            { label: 'Buy Bid (Max)', value: maxBid, setter: setMaxBid, icon: Target },
-            { label: 'Auction Protocol', value: auctionFee, setter: setCustomAuctionFee, icon: Gauge },
-            { label: 'Recon & Detail', value: reconCost, setter: setReconCost, icon: BarChart3 },
-            { label: 'Transport Log', value: transportCost, setter: setTransportCost, icon: TrendingDown },
-          ].map((item, i) => (
-            <div key={i} className="group relative">
-              <div className="flex justify-between items-center mb-2 px-1">
-                <label className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                  <item.icon size={10} className="text-primary-500" /> {item.label}
-                </label>
-              </div>
-              {isEditing ? (
-                <div className="relative">
-                  <span className="absolute left-5 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">$</span>
-                  <input type="number" value={item.value} onChange={(e) => item.setter(Number(e.target.value))} className="w-full pl-10 pr-4 py-4 bg-slate-50 dark:bg-black/20 border border-slate-200 dark:border-white/5 rounded-2xl text-[10px] font-black tracking-widest uppercase outline-none focus:ring-2 focus:ring-primary-500 transition-all text-slate-900 dark:text-white" />
-                </div>
-              ) : (
-                <div className="px-6 py-4 bg-slate-50 dark:bg-white/5 rounded-2xl border border-transparent flex justify-between items-center">
-                  <span className="text-xl font-black text-slate-900 dark:text-white">{formatCurrency(item.value)}</span>
-                </div>
-              )}
-            </div>
-          ))}
+      <div className="space-y-3">
+        {/* Max Bid */}
+        <div className="flex justify-between items-center">
+          <span className="text-gray-600 font-medium">Suggested Max Bid</span>
+          {isEditing ? (
+            <input
+              type="number"
+              value={maxBid}
+              onChange={(e) => setMaxBid(Number(e.target.value))}
+              className="w-32 px-3 py-1 border border-gray-300 rounded text-right font-semibold"
+            />
+          ) : (
+            <span className="font-semibold">${maxBid.toLocaleString()}</span>
+          )}
         </div>
 
-        <div className="space-y-6">
-          <div className="bg-primary-500/5 dark:bg-primary-500/10 rounded-3xl p-8 border border-primary-500/10 relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-              <DollarSign size={120} />
-            </div>
-            <div className="relative z-10">
-              <div className="text-[10px] font-black uppercase tracking-widest text-primary-500 mb-6 flex justify-between items-center">
-                Total Investment Phase
-                <div className="px-3 py-1 bg-primary-500 text-white rounded-lg">LIVE DELTA</div>
-              </div>
-              <div className="text-5xl font-black text-slate-900 dark:text-white tracking-tighter mb-4 italic">{formatCurrency(totalCost)}</div>
-              <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">Aggregated costs for current acquisition protocol</p>
-            </div>
-          </div>
+        {/* Auction Fee */}
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-600">+ Auction Fee</span>
+          {isEditing ? (
+            <input
+              type="number"
+              value={customAuctionFee !== null ? customAuctionFee : calculatedAuctionFee}
+              onChange={(e) => setCustomAuctionFee(Number(e.target.value))}
+              className="w-24 px-3 py-1 border border-gray-300 rounded text-right"
+              placeholder="Custom Fee"
+            />
+          ) : (
+            <span className="font-medium">${auctionFee.toLocaleString()}</span>
+          )}
+        </div>
+        {/* Recon Cost */}
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-600">+ Recon/Detail</span>
+          {isEditing ? (
+            <input
+              type="number"
+              value={reconCost}
+              onChange={(e) => setReconCost(Number(e.target.value))}
+              className="w-24 px-3 py-1 border border-gray-300 rounded text-right"
+            />
+          ) : (
+            <span className="font-medium">${reconCost.toLocaleString()}</span>
+          )}
+        </div>
 
-          <div className="grid grid-cols-2 gap-6">
-            <div className="bg-slate-50 dark:bg-white/5 rounded-3xl p-6 border border-slate-100 dark:border-white/5">
-              <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-3">Gross Alpha</div>
-              <div className={`text-2xl font-black tracking-tight ${estimatedProfit > 0 ? 'text-primary-500' : 'text-red-500'}`}>{formatCurrency(estimatedProfit)}</div>
-            </div>
-            <div className="bg-slate-50 dark:bg-white/5 rounded-3xl p-6 border border-slate-100 dark:border-white/5">
-              <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-3">Yield Matrix</div>
-              <div className="text-2xl font-black text-slate-900 dark:text-white tracking-tight">{profitMargin.toFixed(1)}%</div>
-            </div>
-          </div>
+        {/* Transport Cost */}
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-600">+ Transport</span>
+          {isEditing ? (
+            <input
+              type="number"
+              value={transportCost}
+              onChange={(e) => setTransportCost(Number(e.target.value))}
+              className="w-24 px-3 py-1 border border-gray-300 rounded text-right"
+            />
+          ) : (
+            <span className="font-medium">${transportCost.toLocaleString()}</span>
+          )}
+        </div>
 
-          <div className="p-6 bg-slate-900 dark:bg-white rounded-3xl flex items-center justify-between">
-            <div>
-              <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">Market Retail Reference</div>
-              {isEditing ? (
-                <div className="relative mt-2">
-                  <span className="absolute left-4 top-1/2 -translate-y-1/2 text-[10px] font-black text-slate-400">$</span>
-                  <input type="number" value={marketPrice} onChange={(e) => setMarketPrice(Number(e.target.value))} className="w-40 pl-8 pr-4 py-2 bg-white/10 dark:bg-slate-900/10 border border-white/20 dark:border-slate-900/20 rounded-xl text-[10px] font-black tracking-widest uppercase outline-none focus:ring-2 focus:ring-primary-500 transition-all text-white dark:text-slate-900" />
-                </div>
-              ) : (
-                <div className="text-xl font-black text-white dark:text-slate-900 tracking-tight">{formatCurrency(marketPrice)}</div>
-              )}
-            </div>
-            <div className="text-right">
-              <div className="text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">ROI Index</div>
-              <div className="text-xl font-black text-primary-500 tracking-tight">{((estimatedProfit / totalCost) * 100).toFixed(1)}%</div>
-            </div>
+        {/* Total Investment */}
+        <div className="border-t pt-3">
+          <div className="flex justify-between font-semibold">
+            <span>Total Investment</span>
+            <span>${totalCost.toLocaleString()}</span>
           </div>
+        </div>
+
+        {/* Market Retail */}
+        <div className="flex justify-between items-center text-sm">
+          <span className="text-gray-600">Market Retail Price</span>
+          {isEditing ? (
+            <input
+              type="number"
+              value={marketPrice}
+              onChange={(e) => setMarketPrice(Number(e.target.value))}
+              className="w-32 px-3 py-1 border border-gray-300 rounded text-right font-medium"
+            />
+          ) : (
+            <span className="font-medium">${marketPrice.toLocaleString()}</span>
+          )}
+        </div>
+
+        {/* Expected Gross Profit */}
+        <div
+          className={`flex justify-between text-lg font-bold pt-2 border-t ${estimatedProfit >= 1500
+            ? 'text-green-600'
+            : estimatedProfit >= 800
+              ? 'text-yellow-600'
+              : 'text-red-600'
+            }`}
+        >
+          <span>Expected Gross Profit</span>
+          <span>${estimatedProfit.toLocaleString()}</span>
+        </div>
+
+        {/* Profit Margin */}
+        <div className="flex justify-between text-sm text-gray-600">
+          <span>Profit Margin</span>
+          <span className="font-medium">{profitMargin.toFixed(1)}%</span>
+        </div>
+
+        {/* ROI */}
+        <div className="flex justify-between text-sm text-gray-600">
+          <span>Return on Investment (ROI)</span>
+          <span className="font-medium">{((estimatedProfit / totalCost) * 100).toFixed(1)}%</span>
         </div>
       </div>
+
+      {isEditing && (
+        <div className="mt-4 p-3 bg-blue-50 rounded-lg text-sm text-blue-900">
+          💡 Tip: Adjust costs based on this specific vehicle's needs. Your changes only apply to
+          this scan.
+        </div>
+      )}
     </div>
   );
 });

@@ -1,176 +1,427 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { CheckCircle, Target, Clock, RefreshCw, AlertCircle, ChevronRight, Globe, Database, ArrowLeft, Mail, ShieldCheck, Zap, Rocket, BarChart3, TrendingUp } from 'lucide-react';
-import GlassCard from '../components/ui/GlassCard';
-import Header from '../components/Header';
+import { CheckCircle, Target, Clock, RefreshCw, AlertCircle, Menu, X } from 'lucide-react';
+import NavigationMenu from '../components/NavigationMenu';
+
+interface ScrapingResult {
+  tenant_id: string;
+  tenant_name: string;
+  website_url: string;
+  vehicles_found: number;
+  new_vehicles: number;
+  updated_vehicles: number;
+  sold_vehicles: number;
+  status: 'success' | 'partial' | 'failed';
+  error?: string;
+  duration_ms: number;
+}
 
 export default function OnboardingPage() {
-  const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [step, setStep] = useState(1);
-  const [analyzing, setAnalyzing] = useState(false);
+  const location = useLocation();
+  const { tenant, user, signOut } = useAuth();
+  const [step, setStep] = useState<'input' | 'analyzing' | 'complete' | 'error'>('input');
+  const [websiteUrl, setWebsiteUrl] = useState(tenant?.website_url || '');
   const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [error, setError] = useState<string | null>(null);
-  const [analysisComplete, setAnalysisComplete] = useState(false);
+  const [lastScanDate, setLastScanDate] = useState<Date | null>(null);
+  const [vehicleCount, setVehicleCount] = useState(0);
+  const [scrapingResult, setScrapingResult] = useState<ScrapingResult | null>(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [menuOpen, setMenuOpen] = useState(false);
 
   useEffect(() => {
-    if (analyzing) {
-      const interval = setInterval(() => {
-        setAnalysisProgress(prev => {
-          if (prev >= 100) { clearInterval(interval); setAnalysisComplete(true); setAnalyzing(false); return 100; }
-          return prev + 1;
-        });
-      }, 50);
-      return () => clearInterval(interval);
+    loadScanInfo();
+  }, [user]);
+
+  const loadScanInfo = async () => {
+    if (!user?.tenant_id) return;
+
+    // Check if tenant has been scanned before (check inventory_snapshots_unified)
+    const { data: snapshots } = await supabase
+      .from('inventory_snapshots_unified')
+      .select('*')
+      .eq('tenant_id', user.tenant_id)
+      .eq('status', 'success')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (snapshots && snapshots.length > 0) {
+      setLastScanDate(new Date(snapshots[0].created_at));
+      setVehicleCount(snapshots[0].vehicle_count || 0);
     }
-  }, [analyzing]);
+  };
 
-  const handleStartAnalysis = () => { setError(null); setAnalyzing(true); setAnalysisProgress(0); };
+  const handleAnalyze = async () => {
+    if (!websiteUrl || !user?.tenant_id) return;
 
-  if (analysisComplete) {
-    return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
-        <Header user={user} tenant={tenant} signOut={signOut} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
-        <div className="max-w-4xl mx-auto px-6 py-20 relative z-10 text-center">
-          <GlassCard className="p-16">
-            <div className="mb-10 inline-flex p-6 bg-primary-500 rounded-3xl shadow-glow-primary">
-              <CheckCircle size={48} className="text-white" />
+    setStep('analyzing');
+    setAnalysisProgress(0);
+    setErrorMessage('');
+
+    try {
+      // Normalize URL: Strip protocol and www (Domain Only Standard)
+      let cleanUrl = websiteUrl.trim()
+        .replace(/^https?:\/\//i, '')
+        .replace(/^www\./i, '')
+        .replace(/\/+$/, '')
+        .toLowerCase();
+
+      if (!cleanUrl) throw new Error('Please enter a valid website URL.');
+
+      // Update tenant website URL and set inventory status to 'pending'
+      const { error: tenantUpdateError } = await supabase
+        .from('tenants')
+        .update({
+          website_url: cleanUrl,
+          inventory_status: 'pending'
+        })
+        .eq('id', user.tenant_id);
+
+      if (tenantUpdateError) throw tenantUpdateError;
+
+      setAnalysisProgress(50);
+
+      // 2. Resolve or Create Source Registry Entry
+      const { data: sourceData, error: sourceError } = await supabase
+        .from('source_registry')
+        .upsert({
+          source_url: cleanUrl,
+          source_type: 'dealer',
+          source_name: tenant?.name || cleanUrl,
+          scraping_enabled: true
+        }, {
+          onConflict: 'source_url'
+        })
+        .select('id')
+        .single();
+
+      if (sourceError) throw sourceError;
+
+      // 3. Ensure Tenant-Source Link exists
+      await supabase
+        .from('tenant_sources')
+        .upsert({
+          tenant_id: user.tenant_id,
+          source_id: sourceData.id,
+          relationship_type: 'owner'
+        }, {
+          onConflict: 'tenant_id,source_id'
+        });
+
+      setAnalysisProgress(100);
+
+      // Set to complete with waiting message
+      setStep('complete');
+      setScrapingResult({
+        tenant_id: user.tenant_id,
+        tenant_name: tenant?.name || '',
+        website_url: cleanUrl,
+        vehicles_found: 0,
+        new_vehicles: 0,
+        updated_vehicles: 0,
+        sold_vehicles: 0,
+        status: 'success',
+        duration_ms: 0,
+      });
+
+    } catch (error: any) {
+      console.error('Error requesting inventory scan:', error);
+      setStep('error');
+      setErrorMessage(error.message || 'An unexpected error occurred');
+    }
+  };
+
+  const handleSkip = () => {
+    navigate('/dashboard');
+  };
+
+  const handleRetry = () => {
+    setStep('input');
+    setErrorMessage('');
+    setScrapingResult(null);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
+  const renderHeader = () => (
+    <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <Link to="/dashboard" className="flex items-center">
+            <Target className="h-8 w-8 text-blue-900" />
+            <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+          </Link>
+          <div className="flex items-center space-x-4 relative">
+            <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+            <Link
+              to="/scan"
+              className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
+            >
+              Scan VIN
+            </Link>
+            <div className="relative">
+              <button
+                onClick={() => setMenuOpen(!menuOpen)}
+                className="p-2 rounded-lg hover:bg-gray-100 transition"
+                aria-label="Menu"
+              >
+                {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+              </button>
+
+              {menuOpen && (
+                <NavigationMenu
+                  currentPath={location.pathname}
+                  onClose={() => setMenuOpen(false)}
+                  onSignOut={handleSignOut}
+                  user={user}
+                  tenantName={tenant?.name}
+                />
+              )}
             </div>
-            <h1 className="text-5xl font-black text-slate-900 dark:text-white mb-6 uppercase italic tracking-tighter">Sector <span className="text-primary-500">Synchronized</span></h1>
-            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-relaxed mb-12">Registry calibration complete. Your local market delta has been analyzed and mapped to the global sink.</p>
-            <button onClick={() => navigate('/dashboard')} className="px-12 py-5 bg-slate-900 dark:bg-white text-white dark:text-slate-900 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:shadow-glow-primary transition-all flex items-center gap-3 mx-auto">
-              Deploy Terminal <Rocket size={14} />
-            </button>
-          </GlassCard>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (step === 'analyzing') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {renderHeader()}
+        <div className="flex items-center justify-center px-4 py-8">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8">
+            <div className="text-center mb-6">
+              <Target className="h-12 w-12 text-blue-900 mx-auto mb-4 animate-pulse" />
+              <h2 className="text-2xl font-bold text-gray-900">Scanning Your Website</h2>
+              <p className="text-gray-600 mt-2">This may take up to 30 seconds...</p>
+            </div>
+
+            <div className="space-y-3 mb-6">
+              {[
+                { progress: 20, message: 'Connecting to your website' },
+                { progress: 40, message: 'Fetching inventory pages' },
+                { progress: 60, message: 'Extracting vehicle data' },
+                { progress: 80, message: 'Processing vehicle information' },
+                { progress: 100, message: 'Updating your inventory' },
+              ].map((stepData, index) => (
+                <div key={index} className="flex items-center text-sm">
+                  <CheckCircle
+                    className={`h-5 w-5 mr-2 flex-shrink-0 ${analysisProgress >= stepData.progress ? 'text-green-600' : 'text-gray-300'
+                      }`}
+                  />
+                  <span
+                    className={
+                      analysisProgress >= stepData.progress ? 'text-gray-900' : 'text-gray-400'
+                    }
+                  >
+                    {stepData.message}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div
+                className="bg-blue-900 h-3 rounded-full transition-all duration-500"
+                style={{ width: `${analysisProgress}%` }}
+              />
+            </div>
+            <p className="text-center text-sm text-gray-600 mt-2">{analysisProgress}%</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'error') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {renderHeader()}
+        <div className="flex items-center justify-center px-4 py-8">
+          <div className="max-w-md w-full bg-white rounded-lg shadow-sm p-8">
+            <div className="text-center mb-6">
+              <div className="bg-red-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <AlertCircle className="h-10 w-10 text-red-600" />
+              </div>
+              <h2 className="text-2xl font-bold text-gray-900">Scraping Failed</h2>
+              <p className="text-gray-600 mt-2">We couldn't scan your website</p>
+            </div>
+
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-red-800">{errorMessage}</p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={handleRetry}
+                className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition"
+              >
+                Try Again
+              </button>
+              <button
+                onClick={handleSkip}
+                className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition"
+              >
+                Back to Dashboard
+              </button>
+            </div>
+
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">
+                Common Issues:
+              </h3>
+              <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                <li>Website URL is incorrect or inaccessible</li>
+                <li>Website requires authentication</li>
+                <li>Inventory page structure is not recognized</li>
+                <li>Website is blocking automated requests</li>
+              </ul>
+              <p className="text-xs text-gray-500 mt-3">
+                Contact support if you continue to experience issues.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (step === 'complete') {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        {renderHeader()}
+        <div className="flex items-center justify-center px-4 py-8">
+          <div className="max-w-2xl w-full bg-white rounded-lg shadow-sm p-8">
+            <div className="text-center mb-6">
+              <div className="bg-blue-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <RefreshCw className="h-10 w-10 text-blue-600 animate-spin" />
+              </div>
+              <h2 className="text-3xl font-bold text-gray-900">Your inventory is being processed</h2>
+              <p className="text-gray-600 mt-2">This usually takes a few minutes, but it can take up to 2-4 hours. We appreciate your patience.</p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-6 text-center">
+              <p className="text-blue-800 font-medium">You'll be notified when it is ready for you to review.</p>
+            </div>
+
+            <div className="bg-gray-50 rounded-lg p-6 mb-6">
+              <h3 className="font-bold text-gray-900 mb-3">While you wait, you can:</h3>
+              <ul className="space-y-2 text-sm text-gray-700">
+                <li className="flex items-center">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Scan VINs to get instant purchase recommendations
+                </li>
+                <li className="flex items-center">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Set up your default cost settings in Settings
+                </li>
+                <li className="flex items-center">
+                  <span className="text-green-600 mr-2">✓</span>
+                  Explore the dashboard and familiarize yourself with the features
+                </li>
+              </ul>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                onClick={() => navigate('/dashboard')}
+                className="w-full bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 transition"
+              >
+                Go to Dashboard
+              </button>
+              <button
+                onClick={() => navigate('/scan')}
+                className="w-full border border-gray-300 text-gray-700 py-3 rounded-lg font-semibold hover:bg-gray-50 transition flex items-center justify-center gap-2"
+              >
+                <Target className="w-4 h-4" />
+                VIN Scan
+              </button>
+            </div>
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
-      {/* Mesh Gradient Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 dark:bg-primary-500/20 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-500/10 dark:bg-secondary-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
-      </div>
-
-      <Header user={user} tenant={tenant} signOut={signOut} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
-
-      <div className="max-w-7xl mx-auto px-6 py-20 relative z-10">
-        <div className="grid lg:grid-cols-2 gap-20 items-center">
-          <div>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="px-3 py-1 bg-primary-500 text-white text-[8px] font-black uppercase tracking-widest rounded-lg">Phase 01</div>
-              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Protocol Initialization</span>
-            </div>
-            <h1 className="text-5xl md:text-6xl font-black text-slate-900 dark:text-white mb-8 tracking-tighter uppercase italic">
-              Welcome to the <span className="text-primary-500">Registry</span>
-            </h1>
-            <p className="text-sm font-bold text-slate-500 uppercase tracking-widest leading-loose mb-12 max-w-lg">
-              Your dealership profile has been detected. We are ready to initialize your local sector intelligence and calibrate acquisition protocols.
+    <div className="min-h-screen bg-gray-50">
+      {renderHeader()}
+      <div className="flex items-center justify-center px-4 py-8">
+        <div className="max-w-md w-full">
+          <div className="text-center mb-8">
+            <Target className="h-12 w-12 text-blue-900 mx-auto mb-4" />
+            <h2 className="text-3xl font-bold text-gray-900">
+              {lastScanDate ? 'Scan Website Again' : 'Welcome to Dealer Co-Pilot'}
+            </h2>
+            <p className="text-gray-600 mt-2">
+              {lastScanDate
+                ? 'Re-scan your inventory to get the latest data'
+                : "Let's scan your inventory in real-time"}
             </p>
-
-            <div className="space-y-6">
-              {[
-                { label: 'Validated Merchant Identity', icon: ShieldCheck, status: 'Active' },
-                { label: 'Local Sector Telemetry', icon: Globe, status: 'Ready' },
-                { label: 'Inventory Matrix Mapping', icon: Database, status: 'Pending' },
-              ].map((item, i) => (
-                <div key={i} className="flex items-center gap-4 p-4 bg-white/50 dark:bg-white/5 border border-slate-200/50 dark:border-white/5 rounded-2xl">
-                  <div className="p-3 bg-slate-100 dark:bg-white/10 rounded-xl">
-                    <item.icon size={18} className="text-primary-500" />
-                  </div>
-                  <div className="flex-1">
-                    <div className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest">{item.label}</div>
-                    <div className="text-[8px] font-bold text-slate-400 uppercase tracking-[0.2em] mt-1">{item.status}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
           </div>
 
-          <GlassCard className="p-10 md:p-16 flex flex-col items-center text-center">
-            {!analyzing ? (
-              <>
-                <div className="w-24 h-24 bg-primary-500/10 rounded-3xl flex items-center justify-center mb-10 border border-primary-500/20">
-                  <Target size={40} className="text-primary-500" />
-                </div>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4 uppercase italic tracking-tighter">Initialize Analysis</h2>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed mb-12 max-w-xs">
-                  Begin local sector probe to establish baseline acquisition delta and identify predatory opportunities.
-                </p>
-
-                {error && (
-                  <div className="w-full p-4 mb-8 bg-red-500/10 border border-red-500/20 rounded-2xl text-red-500 text-[10px] font-black uppercase tracking-widest flex items-center gap-3">
-                    <AlertCircle size={14} /> {error}
-                  </div>
-                )}
-
-                <button
-                  onClick={handleStartAnalysis}
-                  className="w-full py-6 bg-primary-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:shadow-glow-primary transition-all flex items-center justify-center gap-3 shadow-lg shadow-primary-500/20"
-                >
-                  Execute Probe Protocol <ChevronRight size={14} />
-                </button>
-              </>
-            ) : (
-              <>
-                <div className="relative w-48 h-48 mb-12">
-                  <svg className="w-full h-full rotate-[-90deg]">
-                    <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-100 dark:text-white/5" />
-                    <circle cx="96" cy="96" r="88" stroke="currentColor" strokeWidth="4" fill="transparent" strokeDasharray={553} strokeDashoffset={553 - (553 * analysisProgress) / 100} className="text-primary-500 transition-all duration-300" />
-                  </svg>
-                  <div className="absolute inset-0 flex flex-col items-center justify-center">
-                    <RefreshCw size={32} className="text-primary-500 animate-spin mb-2" />
-                    <div className="text-3xl font-black text-slate-900 dark:text-white tracking-tighter">{analysisProgress}%</div>
-                  </div>
-                </div>
-                <h2 className="text-2xl font-black text-slate-900 dark:text-white mb-4 uppercase italic tracking-tighter">Analyzing Sector</h2>
-                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed mb-10 animate-pulse">
-                  Mapping competitor nodes and establishing price ceilings...
-                </p>
-                <div className="w-full space-y-3">
-                  {[
-                    { label: 'Scraping Registry Data', progress: Math.min(100, analysisProgress * 1.5) },
-                    { label: 'Calculating Market Delta', progress: Math.max(0, Math.min(100, (analysisProgress - 30) * 1.5)) },
-                    { label: 'Calibrating Protocols', progress: Math.max(0, Math.min(100, (analysisProgress - 60) * 2.5)) },
-                  ].map((p, i) => (
-                    <div key={i}>
-                      <div className="flex justify-between text-[8px] font-black uppercase tracking-widest text-slate-400 mb-1">
-                        <span>{p.label}</span>
-                        <span>{Math.floor(p.progress)}%</span>
-                      </div>
-                      <div className="h-1 bg-slate-100 dark:bg-white/5 rounded-full overflow-hidden">
-                        <div className="h-full bg-primary-500 transition-all duration-300" style={{ width: `${p.progress}%` }} />
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </>
-            )}
-          </GlassCard>
-        </div>
-
-        <div className="mt-20 grid md:grid-cols-3 gap-8">
-          {[
-            { title: 'Alpha Tracking', desc: 'Identify extreme market outliers', icon: TrendingUp },
-            { title: 'Predictive Sourcing', icon: Target, desc: 'AI-driven asset recommendations' },
-            { title: 'Sector Monitoring', icon: BarChart3, desc: 'Real-time competitor inventory logs' },
-          ].map((feat, i) => (
-            <div key={i} className="flex gap-4 p-8 bg-white/30 dark:bg-white/5 rounded-3xl border border-slate-200/50 dark:border-white/5 backdrop-blur-sm">
-              <div className="p-3 h-fit bg-primary-500/10 rounded-2xl">
-                <feat.icon size={20} className="text-primary-500" />
+          {lastScanDate && (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <div className="flex items-center text-blue-900 mb-2">
+                <Clock className="h-5 w-5 mr-2" />
+                <span className="font-semibold">Last Scan</span>
               </div>
-              <div>
-                <h4 className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest mb-2">{feat.title}</h4>
-                <p className="text-[9px] font-bold text-slate-500 uppercase tracking-widest leading-relaxed">{feat.desc}</p>
-              </div>
+              <p className="text-sm text-blue-800">
+                {lastScanDate.toLocaleDateString()} at {lastScanDate.toLocaleTimeString()}
+              </p>
+              <p className="text-sm text-blue-800 mt-1">
+                Found {vehicleCount} vehicle{vehicleCount !== 1 ? 's' : ''} in inventory
+              </p>
             </div>
-          ))}
+          )}
+
+          <div className="bg-white rounded-lg shadow-sm p-8">
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              {lastScanDate ? 'Dealership Website' : "What's your dealership website?"}
+            </label>
+            <input
+              type="url"
+              value={websiteUrl}
+              onChange={(e) => setWebsiteUrl(e.target.value)}
+              placeholder="https://www.yourdealership.com"
+              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 mb-4"
+            />
+
+            <button
+              onClick={handleAnalyze}
+              disabled={!websiteUrl}
+              className="w-full bg-blue-900 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 transition disabled:opacity-50 disabled:cursor-not-allowed mb-3 flex items-center justify-center"
+            >
+              {lastScanDate && <RefreshCw className="h-5 w-5 mr-2" />}
+              {lastScanDate ? 'Re-Scan My Website' : 'Scan My Inventory'} →
+            </button>
+
+            <button
+              onClick={handleSkip}
+              className="w-full text-gray-600 hover:text-gray-900 text-sm"
+            >
+              {lastScanDate ? 'Back to Dashboard' : 'Skip for now'}
+            </button>
+
+            <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <h3 className="text-sm font-semibold text-gray-900 mb-2">How it works:</h3>
+              <ul className="text-xs text-gray-600 space-y-1 list-disc list-inside">
+                <li>We scan your dealership website for vehicle listings</li>
+                <li>Extract detailed information about each vehicle</li>
+                <li>Track inventory changes and identify sold vehicles</li>
+                <li>Build historical data for AI-powered recommendations</li>
+              </ul>
+            </div>
+          </div>
         </div>
       </div>
     </div>

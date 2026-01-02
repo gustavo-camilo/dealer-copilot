@@ -1,9 +1,8 @@
 import React from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { Target, ArrowLeft, TrendingUp, Construction, Calendar, BarChart3, Rocket, ShieldCheck } from 'lucide-react';
-import Header from '../components/Header';
-import GlassCard from '../components/ui/GlassCard';
+import { Target, ArrowLeft, Menu, X, TrendingUp, Construction } from 'lucide-react';
+import NavigationMenu from '../components/NavigationMenu';
 
 export default function CompetitorHistoryPage() {
   const { user, tenant, signOut } = useAuth();
@@ -11,78 +10,133 @@ export default function CompetitorHistoryPage() {
   const { competitorId } = useParams();
   const [menuOpen, setMenuOpen] = React.useState(false);
 
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/signin');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-950 transition-colors">
-      {/* Mesh Gradient Background */}
-      <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary-500/10 dark:bg-primary-500/20 rounded-full blur-[120px] animate-pulse" />
-        <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-secondary-500/10 dark:bg-secondary-500/20 rounded-full blur-[120px] animate-pulse delay-700" />
+    <div className="min-h-screen bg-gray-50">
+      {/* Header */}
+      <div className="sticky top-0 z-40 bg-white border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center h-16">
+            <Link to="/dashboard" className="flex items-center">
+              <Target className="h-8 w-8 text-blue-900" />
+              <span className="ml-2 text-xl font-bold text-gray-900">Dealer Co-Pilot</span>
+            </Link>
+            <div className="flex items-center space-x-4 relative">
+              <span className="text-sm text-gray-600 hidden md:inline">{tenant?.name}</span>
+              <Link
+                to="/scan"
+                className="bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 transition hidden md:inline-block"
+              >
+                Scan VIN
+              </Link>
+              <div className="relative">
+                <button
+                  onClick={() => setMenuOpen(!menuOpen)}
+                  className="p-2 rounded-lg hover:bg-gray-100 transition"
+                  aria-label="Menu"
+                >
+                  {menuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+                </button>
+
+                {menuOpen && (
+                  <NavigationMenu
+                    currentPath="/competitor-analysis"
+                    onClose={() => setMenuOpen(false)}
+                    onSignOut={handleSignOut}
+                    user={user}
+                    tenantName={tenant?.name}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <Header user={user} tenant={tenant} signOut={signOut} menuOpen={menuOpen} setMenuOpen={setMenuOpen} />
-
-      <div className="max-w-7xl mx-auto px-6 py-12 relative z-10">
-        {/* Back Link */}
-        <Link to="/competitor-analysis" className="inline-flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-primary-500 transition-colors mb-12">
-          <ArrowLeft size={14} className="group-hover:-translate-x-1 transition-transform" />
-          Back to Sector Intelligence
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back Button */}
+        <Link
+          to="/competitor-analysis"
+          className="inline-flex items-center gap-2 text-blue-600 hover:text-blue-800 mb-6"
+        >
+          <ArrowLeft className="w-5 h-5" />
+          Back to Competitor Analysis
         </Link>
 
-        {/* Coming Soon Protocol */}
-        <div className="max-w-4xl mx-auto">
-          <GlassCard className="p-16 text-center overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-8 opacity-5">
-              <Construction size={240} />
-            </div>
+        {/* Coming Soon Message */}
+        <div className="bg-white rounded-xl shadow-lg border border-gray-200 p-12 text-center max-w-3xl mx-auto">
+          <div className="inline-flex items-center justify-center w-20 h-20 bg-orange-100 rounded-full mb-6">
+            <Construction className="w-10 h-10 text-orange-600" />
+          </div>
 
-            <div className="relative z-10">
-              <div className="relative inline-block mb-10">
-                <div className="absolute inset-0 bg-secondary-500/20 blur-2xl rounded-full" />
-                <div className="relative bg-secondary-500 p-6 rounded-3xl shadow-glow-secondary">
-                  <Construction className="h-12 w-12 text-white" />
-                </div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-4">
+            Detailed History Analytics Coming Soon
+          </h1>
+
+          <p className="text-lg text-gray-600 mb-8">
+            We're working hard to bring you comprehensive competitor history analytics, including:
+          </p>
+
+          <div className="grid md:grid-cols-2 gap-6 text-left mb-8">
+            <div className="bg-blue-50 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <TrendingUp className="w-5 h-5 text-blue-600" />
+                <h3 className="font-semibold text-gray-900">Trend Analysis</h3>
               </div>
-
-              <h1 className="text-4xl md:text-5xl font-black text-slate-900 dark:text-white mb-6 tracking-tighter uppercase italic">
-                Strategic <span className="text-secondary-500">Timeline</span> Protocols
-              </h1>
-
-              <p className="text-sm font-bold text-slate-500 uppercase tracking-widest max-w-xl mx-auto leading-relaxed mb-16">
-                Initializing detailed historical delta analytics & longitudinal market trend monitoring
+              <p className="text-sm text-gray-600">
+                Visual charts showing pricing, inventory, and market trends over time
               </p>
-
-              <div className="grid md:grid-cols-2 gap-6 text-left mb-16">
-                {[
-                  { label: 'Trend Synthesis', desc: 'Visual trajectory mapping for pricing, inventory, and market shifts.', icon: BarChart3, color: 'text-primary-500' },
-                  { label: 'Comparative Logic', desc: 'Side-by-side sector benchmarking to unlock tactical opportunities.', icon: Calendar, color: 'text-green-500' },
-                  { label: 'Predictive Matrix', desc: 'AI-driven trajectory forecasting for inventory cycle optimization.', icon: ShieldCheck, color: 'text-purple-500' },
-                  { label: 'Legacy Reporting', desc: 'High-fidelity tactical exports for leadership briefings.', icon: Rocket, color: 'text-orange-500' },
-                ].map((item, i) => (
-                  <GlassCard key={i} className="p-6 border-slate-200/50 dark:border-white/5">
-                    <div className="flex items-center gap-4 mb-3">
-                      <div className={`p-2 rounded-xl bg-slate-50 dark:bg-white/5 ${item.color}`}>
-                        <item.icon size={18} />
-                      </div>
-                      <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-900 dark:text-white">{item.label}</h3>
-                    </div>
-                    <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-loose">
-                      {item.desc}
-                    </p>
-                  </GlassCard>
-                ))}
-              </div>
-
-              <div className="bg-slate-900 dark:bg-white rounded-3xl p-10 flex flex-col md:flex-row items-center justify-between gap-8">
-                <div className="text-left">
-                  <h3 className="text-white dark:text-slate-900 font-black uppercase tracking-tighter text-2xl italic mb-2">Protocol Deployment: Q2 2025</h3>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Subscribe to delta updates for immediate activation</p>
-                </div>
-                <button className="whitespace-nowrap px-8 py-4 bg-primary-500 text-white rounded-2xl font-black uppercase tracking-widest text-[10px] hover:shadow-glow-primary transition-all">
-                  Notify My Registry
-                </button>
-              </div>
             </div>
-          </GlassCard>
+
+            <div className="bg-green-50 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <TrendingUp className="w-5 h-5 text-green-600" />
+                <h3 className="font-semibold text-gray-900">Comparative Insights</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Compare multiple competitors side-by-side to identify market opportunities
+              </p>
+            </div>
+
+            <div className="bg-purple-50 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <TrendingUp className="w-5 h-5 text-purple-600" />
+                <h3 className="font-semibold text-gray-900">Predictive Analytics</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                AI-powered predictions for pricing strategies and inventory optimization
+              </p>
+            </div>
+
+            <div className="bg-orange-50 rounded-lg p-4">
+              <div className="flex items-center gap-3 mb-2">
+                <TrendingUp className="w-5 h-5 text-orange-600" />
+                <h3 className="font-semibold text-gray-900">Custom Reports</h3>
+              </div>
+              <p className="text-sm text-gray-600">
+                Export detailed reports for team meetings and strategic planning
+              </p>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 rounded-lg p-6">
+            <h3 className="font-semibold text-gray-900 mb-2">Want to be notified when it's ready?</h3>
+            <p className="text-sm text-gray-600 mb-4">
+              This feature is scheduled for release in Q2 2025. We'll send you an email as soon as
+              it's available.
+            </p>
+            <button className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition font-semibold">
+              Notify Me
+            </button>
+          </div>
         </div>
       </div>
     </div>
