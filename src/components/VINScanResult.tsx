@@ -114,6 +114,8 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     custom_transport_cost: costs.transport,
                     custom_max_bid: costs.maxBid,
                     custom_market_price: costs.marketPrice,
+                    estimated_profit: currentEstimatedProfit,
+                    max_bid_suggestion: currentMaxBid,
                     costs_edited: true,
                 })
                 .eq('id', scanData.id);
