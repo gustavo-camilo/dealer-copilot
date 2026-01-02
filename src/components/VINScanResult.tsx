@@ -99,6 +99,9 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     const [isExpandingSearch, setIsExpandingSearch] = useState(false);
     const [isSaving, setIsSaving] = useState(false);
     const [currentRecommendation, setCurrentRecommendation] = useState(scanData.recommendation);
+    const [currentEstimatedProfit, setCurrentEstimatedProfit] = useState<number | null>(null);
+    const [currentMaxBid, setCurrentMaxBid] = useState<number | null>(null);
+
     const handleSaveCosts = async (costs: { recon: number; transport: number; maxBid: number; marketPrice: number }) => {
         if (!scanData.id) return;
 
@@ -126,6 +129,8 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     custom_transport_cost: costs.transport,
                     custom_max_bid: costs.maxBid,
                     custom_market_price: costs.marketPrice,
+                    estimated_profit: currentEstimatedProfit,
+                    max_bid_suggestion: currentMaxBid,
                 });
             }
         } catch (error) {
@@ -450,8 +455,10 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
                     defaultRecon={defaultCostSettings.reconditioning_cost}
                     defaultTransport={defaultCostSettings.transport_cost}
-                    onCostsChange={() => {
-                        // We no longer auto-save here
+                    onCostsChange={(costs) => {
+                        // Track the current estimated profit and max bid for use in save callback
+                        setCurrentEstimatedProfit(costs.estimatedProfit);
+                        setCurrentMaxBid(costs.maxBid);
                     }}
                     onSave={handleSaveCosts}
                     onEditStatusChange={onEditStatusChange}
