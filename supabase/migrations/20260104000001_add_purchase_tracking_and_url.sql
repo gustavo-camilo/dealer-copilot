@@ -4,14 +4,14 @@
 -- Step 1: Add new columns
 ALTER TABLE vin_scans
   ADD COLUMN IF NOT EXISTS auction_url TEXT,
-  ADD COLUMN IF NOT EXISTS purchase_status TEXT DEFAULT 'not_purchased',
+  ADD COLUMN IF NOT EXISTS purchase_status TEXT DEFAULT 'pending',
   ADD COLUMN IF NOT EXISTS purchase_price DECIMAL(10, 2),
   ADD COLUMN IF NOT EXISTS purchase_date TIMESTAMPTZ;
 
 -- Step 2: Add CHECK constraint for purchase_status
 ALTER TABLE vin_scans
   ADD CONSTRAINT vin_scans_purchase_status_check
-  CHECK (purchase_status IN ('purchased', 'not_purchased'));
+  CHECK (purchase_status IN ('purchased', 'not_purchased', 'pending'));
 
 -- Step 3: Add CHECK constraint for purchase_price (must be positive if set)
 ALTER TABLE vin_scans
@@ -24,6 +24,6 @@ CREATE INDEX IF NOT EXISTS idx_vin_scans_purchase_status
 
 -- Step 5: Add comments for documentation
 COMMENT ON COLUMN vin_scans.auction_url IS 'Direct URL to the vehicle listing in the auction (per-VIN URL)';
-COMMENT ON COLUMN vin_scans.purchase_status IS 'Whether vehicle was purchased: purchased or not_purchased';
+COMMENT ON COLUMN vin_scans.purchase_status IS 'Vehicle decision status: pending (default), purchased, or not_purchased';
 COMMENT ON COLUMN vin_scans.purchase_price IS 'Actual purchase price if vehicle was purchased';
-COMMENT ON COLUMN vin_scans.purchase_date IS 'Date when vehicle was marked as purchased';
+COMMENT ON COLUMN vin_scans.purchase_date IS 'Date when vehicle was marked as purchased or not_purchased';

@@ -16,6 +16,7 @@ import CompetitorHistoryPage from './pages/CompetitorHistoryPage';
 import UpgradePage from './pages/UpgradePage';
 import UpgradeSuccessPage from './pages/UpgradeSuccessPage';
 import RecommendationsPage from './pages/RecommendationsPage';
+import RecommendationDetailPage from './pages/RecommendationDetailPage';
 import AdminPage from './pages/AdminPage';
 import SettingsPage from './pages/SettingsPage';
 
@@ -161,6 +162,14 @@ const router = createBrowserRouter([
     element: (
       <ProtectedRoute>
         <RecommendationsPage />
+      </ProtectedRoute>
+    ),
+  },
+  {
+    path: '/recommendations/:scanId',
+    element: (
+      <ProtectedRoute>
+        <RecommendationDetailPage />
       </ProtectedRoute>
     ),
   },

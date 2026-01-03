@@ -50,7 +50,7 @@ interface VINScanResultProps {
         custom_max_bid?: number | null;
         custom_market_price?: number | null;
         auction_url?: string | null;
-        purchase_status?: 'purchased' | 'not_purchased';
+        purchase_status?: 'purchased' | 'not_purchased' | 'pending';
         purchase_price?: number | null;
         purchase_date?: string | null;
     };
@@ -73,7 +73,7 @@ interface VINScanResultProps {
         custom_max_bid?: number | null;
         custom_market_price?: number | null;
         auction_url?: string | null;
-        purchase_status?: 'purchased' | 'not_purchased';
+        purchase_status?: 'purchased' | 'not_purchased' | 'pending';
         purchase_price?: number | null;
         purchase_date?: string | null;
     }) => void;
@@ -109,8 +109,8 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     const [currentRecommendation, setCurrentRecommendation] = useState(scanData.recommendation);
     const [currentEstimatedProfit, setCurrentEstimatedProfit] = useState<number | null>(null);
     const [currentMaxBid, setCurrentMaxBid] = useState<number | null>(null);
-    const [currentPurchaseStatus, setCurrentPurchaseStatus] = useState<'purchased' | 'not_purchased'>(
-        scanData.purchase_status || 'not_purchased'
+    const [currentPurchaseStatus, setCurrentPurchaseStatus] = useState<'purchased' | 'not_purchased' | 'pending'>(
+        scanData.purchase_status || 'pending'
     );
     const [currentAuctionUrl, setCurrentAuctionUrl] = useState<string>(scanData.auction_url || '');
 
@@ -208,80 +208,15 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
         }
     };
 
-    const handleTogglePurchaseStatus = async () => {
-        if (!scanData.id) return;
-
-        const newStatus = currentPurchaseStatus === 'purchased' ? 'not_purchased' : 'purchased';
-
-        // If marking as purchased, show toast to capture price
-        if (newStatus === 'purchased') {
-            // Show custom toast with price input
-            toast.custom((t) => {
-                // eslint-disable-next-line react-hooks/rules-of-hooks
-                const [priceInput, setPriceInput] = useState('');
-
-                return (
-                    <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white dark:bg-navy-900 shadow-lg dark:shadow-2xl rounded-lg pointer-events-auto flex flex-col ring-1 ring-black dark:ring-navy-700 ring-opacity-5 p-4`}>
-                        <div className="flex items-start mb-3">
-                            <div className="flex-shrink-0">
-                                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                            </div>
-                            <div className="ml-3 flex-1">
-                                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                                    Vehicle Marked as Purchased
-                                </p>
-                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                                    Would you like to record the purchase price?
-                                </p>
-                            </div>
-                        </div>
-                        <input
-                            type="number"
-                            placeholder="Purchase price (optional)"
-                            value={priceInput}
-                            onChange={(e) => setPriceInput(e.target.value)}
-                            className="w-full px-3 py-2 mb-3 border border-gray-300 dark:border-navy-600 rounded-md bg-white dark:bg-navy-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
-                            step="100"
-                            min="0"
-                        />
-                        <div className="flex gap-2">
-                            <button
-                                onClick={async () => {
-                                    toast.dismiss(t.id);
-                                    await savePurchaseStatus(newStatus, priceInput ? parseFloat(priceInput) : null);
-                                }}
-                                className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
-                            >
-                                Save
-                            </button>
-                            <button
-                                onClick={async () => {
-                                    toast.dismiss(t.id);
-                                    await savePurchaseStatus(newStatus, null);
-                                }}
-                                className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-                            >
-                                Skip Price
-                            </button>
-                        </div>
-                    </div>
-                );
-            }, { duration: Infinity });
-        } else {
-            // If unmarking as purchased, just save
-            await savePurchaseStatus(newStatus, null);
-        }
-    };
-
-    const savePurchaseStatus = async (status: 'purchased' | 'not_purchased', price: number | null) => {
+    const savePurchaseStatus = async (status: 'purchased' | 'not_purchased' | 'pending') => {
         if (!scanData.id) return;
 
         setIsSaving(true);
         try {
             const updateData: any = {
                 purchase_status: status,
-                purchase_date: status === 'purchased' ? new Date().toISOString() : null,
-                purchase_price: status === 'purchased' ? price : null,
+                purchase_date: status !== 'pending' ? new Date().toISOString() : null,
+                purchase_price: null, // Price can be added later if needed
             };
 
             const { error: updateError } = await supabase
@@ -292,7 +227,13 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
             if (updateError) throw updateError;
 
             setCurrentPurchaseStatus(status);
-            toast.success(status === 'purchased' ? 'Marked as purchased' : 'Unmarked as purchased');
+
+            const messages = {
+                purchased: 'Marked as purchased',
+                not_purchased: 'Marked as not purchased',
+                pending: 'Marked as pending'
+            };
+            toast.success(messages[status]);
 
             // Notify parent of update
             if (onUpdate) {
@@ -465,19 +406,24 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                 </div>
                             </div>
 
-                            {/* Purchase Status Toggle Button */}
+                            {/* Purchase Status Dropdown */}
                             {scanData.id && (
-                                <button
-                                    onClick={handleTogglePurchaseStatus}
+                                <select
+                                    value={currentPurchaseStatus}
+                                    onChange={(e) => savePurchaseStatus(e.target.value as 'purchased' | 'not_purchased' | 'pending')}
                                     disabled={isSaving}
-                                    className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                                    className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all border-2 ${
                                         currentPurchaseStatus === 'purchased'
-                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-2 border-green-300 dark:border-green-700 hover:bg-green-200 dark:hover:bg-green-900/50'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700'
+                                            : currentPurchaseStatus === 'not_purchased'
+                                            ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700'
+                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'
                                     }`}
                                 >
-                                    {currentPurchaseStatus === 'purchased' ? '✓ Purchased' : 'Not Purchased'}
-                                </button>
+                                    <option value="pending">⏳ Pending</option>
+                                    <option value="purchased">✓ Purchased</option>
+                                    <option value="not_purchased">✗ Not Purchased</option>
+                                </select>
                             )}
                         </div>
                     </div>

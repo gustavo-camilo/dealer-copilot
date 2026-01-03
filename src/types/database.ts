@@ -10,7 +10,7 @@ export type TitleStatus = 'clean' | 'salvage' | 'rebuilt' | 'unknown';
 
 export type RecommendationType = 'buy' | 'maybe' | 'pass';
 
-export type PurchaseStatusType = 'purchased' | 'not_purchased';
+export type PurchaseStatusType = 'purchased' | 'not_purchased' | 'pending';
 
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid';
 

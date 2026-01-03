@@ -2,25 +2,21 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { RecommendationType } from '../types/database';
 import {
   AlertTriangle,
   ThumbsUp,
   Search,
   DollarSign,
   Target,
-  X,
   ChevronRight,
   Trash2,
   AlertCircle,
   TrendingDown,
-  ExternalLink,
   CheckCircle,
+  XCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
-import ConfirmationDialog from '../components/ConfirmationDialog';
 
 interface Recommendation {
   id: string;
@@ -46,10 +42,12 @@ interface Recommendation {
   custom_max_bid: number | null;
   custom_market_price: number | null;
   auction_url: string | null;
-  purchase_status: 'purchased' | 'not_purchased';
+  purchase_status: 'purchased' | 'not_purchased' | 'pending';
   purchase_price: number | null;
   purchase_date: string | null;
 }
+
+type PurchaseStatusFilter = 'all' | 'pending' | 'purchased' | 'not_purchased';
 
 const PAGE_SIZE = 25;
 
@@ -62,27 +60,8 @@ export default function RecommendationsPage() {
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedRec, setSelectedRec] = useState<Recommendation | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
-  const [isEditingCosts, setIsEditingCosts] = useState(false);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [showPurchased, setShowPurchased] = useState(false);
-  const scanResultRef = useRef<{ saveCosts: () => void }>(null);
-
-  const handleCloseModal = () => {
-    if (isEditingCosts) {
-      setShowConfirmDialog(true);
-    } else {
-      setSelectedRec(null);
-      setIsEditingCosts(false);
-    }
-  };
-
-  const confirmCloseModal = () => {
-    setSelectedRec(null);
-    setIsEditingCosts(false);
-    setShowConfirmDialog(false);
-  };
+  const [statusFilter, setStatusFilter] = useState<PurchaseStatusFilter>('all');
 
   const observerTarget = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState({
@@ -158,9 +137,9 @@ export default function RecommendationsPage() {
   useEffect(() => {
     let filtered = [...recommendations];
 
-    // Hide purchased by default
-    if (!showPurchased) {
-      filtered = filtered.filter(r => r.purchase_status !== 'purchased');
+    // Apply purchase status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(r => r.purchase_status === statusFilter);
     }
 
     // Apply search filter
@@ -177,7 +156,7 @@ export default function RecommendationsPage() {
     }
 
     setFilteredRecommendations(filtered);
-  }, [searchQuery, recommendations, showPurchased]);
+  }, [searchQuery, recommendations, statusFilter]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -213,50 +192,6 @@ export default function RecommendationsPage() {
     }
   };
 
-  const handleRecommendationUpdate = (updatedData: {
-    id: string;
-    recommendation?: RecommendationType;
-    estimated_profit?: number | null;
-    max_bid_suggestion?: number | null;
-    custom_recon_cost?: number | null;
-    custom_transport_cost?: number | null;
-    custom_max_bid?: number | null;
-    custom_market_price?: number | null;
-  }) => {
-    const updateList = (prevList: Recommendation[]) =>
-      prevList.map(rec =>
-        rec.id === updatedData.id
-          ? { ...rec, ...updatedData }
-          : rec
-      );
-
-    setRecommendations(updateList);
-    setFilteredRecommendations(updateList);
-
-    // Update selectedRec if it's the one being edited
-    if (selectedRec?.id === updatedData.id) {
-      setSelectedRec(prev => prev ? { ...prev, ...updatedData } : null);
-    }
-
-    // Recalculate stats if recommendation changed
-    if (updatedData.recommendation) {
-      const oldRec = recommendations.find(r => r.id === updatedData.id)?.recommendation;
-      if (oldRec && oldRec !== updatedData.recommendation) {
-        setStats(prevStats => {
-          const newStats = { ...prevStats };
-          // Decrement old
-          if (oldRec === 'buy') newStats.buy--;
-          else if (oldRec === 'maybe') newStats.maybe--;
-          else if (oldRec === 'pass') newStats.pass--;
-          // Increment new
-          if (updatedData.recommendation === 'buy') newStats.buy++;
-          else if (updatedData.recommendation === 'maybe') newStats.maybe++;
-          else if (updatedData.recommendation === 'pass') newStats.pass++;
-          return newStats;
-        });
-      }
-    }
-  };
 
   const formatVehicleName = (name: string) => {
     if (!name) return '';
@@ -332,77 +267,22 @@ export default function RecommendationsPage() {
     });
   };
 
-  const handleTogglePurchaseStatus = async (e: React.MouseEvent, scanId: string, currentStatus: 'purchased' | 'not_purchased') => {
+  const handleMarkAsPurchased = async (e: React.MouseEvent, scanId: string) => {
     e.stopPropagation();
-
-    const newStatus = currentStatus === 'purchased' ? 'not_purchased' : 'purchased';
-
-    if (newStatus === 'purchased') {
-      // Show toast to capture price
-      toast.custom((t) => {
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        const [priceInput, setPriceInput] = useState('');
-
-        return (
-          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white dark:bg-navy-900 shadow-lg dark:shadow-2xl rounded-lg pointer-events-auto flex flex-col ring-1 ring-black dark:ring-navy-700 ring-opacity-5 p-4`}>
-            <div className="flex items-start mb-3">
-              <div className="flex-shrink-0">
-                <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
-                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
-                </div>
-              </div>
-              <div className="ml-3 flex-1">
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  Mark as Purchased?
-                </p>
-                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                  Would you like to record the purchase price?
-                </p>
-              </div>
-            </div>
-            <input
-              type="number"
-              placeholder="Purchase price (optional)"
-              value={priceInput}
-              onChange={(e) => setPriceInput(e.target.value)}
-              className="w-full px-3 py-2 mb-3 border border-gray-300 dark:border-navy-600 rounded-md bg-white dark:bg-navy-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
-              step="100"
-              min="0"
-            />
-            <div className="flex gap-2">
-              <button
-                onClick={async () => {
-                  toast.dismiss(t.id);
-                  await savePurchaseStatus(scanId, newStatus, priceInput ? parseFloat(priceInput) : null);
-                }}
-                className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
-              >
-                Save
-              </button>
-              <button
-                onClick={async () => {
-                  toast.dismiss(t.id);
-                  await savePurchaseStatus(scanId, newStatus, null);
-                }}
-                className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
-              >
-                Skip Price
-              </button>
-            </div>
-          </div>
-        );
-      }, { duration: Infinity });
-    } else {
-      await savePurchaseStatus(scanId, newStatus, null);
-    }
+    await savePurchaseStatus(scanId, 'purchased');
   };
 
-  const savePurchaseStatus = async (scanId: string, status: 'purchased' | 'not_purchased', price: number | null) => {
+  const handleMarkAsNotPurchased = async (e: React.MouseEvent, scanId: string) => {
+    e.stopPropagation();
+    await savePurchaseStatus(scanId, 'not_purchased');
+  };
+
+  const savePurchaseStatus = async (scanId: string, status: 'purchased' | 'not_purchased' | 'pending') => {
     try {
       const updateData: any = {
         purchase_status: status,
-        purchase_date: status === 'purchased' ? new Date().toISOString() : null,
-        purchase_price: status === 'purchased' ? price : null,
+        purchase_date: status !== 'pending' ? new Date().toISOString() : null,
+        purchase_price: null,
       };
 
       const { error } = await supabase
@@ -424,7 +304,12 @@ export default function RecommendationsPage() {
           : rec
       ));
 
-      toast.success(status === 'purchased' ? 'Marked as purchased' : 'Unmarked as purchased');
+      const messages = {
+        purchased: 'Marked as purchased',
+        not_purchased: 'Marked as not purchased',
+        pending: 'Marked as pending'
+      };
+      toast.success(messages[status]);
     } catch (error) {
       console.error('Error updating purchase status:', error);
       toast.error('Failed to update purchase status');
@@ -517,9 +402,10 @@ export default function RecommendationsPage() {
           </div>
         </div>
 
-        {/* Search Bar */}
-        <div className="mb-6">
-          <div className="relative">
+        {/* Search and Filter */}
+        <div className="mb-6 flex flex-col sm:flex-row gap-3">
+          {/* Search Field */}
+          <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
             <input
               type="text"
@@ -529,21 +415,18 @@ export default function RecommendationsPage() {
               className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-navy-600 bg-white dark:bg-navy-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-        </div>
 
-        {/* Purchase Filter Toggle */}
-        <div className="mb-4 flex items-center gap-2">
-          <label className="flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showPurchased}
-              onChange={(e) => setShowPurchased(e.target.checked)}
-              className="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-navy-700 border-gray-300 dark:border-navy-600 rounded focus:ring-blue-500 focus:ring-2"
-            />
-            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
-              Show purchased vehicles ({recommendations.filter(r => r.purchase_status === 'purchased').length})
-            </span>
-          </label>
+          {/* Status Filter Dropdown */}
+          <select
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value as PurchaseStatusFilter)}
+            className="px-4 py-3 border border-gray-300 dark:border-navy-600 bg-white dark:bg-navy-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">All Vehicles</option>
+            <option value="pending">Pending ({recommendations.filter(r => r.purchase_status === 'pending').length})</option>
+            <option value="purchased">Purchased ({recommendations.filter(r => r.purchase_status === 'purchased').length})</option>
+            <option value="not_purchased">Not Purchased ({recommendations.filter(r => r.purchase_status === 'not_purchased').length})</option>
+          </select>
         </div>
 
         {/* Results Count */}
@@ -575,7 +458,7 @@ export default function RecommendationsPage() {
             {filteredRecommendations.map((rec) => (
               <div
                 key={rec.id}
-                onClick={() => setSelectedRec(rec)}
+                onClick={() => navigate(`/recommendations/${rec.id}`)}
                 className={`bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer ${
                   rec.purchase_status === 'purchased' ? 'opacity-75' : ''
                 }`}
@@ -611,38 +494,11 @@ export default function RecommendationsPage() {
 
                   {/* Right: Actions */}
                   <div className="flex items-center gap-2">
-                    {/* Purchase Toggle Button */}
-                    <button
-                      onClick={(e) => handleTogglePurchaseStatus(e, rec.id, rec.purchase_status)}
-                      className={`p-2 rounded-lg transition flex-shrink-0 ${
-                        rec.purchase_status === 'purchased'
-                          ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50'
-                          : 'text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'
-                      }`}
-                      title={rec.purchase_status === 'purchased' ? 'Mark as not purchased' : 'Mark as purchased'}
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                    </button>
-
-                    {/* URL Button (only if auction_url exists) */}
-                    {rec.auction_url && (
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          window.open(rec.auction_url!, '_blank');
-                        }}
-                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
-                        title="Open auction listing"
-                      >
-                        <ExternalLink className="w-5 h-5" />
-                      </button>
-                    )}
-
-                    {/* View Details Button */}
+                    {/* View Details */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
-                        setSelectedRec(rec);
+                        navigate(`/recommendations/${rec.id}`);
                       }}
                       className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
                       title="View Details"
@@ -650,7 +506,25 @@ export default function RecommendationsPage() {
                       <ChevronRight className="w-5 h-5" />
                     </button>
 
-                    {/* Delete Button */}
+                    {/* Mark as Purchased */}
+                    <button
+                      onClick={(e) => handleMarkAsPurchased(e, rec.id)}
+                      className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition flex-shrink-0"
+                      title="Mark as Purchased"
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                    </button>
+
+                    {/* Mark as Not Purchased */}
+                    <button
+                      onClick={(e) => handleMarkAsNotPurchased(e, rec.id)}
+                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition flex-shrink-0"
+                      title="Mark as Not Purchased"
+                    >
+                      <XCircle className="w-5 h-5" />
+                    </button>
+
+                    {/* Delete */}
                     <button
                       onClick={(e) => handleDeleteScan(e, rec.id)}
                       className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
@@ -696,71 +570,6 @@ export default function RecommendationsPage() {
           </div>
         )}
 
-        {/* Details Modal */}
-        {selectedRec && (
-          <div
-            className="fixed inset-0 bg-gray-900 dark:bg-gray-950 bg-opacity-50 dark:bg-opacity-70 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-            onClick={handleCloseModal}
-          >
-            <div
-              className="bg-white dark:bg-navy-900 w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
-            >
-              {/* Modal Header */}
-              <div className="sticky top-0 bg-white dark:bg-navy-900 border-b border-gray-200 dark:border-brand-border-dark p-4 md:p-6 flex items-center justify-between z-10">
-                <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Scan Details</h2>
-                <button
-                  onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-navy-800 rounded-lg transition"
-                >
-                  <X className="w-6 h-6 text-white" />
-                </button>
-              </div>
-
-              <VINScanResult
-                scanData={{
-                  id: selectedRec.id,
-                  decoded_data: selectedRec.decoded_data,
-                  market_data: selectedRec.market_data,
-                  recommendation: selectedRec.recommendation,
-                  confidence_score: selectedRec.confidence_score,
-                  match_reasoning: selectedRec.match_reasoning,
-                  estimated_profit: selectedRec.estimated_profit,
-                  max_bid_suggestion: selectedRec.max_bid_suggestion,
-                  custom_recon_cost: selectedRec.custom_recon_cost,
-                  custom_transport_cost: selectedRec.custom_transport_cost,
-                  custom_max_bid: selectedRec.custom_max_bid,
-                  custom_market_price: selectedRec.custom_market_price,
-                  auction_url: selectedRec.auction_url,
-                  purchase_status: selectedRec.purchase_status,
-                  purchase_price: selectedRec.purchase_price,
-                  purchase_date: selectedRec.purchase_date,
-                }}
-                isModal={true}
-                tenantZipCode={tenant?.zip_code}
-                onClose={handleCloseModal}
-                onUpdate={handleRecommendationUpdate}
-                onEditStatusChange={setIsEditingCosts}
-                onOutsideClick={() => setShowConfirmDialog(true)}
-                ref={scanResultRef}
-                isEditing={isEditingCosts}
-              />
-            </div>
-          </div>
-        )}
-
-        <ConfirmationDialog
-          isOpen={showConfirmDialog}
-          onConfirm={confirmCloseModal}
-          onCancel={() => {
-            scanResultRef.current?.saveCosts();
-            setIsEditingCosts(false);
-            setShowConfirmDialog(false);
-          }}
-          confirmLabel="Discard & Leave"
-          cancelLabel="Save and Stay"
-          message="You have unsaved changes in the profit calculator. How would you like to proceed?"
-        />
       </div>
     </div>
   );
