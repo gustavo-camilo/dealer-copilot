@@ -260,7 +260,7 @@ export default function RecommendationsPage() {
     toast.custom((t) => (
       <div
         className={`${t.visible ? 'animate-enter' : 'animate-leave'
-          } max-w-md w-full bg-white dark:bg-gray-900 shadow-lg dark:shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black dark:ring-gray-700 ring-opacity-5`}
+          } max-w-md w-full bg-white dark:bg-navy-900 shadow-lg dark:shadow-2xl rounded-lg pointer-events-auto flex ring-1 ring-black dark:ring-navy-700 ring-opacity-5`}
       >
         <div className="flex-1 w-0 p-4">
           <div className="flex items-start">
@@ -279,7 +279,7 @@ export default function RecommendationsPage() {
             </div>
           </div>
         </div>
-        <div className="flex border-l border-gray-200 dark:border-gray-700">
+        <div className="flex border-l border-gray-200 dark:border-navy-700">
           <button
             onClick={async () => {
               toast.dismiss(t.id);
@@ -360,7 +360,7 @@ export default function RecommendationsPage() {
 
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex items-center gap-3 mb-2">
               <ThumbsUp className="w-5 h-5 text-green-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">Buy</span>
@@ -368,7 +368,7 @@ export default function RecommendationsPage() {
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.buy}</div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex items-center gap-3 mb-2">
               <AlertTriangle className="w-5 h-5 text-yellow-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">Maybe</span>
@@ -376,7 +376,7 @@ export default function RecommendationsPage() {
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.maybe}</div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex items-center gap-3 mb-2">
               <TrendingDown className="w-5 h-5 text-red-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">Pass</span>
@@ -384,7 +384,7 @@ export default function RecommendationsPage() {
             <div className="text-2xl font-bold text-gray-900 dark:text-white">{stats.pass}</div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex items-center gap-3 mb-2">
               <Target className="w-5 h-5 text-blue-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</span>
@@ -394,7 +394,7 @@ export default function RecommendationsPage() {
             </div>
           </div>
 
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex items-center gap-3 mb-2">
               <DollarSign className="w-5 h-5 text-purple-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">Potential Profit</span>
@@ -414,7 +414,7 @@ export default function RecommendationsPage() {
               placeholder="Search by VIN, make, model, year..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-navy-600 bg-white dark:bg-navy-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
         </div>
@@ -432,7 +432,7 @@ export default function RecommendationsPage() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
         ) : filteredRecommendations.length === 0 ? (
-          <div className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-12 text-center">
+          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-12 text-center">
             <AlertCircle className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
               {searchQuery ? 'No results found' : 'No VIN scans yet'}
@@ -449,7 +449,7 @@ export default function RecommendationsPage() {
               <div
                 key={rec.id}
                 onClick={() => setSelectedRec(rec)}
-                className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer"
+                className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer"
               >
                 <div className="flex items-center justify-between gap-4">
                   {/* Left: Vehicle Info */}
@@ -530,19 +530,19 @@ export default function RecommendationsPage() {
         {/* Details Modal */}
         {selectedRec && (
           <div
-            className="fixed inset-0 bg-gray-900 dark:bg-gray-950 bg-opacity-50 dark:bg-opacity-75 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
+            className="fixed inset-0 bg-gray-900 dark:bg-gray-950 bg-opacity-50 dark:bg-opacity-70 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
             onClick={handleCloseModal}
           >
             <div
-              className="bg-white dark:bg-gray-900 w-full md:max-w-4xl md:rounded-lg shadow-xl dark:shadow-2xl max-h-screen overflow-y-auto"
+              className="bg-white dark:bg-navy-900 w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="sticky top-0 bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 p-4 md:p-6 flex items-center justify-between z-10">
+              <div className="sticky top-0 bg-white dark:bg-navy-900 border-b border-gray-200 dark:border-brand-border-dark p-4 md:p-6 flex items-center justify-between z-10">
                 <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Scan Details</h2>
                 <button
                   onClick={handleCloseModal}
-                  className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+                  className="p-2 hover:bg-gray-100 dark:hover:bg-navy-800 rounded-lg transition"
                 >
                   <X className="w-6 h-6 text-white" />
                 </button>

@@ -147,64 +147,55 @@ export default function VINScansPage() {
     e.stopPropagation(); // Prevent opening the modal
 
     toast.custom((t) => (
-      <div
-        className={`${t.visible ? 'animate-enter' : 'animate-leave'
-          } max-w-md w-full bg-white dark:bg-navy-900 shadow-lg dark:shadow-xl rounded-lg pointer-events-auto flex ring-1 ring-black ring-opacity-5 dark:ring-brand-border-dark`}
-      >
-        <div className="flex-1 w-0 p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0 pt-0.5">
-              <div className="h-10 w-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+      <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900 bg-opacity-50 dark:bg-navy-900 dark:bg-opacity-70 animate-in fade-in duration-200">
+        <div className="bg-white dark:bg-navy-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
+          <div className="p-6">
+            <div className="flex items-center gap-4 mb-4">
+              <div className="bg-red-100 dark:bg-red-900 p-3 rounded-full">
                 <Trash2 className="h-6 w-6 text-red-600 dark:text-red-400" />
               </div>
+              <h3 className="text-xl font-bold text-gray-900 dark:text-white">Delete Scan?</h3>
             </div>
-            <div className="ml-3 flex-1">
-              <p className="text-sm font-medium text-gray-900 dark:text-white">
-                Delete Scan?
-              </p>
-              <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                Are you sure you want to delete this scan? This action cannot be undone.
-              </p>
+            <p className="text-gray-600 dark:text-gray-300 mb-6">
+              Are you sure you want to delete this scan? This action cannot be undone.
+            </p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => toast.dismiss(t.id)}
+                className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-navy-700 rounded-lg hover:bg-gray-200 dark:hover:bg-navy-600 transition"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={async () => {
+                  toast.dismiss(t.id);
+                  try {
+                    const { error } = await supabase
+                      .from('vin_scans')
+                      .delete()
+                      .eq('id', scanId);
+
+                    if (error) throw error;
+
+                    // Remove from local state
+                    setScans(scans.filter(s => s.id !== scanId));
+                    setFilteredScans(filteredScans.filter(s => s.id !== scanId));
+                    toast.success('Scan deleted successfully');
+                  } catch (error) {
+                    console.error('Error deleting scan:', error);
+                    toast.error('Failed to delete scan');
+                  }
+                }}
+                className="px-4 py-2 text-sm font-semibold text-white bg-red-600 dark:bg-red-700 rounded-lg hover:bg-red-700 dark:hover:bg-red-600 transition"
+              >
+                Delete
+              </button>
             </div>
           </div>
         </div>
-        <div className="flex border-l border-gray-200 dark:border-gray-700">
-          <button
-            onClick={async () => {
-              toast.dismiss(t.id);
-              try {
-                const { error } = await supabase
-                  .from('vin_scans')
-                  .delete()
-                  .eq('id', scanId);
-
-                if (error) throw error;
-
-                // Remove from local state
-                setScans(scans.filter(s => s.id !== scanId));
-                setFilteredScans(filteredScans.filter(s => s.id !== scanId));
-                toast.success('Scan deleted successfully');
-              } catch (error) {
-                console.error('Error deleting scan:', error);
-                toast.error('Failed to delete scan');
-              }
-            }}
-            className="w-full border border-transparent rounded-none rounded-r-lg p-4 flex items-center justify-center text-sm font-medium text-red-600 dark:text-red-400 hover:text-red-500 dark:hover:text-red-300 focus:outline-none focus:ring-2 focus:ring-red-500"
-          >
-            Delete
-          </button>
-        </div>
-        <div className="flex border-l border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => toast.dismiss(t.id)}
-            className="w-full border border-transparent rounded-none p-4 flex items-center justify-center text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-500 dark:hover:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500"
-          >
-            Cancel
-          </button>
-        </div>
       </div>
     ), {
-      duration: 5000,
+      duration: Infinity, // Don't auto-dismiss
     });
   };
 

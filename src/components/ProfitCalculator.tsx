@@ -148,7 +148,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
   }, [maxBid, auctionFee, reconCost, transportCost, marketPrice, totalCost, estimatedProfit, costsEdited, onCostsChange]);
 
   return (
-    <div ref={containerRef} className="bg-white dark:bg-gray-900 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+    <div ref={containerRef} className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
       <div className="flex justify-between items-center mb-4">
         <div className="flex items-center gap-2">
           <h3 className="font-bold text-gray-900 dark:text-white">💰 Profit Calculator</h3>
@@ -210,7 +210,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
               type="number"
               value={maxBid}
               onChange={(e) => setMaxBid(Number(e.target.value))}
-              className="w-32 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-right font-semibold bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="w-32 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right font-semibold bg-white dark:bg-navy-800 text-gray-900 dark:text-white"
             />
           ) : (
             <span className="font-semibold text-gray-900 dark:text-white">${maxBid.toLocaleString()}</span>
@@ -225,7 +225,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
               type="number"
               value={customAuctionFee !== null ? customAuctionFee : calculatedAuctionFee}
               onChange={(e) => setCustomAuctionFee(Number(e.target.value))}
-              className="w-24 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="w-24 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right bg-white dark:bg-navy-800 text-gray-900 dark:text-white"
               placeholder="Custom Fee"
             />
           ) : (
@@ -240,7 +240,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
               type="number"
               value={reconCost}
               onChange={(e) => setReconCost(Number(e.target.value))}
-              className="w-24 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="w-24 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right bg-white dark:bg-navy-800 text-gray-900 dark:text-white"
             />
           ) : (
             <span className="font-medium text-gray-900 dark:text-white">${reconCost.toLocaleString()}</span>
@@ -255,7 +255,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
               type="number"
               value={transportCost}
               onChange={(e) => setTransportCost(Number(e.target.value))}
-              className="w-24 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-right bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="w-24 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right bg-white dark:bg-navy-800 text-gray-900 dark:text-white"
             />
           ) : (
             <span className="font-medium text-gray-900 dark:text-white">${transportCost.toLocaleString()}</span>
@@ -263,7 +263,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
         </div>
 
         {/* Total Investment */}
-        <div className="border-t border-gray-200 dark:border-gray-700 pt-3">
+        <div className="border-t border-gray-200 dark:border-navy-700 pt-3">
           <div className="flex justify-between font-semibold text-gray-900 dark:text-white">
             <span>Total Investment</span>
             <span>${totalCost.toLocaleString()}</span>
@@ -278,7 +278,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
               type="number"
               value={marketPrice}
               onChange={(e) => setMarketPrice(Number(e.target.value))}
-              className="w-32 px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-right font-medium bg-white dark:bg-gray-800 text-gray-900 dark:text-white"
+              className="w-32 px-3 py-1 border border-gray-300 dark:border-navy-600 rounded text-right font-medium bg-white dark:bg-navy-800 text-gray-900 dark:text-white"
             />
           ) : (
             <span className="font-medium text-gray-900 dark:text-white">${marketPrice.toLocaleString()}</span>
@@ -287,7 +287,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
 
         {/* Expected Gross Profit */}
         <div
-          className={`flex justify-between text-lg font-bold pt-2 border-t border-gray-200 dark:border-gray-700 ${estimatedProfit >= 1500
+          className={`flex justify-between text-lg font-bold pt-2 border-t border-gray-200 dark:border-navy-700 ${estimatedProfit >= 1500
             ? 'text-green-600 dark:text-green-400'
             : estimatedProfit >= 800
               ? 'text-yellow-600 dark:text-yellow-400'

@@ -248,10 +248,10 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     };
 
     return (
-        <div className={`bg-gray-50 dark:bg-gray-900 ${isModal ? 'p-0' : 'min-h-screen'}`}>
+        <div className={`bg-gray-50 dark:bg-brand-bg-dark ${isModal ? 'p-0' : 'min-h-screen'}`}>
             <div className={`${isModal ? '' : 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}`}>
                 {/* Vehicle Header */}
-                <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6 mb-6">
                     <div className="flex items-center justify-between mb-4">
                         <div>
                             <h2 className="text-2xl font-bold text-gray-900 dark:text-white">

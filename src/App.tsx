@@ -2,6 +2,8 @@ import { createBrowserRouter, RouterProvider, Navigate, useLocation } from 'reac
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import toast from 'react-hot-toast';
+import { X } from 'lucide-react';
 import LandingPage from './pages/LandingPage';
 import SignUpPage from './pages/SignUpPage';
 import SignInPage from './pages/SignInPage';
@@ -193,25 +195,45 @@ function App() {
               background: '#fff',
               color: '#363636',
               padding: '16px',
+              paddingRight: '48px',
               borderRadius: '8px',
               boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
             },
             success: {
-              className: 'dark:!bg-green-900/30 dark:!border-green-700',
+              className: 'dark:!bg-green-900 dark:!border-green-700',
               iconTheme: {
                 primary: '#10b981',
                 secondary: '#fff',
               },
             },
             error: {
-              className: 'dark:!bg-red-900/30 dark:!border-red-700',
+              className: 'dark:!bg-red-900 dark:!border-red-700',
               iconTheme: {
                 primary: '#ef4444',
                 secondary: '#fff',
               },
             },
           }}
-        />
+        >
+          {(t) => {
+            const message = typeof t.message === 'function' ? t.message(t) : t.message;
+            return (
+              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+                {t.icon}
+                <div style={{ marginLeft: '12px', flex: 1 }}>
+                  {message}
+                </div>
+                <button
+                  onClick={() => toast.dismiss(t.id)}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  aria-label="Close notification"
+                >
+                  <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
+                </button>
+              </div>
+            );
+          }}
+        </Toaster>
         <RouterProvider router={router} />
       </ThemeProvider>
     </AuthProvider>

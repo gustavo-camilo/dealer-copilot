@@ -247,23 +247,45 @@ export default function ManageInventoryPage() {
 
     const updatePromise = new Promise(async (resolve, reject) => {
       try {
-        // 1. Get linked source
-        const { data: sourceLink } = await supabase
-          .from('tenant_sources')
-          .select('source_id')
-          .eq('tenant_id', user.tenant_id)
-          .eq('relationship_type', 'owner')
+        // Get or create source from tenant's website_url
+        if (!tenant.website_url) {
+          throw new Error('No website URL configured. Please set up your website in Settings.');
+        }
+
+        // 1. Get or create source registry entry
+        const { data: sourceData, error: sourceError } = await supabase
+          .from('source_registry')
+          .upsert({
+            source_url: tenant.website_url,
+            source_type: 'dealer',
+            source_name: tenant.name || tenant.website_url,
+            scraping_enabled: true
+          }, {
+            onConflict: 'source_url'
+          })
+          .select('id')
           .single();
 
-        if (!sourceLink) throw new Error('No linked website found.');
+        if (sourceError) throw sourceError;
 
-        // 2. Trigger Scrape via RPC (Secure)
+        // 2. Ensure tenant-source link exists
+        await supabase
+          .from('tenant_sources')
+          .upsert({
+            tenant_id: user.tenant_id,
+            source_id: sourceData.id,
+            relationship_type: 'owner'
+          }, {
+            onConflict: 'tenant_id,source_id'
+          });
+
+        // 3. Trigger Scrape via RPC (Secure)
         const { error: rpcError } = await supabase
-          .rpc('request_source_scan', { p_source_id: sourceLink.source_id });
+          .rpc('request_source_scan', { p_source_id: sourceData.id });
 
         if (rpcError) throw rpcError;
 
-        // 3. Update tenant status for UI feedback
+        // 4. Update tenant status for UI feedback
         await supabase
           .from('tenants')
           .update({ inventory_status: 'pending' })
