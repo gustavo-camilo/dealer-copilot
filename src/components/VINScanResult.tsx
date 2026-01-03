@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
 import { VehicleCommentSection } from './VehicleCommentSection';
@@ -49,6 +49,10 @@ interface VINScanResultProps {
         custom_transport_cost?: number | null;
         custom_max_bid?: number | null;
         custom_market_price?: number | null;
+        auction_url?: string | null;
+        purchase_status?: 'purchased' | 'not_purchased';
+        purchase_price?: number | null;
+        purchase_date?: string | null;
     };
     onClose?: () => void;
     onScanAnother?: () => void;
@@ -68,6 +72,10 @@ interface VINScanResultProps {
         custom_transport_cost?: number | null;
         custom_max_bid?: number | null;
         custom_market_price?: number | null;
+        auction_url?: string | null;
+        purchase_status?: 'purchased' | 'not_purchased';
+        purchase_price?: number | null;
+        purchase_date?: string | null;
     }) => void;
 }
 
@@ -101,6 +109,10 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     const [currentRecommendation, setCurrentRecommendation] = useState(scanData.recommendation);
     const [currentEstimatedProfit, setCurrentEstimatedProfit] = useState<number | null>(null);
     const [currentMaxBid, setCurrentMaxBid] = useState<number | null>(null);
+    const [currentPurchaseStatus, setCurrentPurchaseStatus] = useState<'purchased' | 'not_purchased'>(
+        scanData.purchase_status || 'not_purchased'
+    );
+    const [currentAuctionUrl, setCurrentAuctionUrl] = useState<string>(scanData.auction_url || '');
 
     const handleSaveCosts = async (costs: { recon: number; transport: number; maxBid: number; marketPrice: number }) => {
         if (!scanData.id) return;
@@ -196,6 +208,136 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
         }
     };
 
+    const handleTogglePurchaseStatus = async () => {
+        if (!scanData.id) return;
+
+        const newStatus = currentPurchaseStatus === 'purchased' ? 'not_purchased' : 'purchased';
+
+        // If marking as purchased, show toast to capture price
+        if (newStatus === 'purchased') {
+            // Show custom toast with price input
+            toast.custom((t) => {
+                // eslint-disable-next-line react-hooks/rules-of-hooks
+                const [priceInput, setPriceInput] = useState('');
+
+                return (
+                    <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white dark:bg-navy-900 shadow-lg dark:shadow-2xl rounded-lg pointer-events-auto flex flex-col ring-1 ring-black dark:ring-navy-700 ring-opacity-5 p-4`}>
+                        <div className="flex items-start mb-3">
+                            <div className="flex-shrink-0">
+                                <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                            </div>
+                            <div className="ml-3 flex-1">
+                                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                                    Vehicle Marked as Purchased
+                                </p>
+                                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                                    Would you like to record the purchase price?
+                                </p>
+                            </div>
+                        </div>
+                        <input
+                            type="number"
+                            placeholder="Purchase price (optional)"
+                            value={priceInput}
+                            onChange={(e) => setPriceInput(e.target.value)}
+                            className="w-full px-3 py-2 mb-3 border border-gray-300 dark:border-navy-600 rounded-md bg-white dark:bg-navy-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+                            step="100"
+                            min="0"
+                        />
+                        <div className="flex gap-2">
+                            <button
+                                onClick={async () => {
+                                    toast.dismiss(t.id);
+                                    await savePurchaseStatus(newStatus, priceInput ? parseFloat(priceInput) : null);
+                                }}
+                                className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+                            >
+                                Save
+                            </button>
+                            <button
+                                onClick={async () => {
+                                    toast.dismiss(t.id);
+                                    await savePurchaseStatus(newStatus, null);
+                                }}
+                                className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+                            >
+                                Skip Price
+                            </button>
+                        </div>
+                    </div>
+                );
+            }, { duration: Infinity });
+        } else {
+            // If unmarking as purchased, just save
+            await savePurchaseStatus(newStatus, null);
+        }
+    };
+
+    const savePurchaseStatus = async (status: 'purchased' | 'not_purchased', price: number | null) => {
+        if (!scanData.id) return;
+
+        setIsSaving(true);
+        try {
+            const updateData: any = {
+                purchase_status: status,
+                purchase_date: status === 'purchased' ? new Date().toISOString() : null,
+                purchase_price: status === 'purchased' ? price : null,
+            };
+
+            const { error: updateError } = await supabase
+                .from('vin_scans')
+                .update(updateData)
+                .eq('id', scanData.id);
+
+            if (updateError) throw updateError;
+
+            setCurrentPurchaseStatus(status);
+            toast.success(status === 'purchased' ? 'Marked as purchased' : 'Unmarked as purchased');
+
+            // Notify parent of update
+            if (onUpdate) {
+                onUpdate({
+                    id: scanData.id,
+                    purchase_status: status,
+                    purchase_price: updateData.purchase_price,
+                    purchase_date: updateData.purchase_date,
+                });
+            }
+        } catch (err: any) {
+            console.error('Error updating purchase status:', err);
+            toast.error('Failed to update purchase status');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
+    const handleSaveAuctionUrl = async () => {
+        if (!scanData.id) return;
+
+        setIsSaving(true);
+        try {
+            const { error } = await supabase
+                .from('vin_scans')
+                .update({ auction_url: currentAuctionUrl || null })
+                .eq('id', scanData.id);
+
+            if (error) throw error;
+            toast.success('Auction URL saved');
+
+            if (onUpdate) {
+                onUpdate({
+                    id: scanData.id,
+                    auction_url: currentAuctionUrl || null,
+                });
+            }
+        } catch (error) {
+            console.error('Error saving URL:', error);
+            toast.error('Failed to save URL');
+        } finally {
+            setIsSaving(false);
+        }
+    };
+
     const handleReportMissingData = async () => {
         if (!scanData?.decoded_data) return;
 
@@ -250,6 +392,38 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     return (
         <div className={`bg-gray-50 dark:bg-brand-bg-dark ${isModal ? 'p-0' : 'min-h-screen'}`}>
             <div className={`${isModal ? '' : 'max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8'}`}>
+                {/* Top Navigation Bar */}
+                {!isModal && (
+                    <div className="mb-6 flex items-center gap-3">
+                        {/* Go Back Button */}
+                        <button
+                            onClick={() => window.location.href = '/recommendations'}
+                            className="flex items-center gap-2 px-4 py-2 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition"
+                        >
+                            <ArrowLeft className="w-5 h-5" />
+                            <span className="hidden sm:inline">Go Back</span>
+                        </button>
+
+                        {/* Scan Another VIN */}
+                        {onScanAnother && (
+                            <button
+                                onClick={onScanAnother}
+                                className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
+                            >
+                                Scan Another VIN
+                            </button>
+                        )}
+
+                        {/* View All Recommendations */}
+                        <button
+                            onClick={() => window.location.href = '/recommendations'}
+                            className="flex-1 bg-blue-900 dark:bg-blue-800 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-800 dark:hover:bg-blue-700 transition"
+                        >
+                            View All Recommendations
+                        </button>
+                    </div>
+                )}
+
                 {/* Vehicle Header */}
                 <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6 mb-6">
                     <div className="flex items-center justify-between mb-4">
@@ -262,10 +436,9 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                 {scanData.decoded_data.trim && getSimplifiedBodyType(scanData.decoded_data.body_type) && ' • '}
                                 {getSimplifiedBodyType(scanData.decoded_data.body_type)}
                             </p>
-                            {/* If VIN is available in decoded_data, show it. Otherwise it might be in the parent object but we didn't pass it explicitly in the interface above except inside decoded_data potentially */}
-                            {/* We can assume decoded_data has what we need or pass vin separately if needed. For now, let's rely on what's there. */}
                         </div>
-                        <div className="flex flex-col items-end">
+                        <div className="flex flex-col items-end gap-2">
+                            {/* Recommendation Dropdown */}
                             <div className="relative group">
                                 <select
                                     value={currentRecommendation || ''}
@@ -291,6 +464,21 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                     )}
                                 </div>
                             </div>
+
+                            {/* Purchase Status Toggle Button */}
+                            {scanData.id && (
+                                <button
+                                    onClick={handleTogglePurchaseStatus}
+                                    disabled={isSaving}
+                                    className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all ${
+                                        currentPurchaseStatus === 'purchased'
+                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-2 border-green-300 dark:border-green-700 hover:bg-green-200 dark:hover:bg-green-900/50'
+                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-2 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                    }`}
+                                >
+                                    {currentPurchaseStatus === 'purchased' ? '✓ Purchased' : 'Not Purchased'}
+                                </button>
+                            )}
                         </div>
                     </div>
 
@@ -547,38 +735,12 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                         <VehicleCommentSection
                             vinScanId={scanData.id}
                             tenantId={user.tenant_id}
+                            currentAuctionUrl={currentAuctionUrl}
+                            onAuctionUrlChange={setCurrentAuctionUrl}
+                            onSaveAuctionUrl={handleSaveAuctionUrl}
                         />
                     </div>
                 )}
-
-                {/* Action Buttons */}
-                <div className="flex gap-4 mt-6">
-                    {onScanAnother && (
-                        <button
-                            onClick={onScanAnother}
-                            className="flex-1 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 py-3 rounded-lg font-semibold hover:bg-gray-50 dark:hover:bg-gray-700 transition"
-                        >
-                            Scan Another VIN
-                        </button>
-                    )}
-                    {!isModal && (
-                        onClose ? (
-                            <button
-                                onClick={onClose}
-                                className="flex-1 bg-blue-900 dark:bg-blue-800 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 dark:hover:bg-blue-700 transition"
-                            >
-                                Close
-                            </button>
-                        ) : (
-                            <button
-                                onClick={() => window.location.href = '/recommendations'} // Redirect to recommendations page
-                                className="flex-1 bg-blue-900 dark:bg-blue-800 text-white py-3 rounded-lg font-semibold hover:bg-blue-800 dark:hover:bg-blue-700 transition"
-                            >
-                                View All Recommendations
-                            </button>
-                        )
-                    )}
-                </div>
             </div>
         </div>
     );

@@ -14,6 +14,8 @@ import {
   Trash2,
   AlertCircle,
   TrendingDown,
+  ExternalLink,
+  CheckCircle,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import VINScanResult from '../components/VINScanResult';
@@ -43,6 +45,10 @@ interface Recommendation {
   custom_transport_cost: number | null;
   custom_max_bid: number | null;
   custom_market_price: number | null;
+  auction_url: string | null;
+  purchase_status: 'purchased' | 'not_purchased';
+  purchase_price: number | null;
+  purchase_date: string | null;
 }
 
 const PAGE_SIZE = 25;
@@ -60,6 +66,7 @@ export default function RecommendationsPage() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditingCosts, setIsEditingCosts] = useState(false);
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showPurchased, setShowPurchased] = useState(false);
   const scanResultRef = useRef<{ saveCosts: () => void }>(null);
 
   const handleCloseModal = () => {
@@ -149,22 +156,28 @@ export default function RecommendationsPage() {
 
   // Filter recommendations
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredRecommendations(recommendations);
-      return;
+    let filtered = [...recommendations];
+
+    // Hide purchased by default
+    if (!showPurchased) {
+      filtered = filtered.filter(r => r.purchase_status !== 'purchased');
     }
 
-    const query = searchQuery.toLowerCase();
-    const filtered = recommendations.filter(
-      (r) =>
-        r.vin.toLowerCase().includes(query) ||
-        r.decoded_data.make.toLowerCase().includes(query) ||
-        r.decoded_data.model.toLowerCase().includes(query) ||
-        `${r.decoded_data.year}`.includes(query) ||
-        (r.decoded_data.trim && r.decoded_data.trim.toLowerCase().includes(query))
-    );
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (r) =>
+          r.vin.toLowerCase().includes(query) ||
+          r.decoded_data.make.toLowerCase().includes(query) ||
+          r.decoded_data.model.toLowerCase().includes(query) ||
+          `${r.decoded_data.year}`.includes(query) ||
+          (r.decoded_data.trim && r.decoded_data.trim.toLowerCase().includes(query))
+      );
+    }
+
     setFilteredRecommendations(filtered);
-  }, [searchQuery, recommendations]);
+  }, [searchQuery, recommendations, showPurchased]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -319,6 +332,105 @@ export default function RecommendationsPage() {
     });
   };
 
+  const handleTogglePurchaseStatus = async (e: React.MouseEvent, scanId: string, currentStatus: 'purchased' | 'not_purchased') => {
+    e.stopPropagation();
+
+    const newStatus = currentStatus === 'purchased' ? 'not_purchased' : 'purchased';
+
+    if (newStatus === 'purchased') {
+      // Show toast to capture price
+      toast.custom((t) => {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        const [priceInput, setPriceInput] = useState('');
+
+        return (
+          <div className={`${t.visible ? 'animate-enter' : 'animate-leave'} max-w-md w-full bg-white dark:bg-navy-900 shadow-lg dark:shadow-2xl rounded-lg pointer-events-auto flex flex-col ring-1 ring-black dark:ring-navy-700 ring-opacity-5 p-4`}>
+            <div className="flex items-start mb-3">
+              <div className="flex-shrink-0">
+                <div className="h-10 w-10 rounded-full bg-green-100 dark:bg-green-900 flex items-center justify-center">
+                  <CheckCircle className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+              </div>
+              <div className="ml-3 flex-1">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
+                  Mark as Purchased?
+                </p>
+                <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  Would you like to record the purchase price?
+                </p>
+              </div>
+            </div>
+            <input
+              type="number"
+              placeholder="Purchase price (optional)"
+              value={priceInput}
+              onChange={(e) => setPriceInput(e.target.value)}
+              className="w-full px-3 py-2 mb-3 border border-gray-300 dark:border-navy-600 rounded-md bg-white dark:bg-navy-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-green-500"
+              step="100"
+              min="0"
+            />
+            <div className="flex gap-2">
+              <button
+                onClick={async () => {
+                  toast.dismiss(t.id);
+                  await savePurchaseStatus(scanId, newStatus, priceInput ? parseFloat(priceInput) : null);
+                }}
+                className="flex-1 px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition"
+              >
+                Save
+              </button>
+              <button
+                onClick={async () => {
+                  toast.dismiss(t.id);
+                  await savePurchaseStatus(scanId, newStatus, null);
+                }}
+                className="px-3 py-2 text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200"
+              >
+                Skip Price
+              </button>
+            </div>
+          </div>
+        );
+      }, { duration: Infinity });
+    } else {
+      await savePurchaseStatus(scanId, newStatus, null);
+    }
+  };
+
+  const savePurchaseStatus = async (scanId: string, status: 'purchased' | 'not_purchased', price: number | null) => {
+    try {
+      const updateData: any = {
+        purchase_status: status,
+        purchase_date: status === 'purchased' ? new Date().toISOString() : null,
+        purchase_price: status === 'purchased' ? price : null,
+      };
+
+      const { error } = await supabase
+        .from('vin_scans')
+        .update(updateData)
+        .eq('id', scanId);
+
+      if (error) throw error;
+
+      // Update local state
+      setRecommendations(prev => prev.map(rec =>
+        rec.id === scanId
+          ? { ...rec, ...updateData }
+          : rec
+      ));
+      setFilteredRecommendations(prev => prev.map(rec =>
+        rec.id === scanId
+          ? { ...rec, ...updateData }
+          : rec
+      ));
+
+      toast.success(status === 'purchased' ? 'Marked as purchased' : 'Unmarked as purchased');
+    } catch (error) {
+      console.error('Error updating purchase status:', error);
+      toast.error('Failed to update purchase status');
+    }
+  };
+
   const getRecommendationBadge = (recommendation: string) => {
     const badges = {
       buy: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
@@ -419,6 +531,21 @@ export default function RecommendationsPage() {
           </div>
         </div>
 
+        {/* Purchase Filter Toggle */}
+        <div className="mb-4 flex items-center gap-2">
+          <label className="flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showPurchased}
+              onChange={(e) => setShowPurchased(e.target.checked)}
+              className="w-4 h-4 text-blue-600 bg-gray-100 dark:bg-navy-700 border-gray-300 dark:border-navy-600 rounded focus:ring-blue-500 focus:ring-2"
+            />
+            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+              Show purchased vehicles ({recommendations.filter(r => r.purchase_status === 'purchased').length})
+            </span>
+          </label>
+        </div>
+
         {/* Results Count */}
         {searchQuery && (
           <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
@@ -449,7 +576,9 @@ export default function RecommendationsPage() {
               <div
                 key={rec.id}
                 onClick={() => setSelectedRec(rec)}
-                className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer"
+                className={`bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer ${
+                  rec.purchase_status === 'purchased' ? 'opacity-75' : ''
+                }`}
               >
                 <div className="flex items-center justify-between gap-4">
                   {/* Left: Vehicle Info */}
@@ -461,17 +590,55 @@ export default function RecommendationsPage() {
                       <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(rec.recommendation)} flex-shrink-0`}>
                         {rec.recommendation.toUpperCase()}
                       </span>
+                      {rec.purchase_status === 'purchased' && (
+                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 flex-shrink-0">
+                          PURCHASED
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <span className="hidden sm:inline">Max Bid: {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}</span>
                       <span className={`hidden sm:inline font-medium ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>
                         Profit: {rec.estimated_profit ? formatCurrency(rec.estimated_profit) : 'N/A'}
                       </span>
+                      {rec.purchase_status === 'purchased' && rec.purchase_price && (
+                        <span className="hidden sm:inline font-medium text-green-600 dark:text-green-400">
+                          Paid: {formatCurrency(rec.purchase_price)}
+                        </span>
+                      )}
                     </div>
                   </div>
 
                   {/* Right: Actions */}
                   <div className="flex items-center gap-2">
+                    {/* Purchase Toggle Button */}
+                    <button
+                      onClick={(e) => handleTogglePurchaseStatus(e, rec.id, rec.purchase_status)}
+                      className={`p-2 rounded-lg transition flex-shrink-0 ${
+                        rec.purchase_status === 'purchased'
+                          ? 'text-green-600 dark:text-green-400 bg-green-50 dark:bg-green-900/30 hover:bg-green-100 dark:hover:bg-green-900/50'
+                          : 'text-gray-400 dark:text-gray-500 hover:text-green-600 dark:hover:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30'
+                      }`}
+                      title={rec.purchase_status === 'purchased' ? 'Mark as not purchased' : 'Mark as purchased'}
+                    >
+                      <CheckCircle className="w-5 h-5" />
+                    </button>
+
+                    {/* URL Button (only if auction_url exists) */}
+                    {rec.auction_url && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          window.open(rec.auction_url!, '_blank');
+                        }}
+                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
+                        title="Open auction listing"
+                      >
+                        <ExternalLink className="w-5 h-5" />
+                      </button>
+                    )}
+
+                    {/* View Details Button */}
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
@@ -482,6 +649,8 @@ export default function RecommendationsPage() {
                     >
                       <ChevronRight className="w-5 h-5" />
                     </button>
+
+                    {/* Delete Button */}
                     <button
                       onClick={(e) => handleDeleteScan(e, rec.id)}
                       className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
@@ -562,6 +731,10 @@ export default function RecommendationsPage() {
                   custom_transport_cost: selectedRec.custom_transport_cost,
                   custom_max_bid: selectedRec.custom_max_bid,
                   custom_market_price: selectedRec.custom_market_price,
+                  auction_url: selectedRec.auction_url,
+                  purchase_status: selectedRec.purchase_status,
+                  purchase_price: selectedRec.purchase_price,
+                  purchase_date: selectedRec.purchase_date,
                 }}
                 isModal={true}
                 tenantZipCode={tenant?.zip_code}

@@ -10,6 +10,8 @@ export type TitleStatus = 'clean' | 'salvage' | 'rebuilt' | 'unknown';
 
 export type RecommendationType = 'buy' | 'maybe' | 'pass';
 
+export type PurchaseStatusType = 'purchased' | 'not_purchased';
+
 export type SubscriptionStatus = 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid';
 
 export interface AuctionFeeThreshold {
@@ -160,6 +162,10 @@ export interface VINScan {
   custom_transport_cost: number | null;
   custom_max_bid: number | null;
   custom_market_price: number | null;
+  auction_url: string | null;
+  purchase_status: PurchaseStatusType;
+  purchase_price: number | null;
+  purchase_date: string | null;
   created_at: string;
 }
 
