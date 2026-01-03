@@ -107,17 +107,36 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
 
         setIsSaving(true);
         try {
+            // Only update the fields that actually changed
+            const updateData: any = {
+                costs_edited: true,
+            };
+
+            // Only include fields that have custom values
+            if (costs.recon !== (costSettings?.reconditioning_cost || 800)) {
+                updateData.custom_recon_cost = costs.recon;
+            }
+            if (costs.transport !== (costSettings?.transport_cost || 150)) {
+                updateData.custom_transport_cost = costs.transport;
+            }
+            if (costs.maxBid !== (scanData.max_bid_suggestion || 0)) {
+                updateData.custom_max_bid = costs.maxBid;
+            }
+            if (costs.marketPrice !== (scanData.market_data?.averagePrice || 0)) {
+                updateData.custom_market_price = costs.marketPrice;
+            }
+
+            // Always update profit calculations if they changed
+            if (currentEstimatedProfit !== null && currentEstimatedProfit !== scanData.estimated_profit) {
+                updateData.estimated_profit = currentEstimatedProfit;
+            }
+            if (currentMaxBid !== null && currentMaxBid !== scanData.max_bid_suggestion) {
+                updateData.max_bid_suggestion = currentMaxBid;
+            }
+
             const { error: saveError } = await supabase
                 .from('vin_scans')
-                .update({
-                    custom_recon_cost: costs.recon,
-                    custom_transport_cost: costs.transport,
-                    custom_max_bid: costs.maxBid,
-                    custom_market_price: costs.marketPrice,
-                    estimated_profit: currentEstimatedProfit,
-                    max_bid_suggestion: currentMaxBid,
-                    costs_edited: true,
-                })
+                .update(updateData)
                 .eq('id', scanData.id);
 
             if (saveError) throw saveError;

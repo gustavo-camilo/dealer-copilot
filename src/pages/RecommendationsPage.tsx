@@ -321,9 +321,9 @@ export default function RecommendationsPage() {
 
   const getRecommendationBadge = (recommendation: string) => {
     const badges = {
-      buy: 'bg-green-100 text-green-800',
-      maybe: 'bg-yellow-100 text-yellow-800',
-      pass: 'bg-red-100 text-red-800',
+      buy: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300',
+      maybe: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-300',
+      pass: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300',
     };
 
     return badges[recommendation as keyof typeof badges];
