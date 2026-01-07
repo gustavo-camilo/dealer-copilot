@@ -366,9 +366,9 @@ export default function VINScansPage() {
 
                 {/* Mobile Layout */}
                 <div className="sm:hidden">
-                  {/* Title and Badge - Full Width */}
-                  <div className="flex items-center gap-2 mb-2">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                  {/* Row 1: Title and Badge - Full Width, wraps if needed */}
+                  <div className="flex items-start gap-2 mb-3">
+                    <h3 className="font-semibold text-gray-900 dark:text-white flex-1">
                       {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
                     </h3>
                     <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
@@ -376,10 +376,10 @@ export default function VINScansPage() {
                     </span>
                   </div>
 
-                  {/* VIN and Actions Row */}
-                  <div className="flex items-center justify-between gap-2 mb-3">
-                    {/* VIN with Copy Button */}
-                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                  {/* Row 2: VIN on LEFT, Buttons on RIGHT */}
+                  <div className="flex items-center justify-between gap-3 mb-3">
+                    {/* Left: VIN with Copy Button */}
+                    <div className="flex items-center gap-1.5 flex-1 min-w-0">
                       <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
                         {scan.vin}
                       </span>
@@ -396,21 +396,21 @@ export default function VINScansPage() {
                       </button>
                     </div>
 
-                    {/* Action Buttons */}
-                    <div className="flex items-center gap-2">
+                    {/* Right: Action Buttons */}
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
                           setSelectedScan(scan);
                         }}
-                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition flex-shrink-0"
+                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition"
                         title="View Details"
                       >
                         <ChevronRight className="w-5 h-5" />
                       </button>
                       <button
                         onClick={(e) => handleDeleteScan(e, scan.id)}
-                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition flex-shrink-0"
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition"
                         title="Delete Scan"
                       >
                         <Trash2 className="w-5 h-5" />
@@ -418,7 +418,7 @@ export default function VINScansPage() {
                     </div>
                   </div>
 
-                  {/* Financial Info */}
+                  {/* Row 3: Financial Info */}
                   <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex gap-4 text-sm">
                     <div>
                       <span className="text-gray-500 dark:text-gray-400">Max Bid:</span>
