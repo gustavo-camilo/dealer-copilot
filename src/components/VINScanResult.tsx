@@ -378,14 +378,14 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                 {getSimplifiedBodyType(scanData.decoded_data.body_type)}
                             </p>
                         </div>
-                        <div className="flex flex-col items-end gap-2">
+                        <div className="flex flex-col sm:flex-row items-end gap-2">
                             {/* Recommendation Dropdown */}
-                            <div className="relative group">
+                            <div className="relative group w-full sm:w-48">
                                 <select
                                     value={currentRecommendation || ''}
                                     onChange={(e) => handleUpdateRecommendation(e.target.value as 'buy' | 'maybe' | 'pass')}
                                     disabled={isSaving}
-                                    className={`appearance-none px-4 py-2.5 pr-10 rounded-xl font-bold transition-all focus:ring-2 focus:ring-indigo-500 cursor-pointer border-2
+                                    className={`appearance-none w-full px-4 py-2.5 pr-10 rounded-xl font-bold transition-all focus:ring-2 focus:ring-indigo-500 cursor-pointer border-2
                                         ${currentRecommendation === 'buy' ? 'bg-green-100 dark:bg-green-900 border-green-200 dark:border-green-700 text-green-800 dark:text-green-200 hover:bg-green-200 dark:hover:bg-green-800' :
                                             currentRecommendation === 'maybe' ? 'bg-yellow-100 dark:bg-yellow-900 border-yellow-200 dark:border-yellow-700 text-yellow-800 dark:text-yellow-200 hover:bg-yellow-200 dark:hover:bg-yellow-800' :
                                                 'bg-red-100 dark:bg-red-900 border-red-200 dark:border-red-700 text-red-800 dark:text-red-200 hover:bg-red-200 dark:hover:bg-red-800'}`}
@@ -394,7 +394,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                     <option value="maybe" className="bg-white dark:bg-gray-800 text-yellow-800 dark:text-yellow-200">🟡 Maybe</option>
                                     <option value="pass" className="bg-white dark:bg-gray-800 text-red-800 dark:text-red-200">🔴 Pass</option>
                                 </select>
-                                <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                                <div className="absolute inset-y-0 right-2 flex items-center pr-1 pointer-events-none">
                                     {isSaving ? (
                                         <Loader2 className="h-4 w-4 animate-spin opacity-50" />
                                     ) : (
@@ -408,22 +408,31 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
 
                             {/* Purchase Status Dropdown */}
                             {scanData.id && (
-                                <select
-                                    value={currentPurchaseStatus}
-                                    onChange={(e) => savePurchaseStatus(e.target.value as 'purchased' | 'not_purchased' | 'pending')}
-                                    disabled={isSaving}
-                                    className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all border-2 ${
-                                        currentPurchaseStatus === 'purchased'
-                                            ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700'
-                                            : currentPurchaseStatus === 'not_purchased'
-                                            ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700'
-                                            : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600'
-                                    }`}
-                                >
-                                    <option value="pending">⏳ Pending</option>
-                                    <option value="purchased">✓ Purchased</option>
-                                    <option value="not_purchased">✗ Not Purchased</option>
-                                </select>
+                                <div className="relative w-full sm:w-48">
+                                    <select
+                                        value={currentPurchaseStatus}
+                                        onChange={(e) => savePurchaseStatus(e.target.value as 'purchased' | 'not_purchased' | 'pending')}
+                                        disabled={isSaving}
+                                        className={`appearance-none w-full px-4 py-2.5 pr-10 rounded-xl font-bold text-sm transition-all border-2 cursor-pointer focus:ring-2 focus:ring-indigo-500 ${
+                                            currentPurchaseStatus === 'purchased'
+                                                ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700 hover:bg-green-200 dark:hover:bg-green-900/50'
+                                                : currentPurchaseStatus === 'not_purchased'
+                                                ? 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-300 border-red-300 dark:border-red-700 hover:bg-red-200 dark:hover:bg-red-900/50'
+                                                : 'bg-gray-100 dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                        }`}
+                                    >
+                                        <option value="pending">⏳ Pending</option>
+                                        <option value="purchased">✓ Purchased</option>
+                                        <option value="not_purchased">✗ Not Purchased</option>
+                                    </select>
+                                    <div className="absolute inset-y-0 right-2 flex items-center pr-1 pointer-events-none">
+                                        <ChevronDownIcon className={`h-5 w-5 ${
+                                            currentPurchaseStatus === 'purchased' ? 'text-green-600 dark:text-green-400' :
+                                            currentPurchaseStatus === 'not_purchased' ? 'text-red-600 dark:text-red-400' :
+                                            'text-gray-600 dark:text-gray-400'
+                                        }`} />
+                                    </div>
+                                </div>
                             )}
                         </div>
                     </div>

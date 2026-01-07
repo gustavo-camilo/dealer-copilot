@@ -1,7 +1,10 @@
 import { Link } from 'react-router-dom';
-import { Car, Target, Smartphone, TrendingUp, BarChart3, Clock, CheckCircle, ArrowRight, Zap, Shield, LineChart } from 'lucide-react';
+import { Car, Target, Smartphone, TrendingUp, BarChart3, Clock, CheckCircle, ArrowRight, Zap, Shield, LineChart, Menu, X } from 'lucide-react';
+import { useState } from 'react';
 
 export default function LandingPage() {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-slate-950">
       <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
@@ -25,8 +28,56 @@ export default function LandingPage() {
                 Start Free Trial
               </Link>
             </div>
+            <button
+              className="md:hidden text-white p-2"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              aria-label="Toggle menu"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
           </div>
         </div>
+        {mobileMenuOpen && (
+          <div className="md:hidden bg-slate-900/95 backdrop-blur-md border-t border-slate-800">
+            <div className="px-4 py-6 space-y-4">
+              <a
+                href="#features"
+                className="block text-slate-300 hover:text-white transition py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Features
+              </a>
+              <a
+                href="#how-it-works"
+                className="block text-slate-300 hover:text-white transition py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                How It Works
+              </a>
+              <a
+                href="#pricing"
+                className="block text-slate-300 hover:text-white transition py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Pricing
+              </a>
+              <Link
+                to="/signin"
+                className="block text-slate-300 hover:text-white transition py-2"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/signup"
+                className="block bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg shadow-orange-500/30 font-semibold text-center"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                Start Free Trial
+              </Link>
+            </div>
+          </div>
+        )}
       </nav>
 
       <section className="relative pt-24 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">

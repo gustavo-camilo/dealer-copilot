@@ -15,8 +15,6 @@ import {
   X,
   Car,
   Trash2,
-  LayoutGrid,
-  List,
   RefreshCw,
 } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
@@ -44,7 +42,6 @@ interface Vehicle {
 
 type StatusFilter = 'all' | 'active' | 'sold';
 type SortBy = 'recent' | 'price_asc' | 'price_desc' | 'oldest' | 'newest' | 'year_desc' | 'year_asc';
-type ViewMode = 'grid' | 'list';
 
 export default function ManageInventoryPage() {
   const { user, tenant, signOut } = useAuth();
@@ -56,7 +53,6 @@ export default function ManageInventoryPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
   const [sortBy, setSortBy] = useState<SortBy>('recent');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [menuOpen, setMenuOpen] = useState(false);
   const [stats, setStats] = useState({
     total: 0,
@@ -524,26 +520,6 @@ export default function ManageInventoryPage() {
                     <option value="year_asc">Year: Low to High</option>
                   </select>
                 </div>
-
-                {/* View Toggle */}
-                <div className="flex items-center gap-2 bg-gray-100 dark:bg-navy-800 p-1 rounded-lg">
-                  <button
-                    onClick={() => setViewMode('grid')}
-                    className={`p-2 rounded-md transition-colors ${viewMode === 'grid' ? 'bg-white dark:bg-navy-700 shadow-sm text-blue-600' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                      }`}
-                    title="Grid View"
-                  >
-                    <LayoutGrid className="w-5 h-5" />
-                  </button>
-                  <button
-                    onClick={() => setViewMode('list')}
-                    className={`p-2 rounded-md transition-colors ${viewMode === 'list' ? 'bg-white dark:bg-navy-700 shadow-sm text-blue-600' : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-                      }`}
-                    title="List View"
-                  >
-                    <List className="w-5 h-5" />
-                  </button>
-                </div>
               </div>
             </div>
 
@@ -552,7 +528,7 @@ export default function ManageInventoryPage() {
               Showing {filteredVehicles.length} of {vehicles.length} vehicles
             </div>
 
-            {/* Vehicles Grid or List */}
+            {/* Vehicles List */}
             {loading ? (
               <div className="flex justify-center items-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 dark:border-orange-500"></div>
@@ -569,135 +545,15 @@ export default function ManageInventoryPage() {
                     : 'Start scraping your website to track inventory'}
                 </p>
               </div>
-            ) : viewMode === 'grid' ? (
-              /* Grid View */
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-                {filteredVehicles.map((vehicle) => {
-                  const firstImage = vehicle.image_urls && vehicle.image_urls.length > 0 ? vehicle.image_urls[0] : null;
-                  const daysInInventory = getDaysInInventory(vehicle.first_seen_at);
-
-                  return (
-                    <div
-                      key={vehicle.id}
-                      className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 overflow-hidden hover:shadow-lg transition-shadow"
-                    >
-                      {/* Vehicle Image */}
-                      <div className="relative h-40 md:h-48 bg-gray-100 dark:bg-navy-800">
-                        {firstImage ? (
-                          <img
-                            src={firstImage}
-                            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              // Fallback to placeholder if image fails to load
-                              e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5"%3E%3C/path%3E%3C/svg%3E';
-                            }}
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <Car className="w-12 h-12 md:w-16 md:h-16 text-gray-300 dark:text-gray-600" />
-                          </div>
-                        )}
-                        <div className="absolute top-2 right-2">
-                          {getStatusBadge(vehicle.status)}
-                        </div>
-                        <button
-                          onClick={() => handleDeleteVehicle(vehicle.id, `${vehicle.year} ${vehicle.make} ${vehicle.model}`)}
-                          className="absolute top-2 left-2 p-1.5 md:p-2 bg-white/90 dark:bg-navy-700/90 hover:bg-red-50 dark:hover:bg-red-900/50 rounded-full shadow-sm transition-colors group"
-                          title="Delete vehicle"
-                        >
-                          <Trash2 className="w-3 h-3 md:w-4 md:h-4 text-gray-500 dark:text-gray-400 group-hover:text-red-600 dark:group-hover:text-red-400" />
-                        </button>
-                      </div>
-
-                      {/* Vehicle Info */}
-                      <div className="p-3 md:p-4">
-                        {/* Title */}
-                        <h3 className="text-sm md:text-lg font-semibold text-gray-900 dark:text-white mb-1 md:mb-2 line-clamp-2">
-                          {vehicle.year} {vehicle.make} {vehicle.model}
-                        </h3>
-
-                        {/* Price and Mileage */}
-                        <div className="flex items-center justify-between mb-2 md:mb-3 pb-2 md:pb-3 border-b border-gray-200 dark:border-navy-700">
-                          <div className="text-lg md:text-2xl font-bold text-gray-900 dark:text-white">
-                            {formatCurrency(vehicle.price)}
-                          </div>
-                          {vehicle.mileage && (
-                            <div className="text-xs md:text-sm text-gray-600 dark:text-gray-400">
-                              {vehicle.mileage.toLocaleString()} mi
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Listing Date and Days */}
-                        <div className="space-y-1 text-xs md:text-sm text-gray-600 dark:text-gray-400 mb-2 md:mb-3">
-                          <div>
-                            <span className="font-medium">Listed:</span> {formatDate(vehicle.first_seen_at)}
-                          </div>
-                          <div>
-                            <span className="font-medium">Days:</span> {daysInInventory}
-                          </div>
-                        </div>
-
-                        {/* Additional Details (Collapsible) */}
-                        <div className="text-xs text-gray-500 dark:text-gray-500 space-y-1 mb-2 md:mb-3">
-                          {vehicle.stock_number && (
-                            <div className="hidden md:block">Stock #: {vehicle.stock_number}</div>
-                          )}
-                          {vehicle.exterior_color && (
-                            <div className="hidden md:block">Color: {vehicle.exterior_color}</div>
-                          )}
-                          <div className="font-mono truncate hidden md:block" title={vehicle.vin}>
-                            VIN: {vehicle.vin}
-                          </div>
-                        </div>
-
-                        {/* View Listing Link */}
-                        {vehicle.listing_url && (
-                          <a
-                            href={vehicle.listing_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="block w-full text-center text-xs md:text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium hover:underline"
-                          >
-                            View Listing →
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
             ) : (
               /* List View */
               <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 divide-y divide-gray-200 dark:divide-navy-700">
                 {filteredVehicles.map((vehicle) => {
-                  const firstImage = vehicle.image_urls && vehicle.image_urls.length > 0 ? vehicle.image_urls[0] : null;
-                  const daysInInventory = getDaysInInventory(vehicle.first_seen_at);
-
                   return (
                     <div
                       key={vehicle.id}
                       className="flex items-center gap-3 md:gap-4 p-3 md:p-4 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors"
                     >
-                      {/* Thumbnail */}
-                      <div className="relative w-16 h-16 md:w-20 md:h-20 flex-shrink-0 bg-gray-100 dark:bg-navy-800 rounded overflow-hidden">
-                        {firstImage ? (
-                          <img
-                            src={firstImage}
-                            alt={`${vehicle.year} ${vehicle.make} ${vehicle.model}`}
-                            className="w-full h-full object-cover"
-                            onError={(e) => {
-                              e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"%3E%3Cpath d="M7 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M17 17m-2 0a2 2 0 1 0 4 0a2 2 0 1 0 -4 0"%3E%3C/path%3E%3Cpath d="M5 17h-2v-6l2 -5h9l4 5h1a2 2 0 0 1 2 2v4h-2m-4 0h-6m-6 -6h15m-6 0v-5"%3E%3C/path%3E%3C/svg%3E';
-                            }}
-                          />
-                        ) : (
-                          <div className="flex items-center justify-center h-full">
-                            <Car className="w-8 h-8 text-gray-300 dark:text-gray-600" />
-                          </div>
-                        )}
-                      </div>
-
                       {/* Vehicle Info */}
                       <div className="flex-1 min-w-0">
                         <div className="flex items-start justify-between gap-2">
@@ -710,7 +566,6 @@ export default function ManageInventoryPage() {
                               {vehicle.mileage && (
                                 <span className="hidden md:inline">{vehicle.mileage.toLocaleString()} mi</span>
                               )}
-                              <span className="hidden md:inline">{daysInInventory} days</span>
                             </div>
                           </div>
                           <div className="flex items-center gap-2 flex-shrink-0">

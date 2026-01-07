@@ -61,7 +61,7 @@ export default function RecommendationsPage() {
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<PurchaseStatusFilter>('all');
+  const [statusFilter, setStatusFilter] = useState<PurchaseStatusFilter>('pending');
 
   const observerTarget = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState({
@@ -420,12 +420,13 @@ export default function RecommendationsPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as PurchaseStatusFilter)}
-            className="px-4 py-3 border border-gray-300 dark:border-navy-600 bg-white dark:bg-navy-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="px-4 py-3 pr-10 border border-gray-300 dark:border-navy-600 bg-white dark:bg-navy-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
+            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
           >
-            <option value="all">All Vehicles</option>
             <option value="pending">Pending ({recommendations.filter(r => r.purchase_status === 'pending').length})</option>
             <option value="purchased">Purchased ({recommendations.filter(r => r.purchase_status === 'purchased').length})</option>
             <option value="not_purchased">Not Purchased ({recommendations.filter(r => r.purchase_status === 'not_purchased').length})</option>
+            <option value="all">All Vehicles</option>
           </select>
         </div>
 

@@ -3,7 +3,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { useTheme } from '../contexts/ThemeContext';
 import { supabase } from '../lib/supabase';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
-import { Target, Menu, X, Trash2, Plus, Moon, Sun } from 'lucide-react';
+import { Target, Menu, X, Trash2, Plus, Moon, Sun, ChevronDown } from 'lucide-react';
 import NavigationMenu from '../components/NavigationMenu';
 import Header from '../components/Header';
 import { normalizeDomain } from '../utils/url';
@@ -31,6 +31,9 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // Accordion state
+  const [openAccordions, setOpenAccordions] = useState<string[]>([]);
+
   // Form state
   const [dealershipName, setDealershipName] = useState('');
   const [websiteUrl, setWebsiteUrl] = useState('');
@@ -48,6 +51,12 @@ export default function SettingsPage() {
   const [auctionSources, setAuctionSources] = useState<AuctionSource[]>([]);
   const [newAuctionName, setNewAuctionName] = useState('');
   const [addingAuction, setAddingAuction] = useState(false);
+
+  const toggleAccordion = (id: string) => {
+    setOpenAccordions(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    );
+  };
 
   const handleSignOut = async () => {
     try {
@@ -330,50 +339,83 @@ export default function SettingsPage() {
         )}
 
         {/* Appearance Settings */}
-        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Appearance</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            Customize how Dealer Co-Pilot looks on your device
-          </p>
+        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 mb-6 overflow-hidden">
+          <button
+            onClick={() => toggleAccordion('appearance')}
+            className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors"
+          >
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white text-left">Appearance</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 text-left">
+                Customize how Dealer Co-Pilot looks on your device
+              </p>
+            </div>
+            <ChevronDown
+              className={`h-5 w-5 text-gray-500 dark:text-gray-400 transition-transform ${
+                openAccordions.includes('appearance') ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
 
-          <div className="flex items-center justify-between">
-            <div className="flex items-center">
-              {theme === 'dark' ? (
-                <Moon className="h-5 w-5 text-navy-400 mr-3" />
-              ) : (
-                <Sun className="h-5 w-5 text-orange-500 mr-3" />
-              )}
-              <div>
-                <label className="block text-sm font-medium text-gray-900 dark:text-white">
-                  Dark Mode
-                </label>
-                <p className="text-xs text-gray-500 dark:text-gray-400">
-                  {theme === 'dark' ? 'Currently using dark theme' : 'Currently using light theme'}
-                </p>
+          {openAccordions.includes('appearance') && (
+            <div className="px-6 pb-6 border-t border-gray-200 dark:border-navy-700">
+              <div className="flex items-center justify-between pt-4">
+                <div className="flex items-center">
+                  {theme === 'dark' ? (
+                    <Moon className="h-5 w-5 text-navy-400 mr-3" />
+                  ) : (
+                    <Sun className="h-5 w-5 text-orange-500 mr-3" />
+                  )}
+                  <div>
+                    <label className="block text-sm font-medium text-gray-900 dark:text-white">
+                      Dark Mode
+                    </label>
+                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                      {theme === 'dark' ? 'Currently using dark theme' : 'Currently using light theme'}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  onClick={toggleTheme}
+                  className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-navy-900 ${
+                    theme === 'dark' ? 'bg-orange-600' : 'bg-gray-300'
+                  }`}
+                  aria-label="Toggle dark mode"
+                >
+                  <span
+                    className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
+                      theme === 'dark' ? 'translate-x-7' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
               </div>
             </div>
-
-            <button
-              onClick={toggleTheme}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-orange-500 focus:ring-offset-2 dark:focus:ring-offset-navy-900 ${
-                theme === 'dark' ? 'bg-orange-600' : 'bg-gray-300'
-              }`}
-              aria-label="Toggle dark mode"
-            >
-              <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  theme === 'dark' ? 'translate-x-7' : 'translate-x-1'
-                }`}
-              />
-            </button>
-          </div>
+          )}
         </div>
 
         {/* Dealership Profile */}
-        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Dealership Profile</h2>
+        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 mb-6 overflow-hidden">
+          <button
+            onClick={() => toggleAccordion('profile')}
+            className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors"
+          >
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white text-left">Dealership Profile</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 text-left">
+                Manage your dealership information and location
+              </p>
+            </div>
+            <ChevronDown
+              className={`h-5 w-5 text-gray-500 dark:text-gray-400 transition-transform ${
+                openAccordions.includes('profile') ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
 
-          <form onSubmit={handleSaveProfile} className="space-y-4">
+          {openAccordions.includes('profile') && (
+            <div className="px-6 pb-6 border-t border-gray-200 dark:border-navy-700">
+              <form onSubmit={handleSaveProfile} className="space-y-4 pt-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Dealership Name</label>
               <input
@@ -471,17 +513,33 @@ export default function SettingsPage() {
             >
               {saving ? 'Saving...' : 'Save Profile'}
             </button>
-          </form>
+              </form>
+            </div>
+          )}
         </div>
 
         {/* Cost Settings */}
-        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Default Cost Settings</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            These values will be used as defaults when analyzing vehicles. You can override them for individual vehicles.
-          </p>
+        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 mb-6 overflow-hidden">
+          <button
+            onClick={() => toggleAccordion('costs')}
+            className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors"
+          >
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white text-left">Default Cost Settings</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 text-left">
+                These values will be used as defaults when analyzing vehicles
+              </p>
+            </div>
+            <ChevronDown
+              className={`h-5 w-5 text-gray-500 dark:text-gray-400 transition-transform ${
+                openAccordions.includes('costs') ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
 
-          <form onSubmit={handleSaveCostSettings} className="space-y-4">
+          {openAccordions.includes('costs') && (
+            <div className="px-6 pb-6 border-t border-gray-200 dark:border-navy-700">
+              <form onSubmit={handleSaveCostSettings} className="space-y-4 pt-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Auction Fee Thresholds</label>

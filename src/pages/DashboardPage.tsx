@@ -14,7 +14,6 @@ export default function DashboardPage() {
   const [stats, setStats] = useState({
     totalVehicles: 0,
     portfolioValue: 0,
-    avgDaysInInventory: 0,
     weekSales: 0,
   });
   const [recentScans, setRecentScans] = useState<VINScan[]>([]);
@@ -148,14 +147,10 @@ export default function DashboardPage() {
 
       if (vehicles) {
         const totalValue = vehicles.reduce((sum, v) => sum + Number(v.price), 0);
-        const avgDays = vehicles.length > 0
-          ? vehicles.reduce((sum, v) => sum + v.days_in_inventory, 0) / vehicles.length
-          : 0;
 
         setStats({
           totalVehicles: vehicles.length,
           portfolioValue: totalValue,
-          avgDaysInInventory: Math.round(avgDays),
           weekSales: recentSales?.length || 0,
         });
       }
@@ -287,7 +282,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
           <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
             <div className="flex items-center justify-between mb-2">
               <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Vehicles</h3>
@@ -304,14 +299,6 @@ export default function DashboardPage() {
             <p className="text-3xl font-bold text-gray-900 dark:text-white">
               ${stats.portfolioValue.toLocaleString()}
             </p>
-          </div>
-
-          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Avg Days on Lot</h3>
-              <Clock className="h-5 w-5 text-blue-900 dark:text-sky-400" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.avgDaysInInventory}</p>
           </div>
 
           <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
