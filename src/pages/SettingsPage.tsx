@@ -785,8 +785,26 @@ export default function SettingsPage() {
 
         {/* Subscription Info */}
         <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 overflow-hidden">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Subscription</h2>
+          <button
+            onClick={() => toggleAccordion('subscription')}
+            className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors"
+          >
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white text-left">Subscription</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 text-left">
+                View your plan details and upgrade options
+              </p>
+            </div>
+            <ChevronDown
+              className={`h-5 w-5 text-gray-500 dark:text-gray-400 transition-transform ${
+                openAccordions.includes('subscription') ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
 
+          {openAccordions.includes('subscription') && (
+            <div className="px-6 pb-6 border-t border-gray-200 dark:border-navy-700">
+              <div className="pt-4">
           <div className="space-y-3">
             <div className="flex justify-between">
               <span className="text-gray-600 dark:text-gray-400">Current Plan:</span>
@@ -817,6 +835,9 @@ export default function SettingsPage() {
           >
             Upgrade Plan
           </Link>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
