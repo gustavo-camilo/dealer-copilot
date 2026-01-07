@@ -700,16 +700,33 @@ export default function SettingsPage() {
                 Reset to Defaults
               </button>
             </div>
-          </form>
+              </form>
+            </div>
+          )}
         </div>
 
         {/* Auction Sources Management */}
-        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6 mb-6">
-          <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Auction Sources</h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
-            Manage the auction sources where you buy vehicles. These will appear as options when adding comments to vehicles.
-          </p>
+        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 mb-6 overflow-hidden">
+          <button
+            onClick={() => toggleAccordion('auctions')}
+            className="w-full flex items-center justify-between p-6 hover:bg-gray-50 dark:hover:bg-navy-800 transition-colors"
+          >
+            <div>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white text-left">Auction Sources</h2>
+              <p className="text-sm text-gray-600 dark:text-gray-400 mt-1 text-left">
+                Manage the auction sources where you buy vehicles
+              </p>
+            </div>
+            <ChevronDown
+              className={`h-5 w-5 text-gray-500 dark:text-gray-400 transition-transform ${
+                openAccordions.includes('auctions') ? 'rotate-180' : ''
+              }`}
+            />
+          </button>
 
+          {openAccordions.includes('auctions') && (
+            <div className="px-6 pb-6 border-t border-gray-200 dark:border-navy-700">
+              <div className="pt-4">
           {/* Add New Auction Source */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Add New Auction Source</label>
@@ -761,10 +778,13 @@ export default function SettingsPage() {
               </div>
             )}
           </div>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Subscription Info */}
-        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-6">
+        <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 overflow-hidden">
           <h2 className="text-xl font-semibold text-gray-900 dark:text-white mb-4">Subscription</h2>
 
           <div className="space-y-3">

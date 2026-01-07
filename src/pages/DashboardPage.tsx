@@ -466,13 +466,6 @@ export default function DashboardPage() {
                     </p>
                   </div>
                 </div>
-                <div className="p-4 bg-gray-50 dark:bg-navy-800 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm text-gray-600 dark:text-gray-400">Avg Days on Lot</span>
-                    <Clock className="w-4 h-4 text-gray-600 dark:text-sky-400" />
-                  </div>
-                  <p className="text-xl font-bold text-gray-900 dark:text-white">{stats.avgDaysInInventory} days</p>
-                </div>
                 {tenant?.inventory_ready_at && (
                   <p className="text-xs text-gray-500 dark:text-gray-500 text-center">
                     Last updated: {new Date(tenant.inventory_ready_at).toLocaleDateString()}
