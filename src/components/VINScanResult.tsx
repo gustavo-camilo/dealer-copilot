@@ -1,10 +1,20 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft, ExternalLink } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
 import { VehicleCommentSection } from './VehicleCommentSection';
 import { useAuth } from '../contexts/AuthContext';
 import toast from 'react-hot-toast';
+
+// Helper function to format vehicle name (capitalize first letter of each word)
+function formatVehicleName(name: string): string {
+    if (!name) return '';
+    // Special case for BMW
+    if (name.toUpperCase() === 'BMW') return 'BMW';
+
+    // Capitalize first letter of each word
+    return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+}
 
 // Helper function to simplify body types to Sedan, SUV, Pickup, or hide if not matching
 function getSimplifiedBodyType(bodyType: string | undefined): string {
@@ -279,6 +289,52 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
         }
     };
 
+    const handleOpenAuctionUrl = () => {
+        if (!currentAuctionUrl || currentAuctionUrl.trim() === '') {
+            // Show toast with action button to add URL
+            toast((t) => (
+                <div className="flex flex-col gap-2">
+                    <p className="text-sm font-medium text-gray-900 dark:text-white">
+                        No Auction URL set for this vehicle
+                    </p>
+                    <button
+                        onClick={() => {
+                            toast.dismiss(t.id);
+                            // Scroll to the auction URL section (inside comments section)
+                            const commentsSection = document.querySelector('[data-auction-url-section]');
+                            if (commentsSection) {
+                                commentsSection.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                                // Focus the input after a brief delay
+                                setTimeout(() => {
+                                    const urlInput = document.querySelector('[data-auction-url-input]') as HTMLInputElement;
+                                    if (urlInput) {
+                                        urlInput.focus();
+                                    }
+                                }, 300);
+                            }
+                        }}
+                        className="px-3 py-1.5 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+                    >
+                        Add URL Now
+                    </button>
+                </div>
+            ), {
+                duration: 5000,
+                icon: '🔗',
+            });
+            return;
+        }
+
+        // Validate URL format
+        try {
+            const url = new URL(currentAuctionUrl);
+            // Open in new tab
+            window.open(currentAuctionUrl, '_blank', 'noopener,noreferrer');
+        } catch (error) {
+            toast.error('Invalid URL format. Please update the auction URL.');
+        }
+    };
+
     const handleReportMissingData = async () => {
         if (!scanData?.decoded_data) return;
 
@@ -368,15 +424,29 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                 {/* Vehicle Header */}
                 <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6 mb-6">
                     <div className="flex items-center justify-between mb-4">
-                        <div>
-                            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-                                {scanData.decoded_data.year} {scanData.decoded_data.make} {scanData.decoded_data.model}
-                            </h2>
-                            <p className="text-gray-600 dark:text-gray-400">
-                                {scanData.decoded_data.trim}
-                                {scanData.decoded_data.trim && getSimplifiedBodyType(scanData.decoded_data.body_type) && ' • '}
-                                {getSimplifiedBodyType(scanData.decoded_data.body_type)}
-                            </p>
+                        <div className="flex items-center gap-2">
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+                                    {scanData.decoded_data.year} {formatVehicleName(scanData.decoded_data.make)} {formatVehicleName(scanData.decoded_data.model)}
+                                </h2>
+                                <p className="text-gray-600 dark:text-gray-400">
+                                    {scanData.decoded_data.trim}
+                                    {scanData.decoded_data.trim && getSimplifiedBodyType(scanData.decoded_data.body_type) && ' • '}
+                                    {getSimplifiedBodyType(scanData.decoded_data.body_type)}
+                                </p>
+                            </div>
+                            {/* Auction URL Icon Button */}
+                            <button
+                                onClick={handleOpenAuctionUrl}
+                                className={`p-2 rounded-lg transition-colors ${
+                                    currentAuctionUrl && currentAuctionUrl.trim() !== ''
+                                        ? 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-900/50'
+                                        : 'bg-gray-100 dark:bg-gray-800 text-gray-400 dark:text-gray-500 hover:bg-gray-200 dark:hover:bg-gray-700'
+                                }`}
+                                title={currentAuctionUrl && currentAuctionUrl.trim() !== '' ? 'Open Auction URL' : 'No Auction URL set'}
+                            >
+                                <ExternalLink className="h-5 w-5" />
+                            </button>
                         </div>
                         <div className="flex flex-col sm:flex-row items-end gap-2">
                             {/* Recommendation Dropdown */}
@@ -413,7 +483,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                         value={currentPurchaseStatus}
                                         onChange={(e) => savePurchaseStatus(e.target.value as 'purchased' | 'not_purchased' | 'pending')}
                                         disabled={isSaving}
-                                        className={`appearance-none w-full px-4 py-2.5 pr-10 rounded-xl font-bold text-sm transition-all border-2 cursor-pointer focus:ring-2 focus:ring-indigo-500 ${
+                                        className={`appearance-none w-full px-4 py-2.5 pr-10 rounded-xl font-bold transition-all border-2 cursor-pointer focus:ring-2 focus:ring-indigo-500 ${
                                             currentPurchaseStatus === 'purchased'
                                                 ? 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 border-green-300 dark:border-green-700 hover:bg-green-200 dark:hover:bg-green-900/50'
                                                 : currentPurchaseStatus === 'not_purchased'
