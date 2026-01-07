@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
-import { Search, Trash2, AlertCircle, ChevronRight } from 'lucide-react';
+import { Search, Trash2, AlertCircle, ChevronRight, Copy, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import Header from '../components/Header';
 import VINScanResult from '../components/VINScanResult';
@@ -39,6 +39,7 @@ export default function VINScansPage() {
   const [page, setPage] = useState(0);
   const [selectedScan, setSelectedScan] = useState<VINScan | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [copiedVin, setCopiedVin] = useState<string | null>(null);
   const observerTarget = useRef<HTMLDivElement>(null);
 
   // Load initial scans
@@ -141,6 +142,19 @@ export default function VINScansPage() {
 
     // Capitalize first letter of each word
     return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  };
+
+  const handleCopyVin = async (e: React.MouseEvent, vin: string) => {
+    e.stopPropagation(); // Prevent opening the modal
+    try {
+      await navigator.clipboard.writeText(vin);
+      setCopiedVin(vin);
+      toast.success('VIN copied to clipboard');
+      // Reset after 2 seconds
+      setTimeout(() => setCopiedVin(null), 2000);
+    } catch (error) {
+      toast.error('Failed to copy VIN');
+    }
   };
 
   const handleDeleteScan = async (e: React.MouseEvent, scanId: string) => {
@@ -285,60 +299,139 @@ export default function VINScansPage() {
                 onClick={() => setSelectedScan(scan)}
                 className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-4 hover:shadow-md dark:hover:shadow-lg transition cursor-pointer"
               >
-                <div className="flex items-center justify-between gap-4">
-                  {/* Left: Vehicle Info */}
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
-                      <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                        {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
-                      </h3>
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
-                        {scan.recommendation.toUpperCase()}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                      <span className="hidden sm:inline">Max Bid: {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}</span>
-                      <span className={`hidden sm:inline font-medium ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                        Profit: {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
-                      </span>
-                    </div>
-                  </div>
+                {/* Desktop Layout */}
+                <div className="hidden sm:block">
+                  <div className="flex items-start justify-between gap-4">
+                    {/* Left: Vehicle Info */}
+                    <div className="flex-1 min-w-0">
+                      {/* Title and Badge */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <h3 className="font-semibold text-gray-900 dark:text-white">
+                          {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
+                        </h3>
+                        <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
+                          {scan.recommendation.toUpperCase()}
+                        </span>
+                      </div>
 
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-2">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        setSelectedScan(scan);
-                      }}
-                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition flex-shrink-0"
-                      title="View Details"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
-                    <button
-                      onClick={(e) => handleDeleteScan(e, scan.id)}
-                      className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition flex-shrink-0"
-                      title="Delete Scan"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                      {/* VIN with Copy Button */}
+                      <div className="flex items-center gap-2 mb-2">
+                        <span className="text-xs text-gray-500 dark:text-gray-400 font-mono">
+                          {scan.vin}
+                        </span>
+                        <button
+                          onClick={(e) => handleCopyVin(e, scan.vin)}
+                          className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition flex-shrink-0"
+                          title="Copy VIN"
+                        >
+                          {copiedVin === scan.vin ? (
+                            <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                          ) : (
+                            <Copy className="w-3.5 h-3.5" />
+                          )}
+                        </button>
+                      </div>
+
+                      {/* Max Bid and Profit */}
+                      <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
+                        <span>Max Bid: {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}</span>
+                        <span className={`font-medium ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                          Profit: {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Right: Actions */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedScan(scan);
+                        }}
+                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition flex-shrink-0"
+                        title="View Details"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteScan(e, scan.id)}
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition flex-shrink-0"
+                        title="Delete Scan"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
-                {/* Mobile: Show financial info */}
-                <div className="mt-3 pt-3 border-t border-gray-100 dark:border-gray-700 flex gap-4 text-sm sm:hidden">
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">Max Bid:</span>
-                    <span className="ml-1 font-semibold text-blue-600 dark:text-blue-400">
-                      {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}
+                {/* Mobile Layout */}
+                <div className="sm:hidden">
+                  {/* Title and Badge - Full Width */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <h3 className="font-semibold text-gray-900 dark:text-white">
+                      {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
+                    </h3>
+                    <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
+                      {scan.recommendation.toUpperCase()}
                     </span>
                   </div>
-                  <div>
-                    <span className="text-gray-500 dark:text-gray-400">Profit:</span>
-                    <span className={`ml-1 font-semibold ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                      {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
-                    </span>
+
+                  {/* VIN and Actions Row */}
+                  <div className="flex items-center justify-between gap-2 mb-3">
+                    {/* VIN with Copy Button */}
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                      <span className="text-xs text-gray-500 dark:text-gray-400 font-mono truncate">
+                        {scan.vin}
+                      </span>
+                      <button
+                        onClick={(e) => handleCopyVin(e, scan.vin)}
+                        className="p-1 text-gray-400 dark:text-gray-500 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded transition flex-shrink-0"
+                        title="Copy VIN"
+                      >
+                        {copiedVin === scan.vin ? (
+                          <Check className="w-3.5 h-3.5 text-green-600 dark:text-green-400" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+                    </div>
+
+                    {/* Action Buttons */}
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setSelectedScan(scan);
+                        }}
+                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition flex-shrink-0"
+                        title="View Details"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={(e) => handleDeleteScan(e, scan.id)}
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition flex-shrink-0"
+                        title="Delete Scan"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Financial Info */}
+                  <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex gap-4 text-sm">
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Max Bid:</span>
+                      <span className="ml-1 font-semibold text-blue-600 dark:text-blue-400">
+                        {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-gray-500 dark:text-gray-400">Profit:</span>
+                      <span className={`ml-1 font-semibold ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
+                        {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
