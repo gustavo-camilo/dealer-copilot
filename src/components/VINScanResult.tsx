@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
 import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft, ExternalLink } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft, ExternalLink, Copy } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { supabase } from '../lib/supabase';
 import { VehicleCommentSection } from './VehicleCommentSection';
@@ -289,6 +290,13 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
         }
     };
 
+    const handleCopyVin = () => {
+        if (scanData.decoded_data?.vin) {
+            navigator.clipboard.writeText(scanData.decoded_data.vin);
+            toast.success('VIN copied to clipboard');
+        }
+    };
+
     const handleOpenAuctionUrl = () => {
         if (!currentAuctionUrl || currentAuctionUrl.trim() === '') {
             // Show toast with action button to add URL
@@ -429,11 +437,27 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
                                     {scanData.decoded_data.year} {formatVehicleName(scanData.decoded_data.make)} {formatVehicleName(scanData.decoded_data.model)}
                                 </h2>
+                                {/*
                                 <p className="text-gray-600 dark:text-gray-400">
                                     {scanData.decoded_data.trim}
                                     {scanData.decoded_data.trim && getSimplifiedBodyType(scanData.decoded_data.body_type) && ' • '}
                                     {getSimplifiedBodyType(scanData.decoded_data.body_type)}
                                 </p>
+                                */}
+                                {scanData.decoded_data.vin && (
+                                    <div className="flex items-center gap-2 mt-1">
+                                        <span className="text-sm font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded select-all">
+                                            {scanData.decoded_data.vin}
+                                        </span>
+                                        <button
+                                            onClick={handleCopyVin}
+                                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            title="Copy VIN"
+                                        >
+                                            <Copy className="h-3.5 w-3.5" />
+                                        </button>
+                                    </div>
+                                )}
                             </div>
                             {/* Auction URL Icon Button */}
                             <button
@@ -514,10 +538,12 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                 <p className="font-semibold dark:text-gray-200">{scanData.decoded_data.mileage.toLocaleString()} mi</p>
                             </div>
                         )}
+                        {/* 
                         <div>
                             <p className="text-gray-600 dark:text-gray-400">Title Status</p>
                             <p className="font-semibold dark:text-gray-200 capitalize">{scanData.decoded_data.title_status || 'Unknown'}</p>
                         </div>
+                        */}
                         {scanData.decoded_data.owner_count !== undefined && (
                             <div>
                                 <p className="text-gray-600 dark:text-gray-400">Owners</p>
