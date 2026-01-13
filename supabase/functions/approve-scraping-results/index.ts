@@ -83,6 +83,27 @@ function normalizeVehicleForTracking(vehicle: any): any {
   };
 }
 
+function aggregateVehicleData(vehicles: any[]) {
+  const prices = vehicles.map(v => parseFloat(v.price)).filter(p => !isNaN(p) && p > 0);
+  const mileages = vehicles.map(v => parseInt(v.mileage)).filter(m => !isNaN(m) && m >= 0);
+  const makeCounts: Record<string, number> = {};
+  vehicles.forEach(v => {
+    if (v.make) makeCounts[v.make] = (makeCounts[v.make] || 0) + 1;
+  });
+  const topMakes = Object.fromEntries(Object.entries(makeCounts).sort(([, a], [, b]) => b - a).slice(0, 10));
+  return {
+    vehicle_count: vehicles.length,
+    avg_price: prices.length > 0 ? prices.reduce((a, b) => a + b, 0) / prices.length : null,
+    min_price: prices.length > 0 ? Math.min(...prices) : null,
+    max_price: prices.length > 0 ? Math.max(...prices) : null,
+    avg_mileage: mileages.length > 0 ? Math.round(mileages.reduce((a, b) => a + b, 0) / mileages.length) : null,
+    min_mileage: mileages.length > 0 ? Math.min(...mileages) : null,
+    max_mileage: mileages.length > 0 ? Math.max(...mileages) : null,
+    total_inventory_value: prices.length > 0 ? prices.reduce((a, b) => a + b, 0) : null,
+    top_makes: topMakes,
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -281,11 +302,20 @@ serve(async (req) => {
     }
 
     // Update snapshot status to approved/success
+    const stats = aggregateVehicleData(normalizedVehicles);
     const { error: approveError } = await supabaseClient
       .from('inventory_snapshots_unified')
       .update({
         status: 'success',
-        vehicle_count: normalizedVehicles.length,
+        vehicle_count: stats.vehicle_count,
+        avg_price: stats.avg_price,
+        min_price: stats.min_price,
+        max_price: stats.max_price,
+        avg_mileage: stats.avg_mileage,
+        min_mileage: stats.min_mileage,
+        max_mileage: stats.max_mileage,
+        total_inventory_value: stats.total_inventory_value,
+        make_distribution: stats.top_makes,
         source_url: normalizedSourceUrl,
       })
       .eq('id', snapshot_id);
@@ -307,6 +337,9 @@ serve(async (req) => {
       console.error('Failed to update tenant status:', tenantUpdateError);
     }
 
+    // Aggregate vehicle data for inventory stats
+    const aggregatedData = aggregateVehicleData(normalizedVehicles);
+
     return new Response(
       JSON.stringify({
         success: true,
@@ -316,6 +349,7 @@ serve(async (req) => {
         vehicles_updated: updatedCount,
         vehicles_sold: soldCount,
         total_processed: vehiclesData.length,
+        inventory_stats: aggregatedData,
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
