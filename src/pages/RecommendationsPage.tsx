@@ -7,7 +7,6 @@ import {
   ThumbsUp,
   Search,
   DollarSign,
-  Target,
   ChevronRight,
   Trash2,
   AlertCircle,
@@ -68,7 +67,7 @@ export default function RecommendationsPage() {
     buy: 0,
     maybe: 0,
     pass: 0,
-    avgConfidence: 0,
+    totalInvestment: 0,
     potentialProfit: 0,
   });
 
@@ -98,26 +97,6 @@ export default function RecommendationsPage() {
             setRecommendations(data);
           }
           setHasMore(data.length === PAGE_SIZE);
-
-          // Calculate stats (only on initial load)
-          if (!append) {
-            const buy = data.filter((r) => r.recommendation === 'buy').length;
-            const maybe = data.filter((r) => r.recommendation === 'maybe').length;
-            const pass = data.filter((r) => r.recommendation === 'pass').length;
-            const avgConfidence =
-              data.reduce((sum, r) => sum + r.confidence_score, 0) / (data.length || 1);
-            const potentialProfit = data
-              .filter((r) => r.recommendation === 'buy' && r.confidence_score >= 70)
-              .reduce((sum, r) => sum + (r.estimated_profit || 0), 0);
-
-            setStats({
-              buy,
-              maybe,
-              pass,
-              avgConfidence,
-              potentialProfit,
-            });
-          }
         }
       } catch (error) {
         console.error('Error loading recommendations:', error);
@@ -157,6 +136,23 @@ export default function RecommendationsPage() {
 
     setFilteredRecommendations(filtered);
   }, [searchQuery, recommendations, statusFilter]);
+
+  // Calculate stats from filtered recommendations
+  useEffect(() => {
+    const buy = filteredRecommendations.filter((r) => r.recommendation === 'buy').length;
+    const maybe = filteredRecommendations.filter((r) => r.recommendation === 'maybe').length;
+    const pass = filteredRecommendations.filter((r) => r.recommendation === 'pass').length;
+    const totalInvestment = filteredRecommendations.reduce((sum, r) => sum + (r.max_bid_suggestion || 0), 0);
+    const potentialProfit = filteredRecommendations.reduce((sum, r) => sum + (r.estimated_profit || 0), 0);
+
+    setStats({
+      buy,
+      maybe,
+      pass,
+      totalInvestment,
+      potentialProfit,
+    });
+  }, [filteredRecommendations]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -349,14 +345,14 @@ export default function RecommendationsPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">VIN Scan Recommendations</h1>
+          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">VIN Scans</h1>
           <p className="text-gray-600 dark:text-gray-400">
             View all your scanned VINs with AI-powered buying recommendations
           </p>
         </div>
 
         {/* Stats Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
+        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex items-center gap-3 mb-2">
               <ThumbsUp className="w-5 h-5 text-green-600" />
@@ -383,15 +379,15 @@ export default function RecommendationsPage() {
 
           <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex items-center gap-3 mb-2">
-              <Target className="w-5 h-5 text-blue-600" />
-              <span className="text-sm text-gray-600 dark:text-gray-400">Avg Confidence</span>
+              <DollarSign className="w-5 h-5 text-blue-600" />
+              <span className="text-sm text-gray-600 dark:text-gray-400">Total Investment</span>
             </div>
             <div className="text-2xl font-bold text-gray-900 dark:text-white">
-              {stats.avgConfidence.toFixed(0)}%
+              {formatCurrency(stats.totalInvestment)}
             </div>
           </div>
 
-          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
+          <div className="col-span-2 lg:col-span-1 bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
             <div className="flex items-center gap-3 mb-2">
               <DollarSign className="w-5 h-5 text-purple-600" />
               <span className="text-sm text-gray-600 dark:text-gray-400">Potential Profit</span>
