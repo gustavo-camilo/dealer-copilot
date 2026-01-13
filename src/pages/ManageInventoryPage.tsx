@@ -20,6 +20,7 @@ import {
 import NavigationMenu from '../components/NavigationMenu';
 import Header from '../components/Header';
 import toast, { Toaster } from 'react-hot-toast';
+import InventoryAssessment from '../components/InventoryAssessment';
 
 interface Vehicle {
   id: string;
@@ -60,6 +61,12 @@ export default function ManageInventoryPage() {
     sold: 0,
     avgPrice: 0,
     totalValue: 0,
+    minPrice: 0,
+    maxPrice: 0,
+    minMileage: 0,
+    maxMileage: 0,
+    avgMileage: 0,
+    topMakes: {} as Record<string, number>,
   });
 
   // Load vehicles
@@ -183,19 +190,43 @@ export default function ManageInventoryPage() {
         setVehicles(mergedVehicles);
 
         // Calculate stats
-        const active = mergedVehicles.filter((v: Vehicle) => v.status === 'active').length;
-        const sold = mergedVehicles.filter((v: Vehicle) => v.status === 'sold').length;
-        const totalValue = mergedVehicles
-          .filter((v: Vehicle) => v.status === 'active')
-          .reduce((sum: number, v: Vehicle) => sum + v.price, 0);
-        const avgPrice = active > 0 ? totalValue / active : 0;
+        const activeVehicles = mergedVehicles.filter((v: Vehicle) => v.status === 'active');
+        const activeCount = activeVehicles.length;
+        const soldCount = mergedVehicles.filter((v: Vehicle) => v.status === 'sold').length;
+        const totalValue = activeVehicles.reduce((sum: number, v: Vehicle) => sum + v.price, 0);
+        const avgPrice = activeCount > 0 ? totalValue / activeCount : 0;
+        
+        // Calculate detailed stats
+        const prices = activeVehicles.map(v => Number(v.price)).filter(p => !isNaN(p) && p > 0);
+        const mileages = activeVehicles.map(v => Number(v.mileage)).filter(m => !isNaN(m) && m > 0);
+        
+        const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+        const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+        
+        const minMileage = mileages.length > 0 ? Math.min(...mileages) : 0;
+        const maxMileage = mileages.length > 0 ? Math.max(...mileages) : 0;
+        const avgMileage = mileages.length > 0 ? mileages.reduce((a, b) => a + b, 0) / mileages.length : 0;
+        
+        // Calculate top makes
+        const topMakes: Record<string, number> = {};
+        activeVehicles.forEach(v => {
+          if (v.make) {
+            topMakes[v.make] = (topMakes[v.make] || 0) + 1;
+          }
+        });
 
         setStats({
           total: mergedVehicles.length,
-          active,
-          sold,
+          active: activeCount,
+          sold: soldCount,
           avgPrice,
           totalValue,
+          minPrice,
+          maxPrice,
+          minMileage,
+          maxMileage,
+          avgMileage,
+          topMakes,
         });
       }
     } catch (error) {
@@ -472,6 +503,9 @@ export default function ManageInventoryPage() {
                 </div>
               </div>
             </div>
+
+            {/* Inventory Assessment */}
+            <InventoryAssessment stats={{...stats, vehicleCount: stats.active}} />
 
             {/* Filters and Search */}
             <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-navy-700 p-4 mb-6">

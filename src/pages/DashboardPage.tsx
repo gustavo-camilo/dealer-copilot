@@ -7,6 +7,7 @@ import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Globe, ChevronRight, P
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import InventoryAssessment from '../components/InventoryAssessment';
 
 export default function DashboardPage() {
   const { user, tenant, signOut } = useAuth();
@@ -15,6 +16,13 @@ export default function DashboardPage() {
     totalVehicles: 0,
     portfolioValue: 0,
     weekSales: 0,
+    minPrice: 0,
+    maxPrice: 0,
+    avgPrice: 0,
+    minMileage: 0,
+    maxMileage: 0,
+    avgMileage: 0,
+    topMakes: {} as Record<string, number>,
   });
   const [recentScans, setRecentScans] = useState<VINScan[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
@@ -147,11 +155,38 @@ export default function DashboardPage() {
 
       if (vehicles) {
         const totalValue = vehicles.reduce((sum, v) => sum + Number(v.price), 0);
+        
+        // Calculate inventory stats
+        const prices = vehicles.map(v => Number(v.price)).filter(p => !isNaN(p) && p > 0);
+        const mileages = vehicles.map(v => Number(v.mileage)).filter(m => !isNaN(m) && m > 0);
+        
+        const minPrice = prices.length > 0 ? Math.min(...prices) : 0;
+        const maxPrice = prices.length > 0 ? Math.max(...prices) : 0;
+        const avgPrice = prices.length > 0 ? totalValue / prices.length : 0;
+        
+        const minMileage = mileages.length > 0 ? Math.min(...mileages) : 0;
+        const maxMileage = mileages.length > 0 ? Math.max(...mileages) : 0;
+        const avgMileage = mileages.length > 0 ? mileages.reduce((a, b) => a + b, 0) / mileages.length : 0;
+        
+        // Calculate top makes
+        const topMakes: Record<string, number> = {};
+        vehicles.forEach(v => {
+          if (v.make) {
+            topMakes[v.make] = (topMakes[v.make] || 0) + 1;
+          }
+        });
 
         setStats({
           totalVehicles: vehicles.length,
           portfolioValue: totalValue,
           weekSales: recentSales?.length || 0,
+          minPrice,
+          maxPrice,
+          avgPrice,
+          minMileage,
+          maxMileage,
+          avgMileage,
+          topMakes,
         });
       }
 
@@ -309,6 +344,14 @@ export default function DashboardPage() {
             <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.weekSales}</p>
           </div>
         </div>
+
+        {/* Inventory Assessment */}
+        {stats.totalVehicles > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Inventory Assessment</h2>
+            <InventoryAssessment stats={{...stats, vehicleCount: stats.totalVehicles, totalValue: stats.portfolioValue}} />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Buy Recommendations */}
