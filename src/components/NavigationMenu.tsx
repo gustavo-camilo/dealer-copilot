@@ -75,18 +75,18 @@ export default function NavigationMenu({
       />
 
       {/* Mobile: Full-page menu, Desktop: Dropdown */}
-      <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200 dark:bg-navy-900 dark:border-navy-700">
-        {/* Mobile Header */}
-        <div className="flex justify-between items-center p-4 border-b border-gray-200 md:hidden dark:border-navy-700">
+      <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200 dark:bg-brand-topbar-dark dark:border-navy-700">
+        {/* Mobile Header - matches main header exactly */}
+        <div className="flex justify-between items-center h-16 px-4 border-b border-gray-200 md:hidden dark:border-brand-border-dark bg-white dark:bg-brand-topbar-dark">
           <div className="flex items-center">
-            <Target className="h-6 w-6 text-blue-900 dark:text-white" />
-            <span className="ml-2 text-lg font-bold text-gray-900 dark:text-white">Dealer Co-Pilot</span>
+            <Target className="h-8 w-8 text-blue-900 dark:text-white" />
+            <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Dealer Co-Pilot</span>
           </div>
           <button
             onClick={onClose}
             className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-800"
           >
-            <X className="h-6 w-6 text-white" />
+            <X className="h-6 w-6 text-gray-900 dark:text-white" />
           </button>
         </div>
 
