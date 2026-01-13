@@ -241,7 +241,7 @@ export default function DashboardPage() {
           <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Link
               to="/scan"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-orange-600 hover:shadow-md dark:hover:shadow-lg transition text-center"
+              className="col-span-2 md:col-span-1 bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-orange-600 hover:shadow-md dark:hover:shadow-lg transition text-center"
             >
               <Scan className="h-8 w-8 text-orange-600 mx-auto mb-2" />
               <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Scan VIN</h3>

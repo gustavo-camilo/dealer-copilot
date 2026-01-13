@@ -460,18 +460,19 @@ export default function RecommendationsPage() {
                   rec.purchase_status === 'purchased' ? 'opacity-75' : ''
                 }`}
               >
-                <div className="flex items-center justify-between gap-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
                   {/* Left: Vehicle Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center gap-2 mb-2 sm:mb-2">
                       <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                         {rec.decoded_data.year} {formatVehicleName(rec.decoded_data.make)} {formatVehicleName(rec.decoded_data.model)}
                       </h3>
-                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(rec.recommendation)} flex-shrink-0`}>
+                      {/* Desktop Badges */}
+                      <span className={`hidden sm:inline-flex px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(rec.recommendation)} flex-shrink-0`}>
                         {rec.recommendation.toUpperCase()}
                       </span>
                       {rec.purchase_status === 'purchased' && (
-                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 flex-shrink-0">
+                        <span className="hidden sm:inline-flex px-2 py-0.5 rounded text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 flex-shrink-0">
                           PURCHASED
                         </span>
                       )}
@@ -489,46 +490,60 @@ export default function RecommendationsPage() {
                     </div>
                   </div>
 
-                  {/* Right: Actions */}
-                  <div className="flex items-center gap-2">
-                    {/* View Details */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/recommendations/${rec.id}`);
-                      }}
-                      className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
-                      title="View Details"
-                    >
-                      <ChevronRight className="w-5 h-5" />
-                    </button>
+                  {/* Right: Actions + Mobile Badges */}
+                  <div className="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                    {/* Mobile Badges */}
+                    <div className="flex sm:hidden items-center gap-2">
+                      <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(rec.recommendation)} flex-shrink-0`}>
+                        {rec.recommendation.toUpperCase()}
+                      </span>
+                      {rec.purchase_status === 'purchased' && (
+                        <span className="px-2 py-0.5 rounded text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-300 flex-shrink-0">
+                          PURCHASED
+                        </span>
+                      )}
+                    </div>
 
-                    {/* Mark as Purchased */}
-                    <button
-                      onClick={(e) => handleMarkAsPurchased(e, rec.id)}
-                      className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition flex-shrink-0"
-                      title="Mark as Purchased"
-                    >
-                      <CheckCircle className="w-5 h-5" />
-                    </button>
+                    <div className="flex items-center gap-2">
+                      {/* View Details */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          navigate(`/recommendations/${rec.id}`);
+                        }}
+                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
+                        title="View Details"
+                      >
+                        <ChevronRight className="w-5 h-5" />
+                      </button>
 
-                    {/* Mark as Not Purchased */}
-                    <button
-                      onClick={(e) => handleMarkAsNotPurchased(e, rec.id)}
-                      className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition flex-shrink-0"
-                      title="Mark as Not Purchased"
-                    >
-                      <XCircle className="w-5 h-5" />
-                    </button>
+                      {/* Mark as Purchased */}
+                      <button
+                        onClick={(e) => handleMarkAsPurchased(e, rec.id)}
+                        className="p-2 text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/30 rounded-lg transition flex-shrink-0"
+                        title="Mark as Purchased"
+                      >
+                        <CheckCircle className="w-5 h-5" />
+                      </button>
 
-                    {/* Delete */}
-                    <button
-                      onClick={(e) => handleDeleteScan(e, rec.id)}
-                      className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
-                      title="Delete Scan"
-                    >
-                      <Trash2 className="w-5 h-5" />
-                    </button>
+                      {/* Mark as Not Purchased */}
+                      <button
+                        onClick={(e) => handleMarkAsNotPurchased(e, rec.id)}
+                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition flex-shrink-0"
+                        title="Mark as Not Purchased"
+                      >
+                        <XCircle className="w-5 h-5" />
+                      </button>
+
+                      {/* Delete */}
+                      <button
+                        onClick={(e) => handleDeleteScan(e, rec.id)}
+                        className="p-2 text-gray-400 dark:text-gray-500 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-gray-800 rounded-lg transition flex-shrink-0"
+                        title="Delete Scan"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                      </button>
+                    </div>
                   </div>
                 </div>
 
