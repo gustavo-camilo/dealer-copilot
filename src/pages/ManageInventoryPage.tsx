@@ -205,7 +205,7 @@ export default function ManageInventoryPage() {
         
         const minMileage = mileages.length > 0 ? Math.min(...mileages) : 0;
         const maxMileage = mileages.length > 0 ? Math.max(...mileages) : 0;
-        const avgMileage = mileages.length > 0 ? mileages.reduce((a, b) => a + b, 0) / mileages.length : 0;
+        const avgMileage = mileages.length > 0 ? Math.round(mileages.reduce((a, b) => a + b, 0) / mileages.length) : 0;
         
         // Calculate top makes
         const topMakes: Record<string, number> = {};

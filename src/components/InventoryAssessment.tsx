@@ -28,7 +28,7 @@ export default function InventoryAssessment({ stats }: InventoryAssessmentProps)
 
   const formatNumber = (value: number | undefined) => {
     if (value === undefined) return 'N/A';
-    return value.toLocaleString();
+    return Math.round(value).toLocaleString();
   };
 
   return (
