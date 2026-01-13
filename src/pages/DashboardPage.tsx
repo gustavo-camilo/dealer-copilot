@@ -385,77 +385,6 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Recent VIN Scans - Full Width */}
-        <div className="mb-8">
-          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent VIN Scans</h2>
-              {recentScans.length > 0 && (
-                <Link
-                  to="/recommendations"
-                  className="text-sm text-blue-900 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center"
-                >
-                  View All
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Link>
-              )}
-            </div>
-            {recentScans.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-500">
-                <Scan className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
-                <p>No scans yet</p>
-                <Link
-                  to="/scan"
-                  className="text-blue-900 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-sm mt-2 inline-block"
-                >
-                  Scan your first VIN
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentScans.map((scan) => (
-                  <div
-                    key={scan.id}
-                    onClick={() => setSelectedScan(scan)}
-                    className="p-3 border border-gray-200 dark:border-brand-border-dark rounded-lg hover:bg-gray-50 dark:hover:bg-navy-800 hover:shadow-md transition cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                            {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
-                          </h3>
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
-                            {scan.recommendation.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                          <span>Max Bid: {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}</span>
-                          <span className={`font-medium ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                            Profit: {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedScan(scan);
-                        }}
-                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-navy-800 rounded-lg transition flex-shrink-0"
-                        title="View Details"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-
-
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
           <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
@@ -524,7 +453,7 @@ export default function DashboardPage() {
 
 
           </div>
-        </div >
+        </div>
 
         {/* Details Modal */}
         {
@@ -589,7 +518,7 @@ export default function DashboardPage() {
           cancelLabel="Save and Stay"
           message="You have unsaved changes in the profit calculator. How would you like to proceed?"
         />
-      </div >
-    </div >
+      </div>
+    </div>
   );
 }
