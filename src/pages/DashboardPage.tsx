@@ -3,11 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { VINScan, RecommendationType } from '../types/database';
-import { BarChart3, Car, TrendingUp, Clock, Target, Scan, Globe, ChevronRight, Package, Eye, RefreshCw, X } from 'lucide-react';
+import { BarChart3, Car, Target, Scan, Globe, ChevronRight, Eye, X } from 'lucide-react';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
 import ConfirmationDialog from '../components/ConfirmationDialog';
-import InventoryAssessment from '../components/InventoryAssessment';
+
 
 export default function DashboardPage() {
   const { user, tenant, signOut } = useAuth();
@@ -519,6 +519,5 @@ export default function DashboardPage() {
           message="You have unsaved changes in the profit calculator. How would you like to proceed?"
         />
       </div>
-    </div>
   );
 }
