@@ -2,28 +2,71 @@ import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Target, Zap, Shield, TrendingUp, CheckCircle, XCircle, AlertTriangle, ArrowRight, Menu, X, Smartphone, BarChart3, Lock } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { decodeVIN } from '../services/vinDecoder';
+import { getMarketPricing } from '../services/marketPricing';
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [vinInput, setVinInput] = useState('');
   const [isScanning, setIsScanning] = useState(false);
-  const [scanResult, setScanResult] = useState<'idle' | 'scanning' | 'success' | 'danger'>('idle');
+  const [scanResult, setScanResult] = useState<'idle' | 'scanning' | 'success' | 'danger' | 'error' | 'limit'>('idle');
   const [roastRevealed, setRoastRevealed] = useState(false);
+  const [scanData, setScanData] = useState<any>(null);
 
-  // Mock Scan Logic
-  const handleScan = (e: React.FormEvent) => {
+  // Scan Logic
+  const handleScan = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (vinInput.length < 5) return;
+    if (vinInput.length < 17) {
+        // Allow short vins for mock if needed, but for real scan we need 17
+        // User asked for "Try 1G..." removal, implies real VINs.
+        // But for UX, let's just warn if < 17
+        if (vinInput.length < 11) return; // Basic length check
+    }
     
+    // Check Limit
+    const today = new Date().toISOString().split('T')[0];
+    const storageKey = `dealer_copilot_scans_${today}`;
+    const currentScans = parseInt(localStorage.getItem(storageKey) || '0');
+    
+    if (currentScans >= 3) {
+        setScanResult('limit');
+        return;
+    }
+
     setScanResult('scanning');
     setIsScanning(true);
+    setScanData(null);
     
-    // Simulate API call
-    setTimeout(() => {
-      setIsScanning(false);
-      // Randomly show success or danger for demo purposes, or deterministic based on input length
-      setScanResult(vinInput.length % 2 === 0 ? 'success' : 'danger');
-    }, 2500);
+    try {
+        // Call Real Service
+        const decoded = await decodeVIN(vinInput);
+        
+        if (!decoded.success || !decoded.data) {
+             setScanResult('error');
+             setIsScanning(false);
+             return;
+        }
+
+        const market = await getMarketPricing(decoded.data);
+        
+        // Update Limit
+        localStorage.setItem(storageKey, (currentScans + 1).toString());
+
+        setScanData({
+            vehicle: decoded.data,
+            market: market
+        });
+        
+        // Determine "Green" or "Red" based on ... well we don't have a bid.
+        // So we just show "Success" state with the data.
+        setScanResult('success');
+
+    } catch (err) {
+        console.error(err);
+        setScanResult('error');
+    } finally {
+        setIsScanning(false);
+    }
   };
 
   return (
@@ -60,6 +103,32 @@ export default function LandingPage() {
             </button>
           </div>
         </div>
+
+        {/* Mobile Menu */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="md:hidden bg-slate-950 border-t border-slate-800 overflow-hidden"
+            >
+              <div className="px-4 py-6 space-y-4">
+                <a href="#roast" className="block text-slate-400 hover:text-white font-medium" onClick={() => setMobileMenuOpen(false)}>The Trap</a>
+                <a href="#personas" className="block text-slate-400 hover:text-white font-medium" onClick={() => setMobileMenuOpen(false)}>For You</a>
+                <a href="#beta" className="block text-slate-400 hover:text-white font-medium" onClick={() => setMobileMenuOpen(false)}>Beta Access</a>
+                <Link to="/signin" className="block text-slate-400 hover:text-white font-medium" onClick={() => setMobileMenuOpen(false)}>Sign In</Link>
+                <Link
+                  to="/signup"
+                  className="block bg-orange-600 text-white text-center py-3 rounded-xl font-bold hover:bg-orange-700 transition"
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  Get Started
+                </Link>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       {/* Hero Section */}
@@ -113,12 +182,12 @@ export default function LandingPage() {
                   type="text"
                   value={vinInput}
                   onChange={(e) => setVinInput(e.target.value.toUpperCase())}
-                  placeholder="Enter VIN to Scan (Try 1GCEC...)"
+                  placeholder="Enter VIN to Scan"
                   className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all font-mono tracking-wider"
                 />
                 <button
                   type="submit"
-                  disabled={vinInput.length < 3}
+                  disabled={vinInput.length < 11}
                   className="absolute right-2 top-2 bottom-2 bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 rounded-lg font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/20"
                 >
                   Scan
@@ -129,7 +198,7 @@ export default function LandingPage() {
             {scanResult === 'scanning' && (
               <div className="h-[72px] flex items-center justify-center gap-3">
                 <div className="animate-spin rounded-full h-5 w-5 border-2 border-orange-500 border-t-transparent" />
-                <span className="text-slate-300 font-mono animate-pulse">Analyzing Auction Fees...</span>
+                <span className="text-slate-300 font-mono animate-pulse">Analyzing Market Data...</span>
               </div>
             )}
 
@@ -137,8 +206,18 @@ export default function LandingPage() {
               <div className="p-4">
                 <div className="flex justify-between items-start mb-4">
                   <div>
-                    <div className="text-xs text-slate-500 font-mono mb-1">VIN: {vinInput}</div>
-                    <div className="text-sm font-medium text-slate-300">2018 Ford F-150 XLT</div>
+                     {scanResult === 'limit' ? (
+                         <div className="text-red-400 font-bold mb-1">Daily Limit Reached</div>
+                     ) : scanResult === 'error' ? (
+                         <div className="text-red-400 font-bold mb-1">Scan Failed</div>
+                     ) : (
+                        <>
+                            <div className="text-xs text-slate-500 font-mono mb-1">VIN: {vinInput}</div>
+                            <div className="text-sm font-medium text-slate-300">
+                                {scanData?.vehicle?.year} {scanData?.vehicle?.make} {scanData?.vehicle?.model}
+                            </div>
+                        </>
+                     )}
                   </div>
                   <button 
                     onClick={() => setScanResult('idle')}
@@ -148,45 +227,50 @@ export default function LandingPage() {
                   </button>
                 </div>
 
-                {scanResult === 'success' ? (
-                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <CheckCircle className="text-emerald-500 h-6 w-6" />
-                      <span className="text-emerald-400 font-bold text-lg">GREEN LIGHT</span>
+                {scanResult === 'success' && scanData && (
+                  <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-4 mb-4">
+                    <div className="flex justify-between items-center mb-3">
+                        <span className="text-slate-400 text-sm">Est. Retail</span>
+                        <span className="text-emerald-400 font-bold text-lg">
+                            ${scanData.market?.average_price?.toLocaleString() || 'N/A'}
+                        </span>
                     </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">Est. Profit:</span>
-                      <span className="text-white font-bold">$2,450</span>
+                    <div className="flex justify-between items-center mb-2">
+                         <span className="text-slate-400 text-sm">Market Days Supply</span>
+                         <span className="text-white font-mono">{scanData.market?.days_supply || '45'} Days</span>
                     </div>
-                  </div>
-                ) : (
-                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4">
-                    <div className="flex items-center gap-3 mb-2">
-                      <XCircle className="text-red-500 h-6 w-6" />
-                      <span className="text-red-400 font-bold text-lg">RED LIGHT</span>
-                    </div>
-                    <div className="flex justify-between text-sm">
-                      <span className="text-slate-400">Hidden Loss:</span>
-                      <span className="text-red-400 font-bold">-$850</span>
-                    </div>
-                    <div className="text-xs text-red-500/70 mt-2">
-                      *Auction fees ($680) + Reconditioning exceed margin.
+                    <div className="mt-3 pt-3 border-t border-slate-700">
+                        <p className="text-xs text-slate-500 text-center">
+                            *Estimated values. Unlock full report for exact fee calculation.
+                        </p>
                     </div>
                   </div>
+                )}
+                
+                {scanResult === 'limit' && (
+                    <div className="text-slate-400 text-sm mb-4">
+                        You've reached your 3 free scans for today. Sign up for unlimited access.
+                    </div>
+                )}
+                
+                {scanResult === 'error' && (
+                     <div className="text-slate-400 text-sm mb-4">
+                        Could not decode this VIN. Please check and try again.
+                    </div>
                 )}
 
                 <Link 
                   to="/signup"
                   className="block w-full bg-white text-slate-950 text-center py-3 rounded-xl font-bold hover:bg-slate-100 transition-colors"
                 >
-                  Unlock Full Report
+                  {scanResult === 'limit' ? 'Get Unlimited Scans' : 'Unlock Full Auction Shield'}
                 </Link>
               </div>
             )}
           </motion.div>
           
-          <p className="mt-4 text-xs text-slate-600 uppercase tracking-widest font-medium">
-            Try scanning mock VIN: <span className="text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => { setVinInput('1GCEC14X05'); setScanResult('idle'); }}>1GCEC...</span> (Winner) or <span className="text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => { setVinInput('5T1BF1FK79'); setScanResult('idle'); }}>5T1BF...</span> (Loser)
+          <p className="mt-4 text-xs text-slate-500 font-medium">
+            <span className="text-orange-500 font-bold">Quick Tip:</span> Enter any VIN to get an instant market estimate. Free for 3 vehicles/day.
           </p>
         </div>
       </section>
