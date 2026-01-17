@@ -1,482 +1,390 @@
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import { Car, Target, Smartphone, TrendingUp, BarChart3, Clock, CheckCircle, ArrowRight, Zap, Shield, LineChart, Menu, X } from 'lucide-react';
-import { useState } from 'react';
+import { Target, Zap, Shield, TrendingUp, CheckCircle, XCircle, AlertTriangle, ArrowRight, Menu, X, Smartphone, BarChart3, Lock } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function LandingPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [vinInput, setVinInput] = useState('');
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<'idle' | 'scanning' | 'success' | 'danger'>('idle');
+  const [roastRevealed, setRoastRevealed] = useState(false);
+
+  // Mock Scan Logic
+  const handleScan = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (vinInput.length < 5) return;
+    
+    setScanResult('scanning');
+    setIsScanning(true);
+    
+    // Simulate API call
+    setTimeout(() => {
+      setIsScanning(false);
+      // Randomly show success or danger for demo purposes, or deterministic based on input length
+      setScanResult(vinInput.length % 2 === 0 ? 'success' : 'danger');
+    }, 2500);
+  };
 
   return (
-    <div className="min-h-screen bg-slate-950">
-      <nav className="bg-slate-950/80 backdrop-blur-md border-b border-slate-800 sticky top-0 z-50">
+    <div className="min-h-screen bg-slate-950 text-white font-sans selection:bg-orange-500/30">
+      {/* Navigation */}
+      <nav className="fixed w-full z-50 bg-slate-950/80 backdrop-blur-md border-b border-white/5">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            <div className="flex items-center">
-              <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-1.5 rounded-lg">
-                <Target className="h-6 w-6 text-white" />
+            <div className="flex items-center gap-2">
+              <div className="bg-gradient-to-br from-orange-500 to-red-600 p-1.5 rounded-lg shadow-lg shadow-orange-500/20">
+                <Target className="h-5 w-5 text-white" />
               </div>
-              <span className="ml-3 text-xl font-bold text-white">Dealer Co-Pilot</span>
+              <span className="text-xl font-bold tracking-tight text-white">Dealer Co-Pilot</span>
             </div>
+            
             <div className="hidden md:flex items-center space-x-8">
-              <a href="#features" className="text-slate-300 hover:text-white transition">Features</a>
-              <a href="#how-it-works" className="text-slate-300 hover:text-white transition">How It Works</a>
-              <a href="#pricing" className="text-slate-300 hover:text-white transition">Pricing</a>
-              <Link to="/signin" className="text-slate-300 hover:text-white transition">Sign In</Link>
+              <a href="#roast" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">The Trap</a>
+              <a href="#personas" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">For You</a>
+              <a href="#beta" className="text-sm font-medium text-slate-400 hover:text-white transition-colors">Beta Access</a>
+              <Link to="/signin" className="text-sm font-medium text-white hover:text-orange-400 transition-colors">Sign In</Link>
               <Link
                 to="/signup"
-                className="bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-2.5 rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg shadow-orange-500/30 font-semibold"
-              >
-                Start Free Trial
-              </Link>
-            </div>
-            <button
-              className="md:hidden text-white p-2"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-label="Toggle menu"
-            >
-              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
-            </button>
-          </div>
-        </div>
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-slate-900/95 backdrop-blur-md border-t border-slate-800">
-            <div className="px-4 py-6 space-y-4">
-              <a
-                href="#features"
-                className="block text-slate-300 hover:text-white transition py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Features
-              </a>
-              <a
-                href="#how-it-works"
-                className="block text-slate-300 hover:text-white transition py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                How It Works
-              </a>
-              <a
-                href="#pricing"
-                className="block text-slate-300 hover:text-white transition py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Pricing
-              </a>
-              <Link
-                to="/signin"
-                className="block text-slate-300 hover:text-white transition py-2"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Sign In
-              </Link>
-              <Link
-                to="/signup"
-                className="block bg-gradient-to-r from-orange-500 to-orange-600 text-white px-6 py-3 rounded-lg hover:from-orange-600 hover:to-orange-700 transition-all shadow-lg shadow-orange-500/30 font-semibold text-center"
-                onClick={() => setMobileMenuOpen(false)}
-              >
-                Start Free Trial
-              </Link>
-            </div>
-          </div>
-        )}
-      </nav>
-
-      <section className="relative pt-24 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-blue-950/50 to-slate-950"></div>
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiMxZTQwYWYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE2djRoLTR2LTRoNG16bTAgMGg0djRoLTR2LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-40"></div>
-
-        <div className="max-w-7xl mx-auto text-center relative z-10">
-          <div className="inline-flex items-center bg-blue-950/50 border border-blue-800/50 rounded-full px-4 py-2 mb-8">
-            <Zap className="h-4 w-4 text-orange-400 mr-2" />
-            <span className="text-sm text-blue-200 font-medium">AI-Powered Auction Intelligence</span>
-          </div>
-
-          <h1 className="text-5xl md:text-7xl font-bold text-white leading-tight mb-6">
-            Know What to Buy<br />
-            <span className="bg-gradient-to-r from-orange-400 via-orange-500 to-orange-600 text-transparent bg-clip-text">
-              In 3 Seconds
-            </span>
-          </h1>
-
-          <p className="mt-6 text-xl md:text-2xl text-slate-300 max-w-3xl mx-auto leading-relaxed">
-            Scan your website, understand what you sell best, get smart buy recommendations.
-            Turn data into profit at every auction.
-          </p>
-
-          <div className="mt-12 flex flex-col sm:flex-row gap-4 justify-center">
-            <Link
-              to="/signup"
-              className="group bg-gradient-to-r from-orange-500 to-orange-600 text-white px-10 py-5 rounded-xl text-lg font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-2xl shadow-orange-500/30 hover:shadow-orange-500/50 inline-flex items-center justify-center"
-            >
-              Start Free Trial
-              <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform" />
-            </Link>
-            <a
-              href="#how-it-works"
-              className="border-2 border-slate-700 bg-slate-900/50 text-white px-10 py-5 rounded-xl text-lg font-bold hover:border-slate-600 hover:bg-slate-900 transition-all backdrop-blur"
-            >
-              See How It Works
-            </a>
-          </div>
-
-          <p className="mt-6 text-slate-400 text-sm">
-            14-day free trial • No credit card required • Cancel anytime
-          </p>
-        </div>
-
-        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-slate-950 to-transparent"></div>
-      </section>
-
-      <section className="py-16 bg-slate-900/50 border-y border-slate-800">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid md:grid-cols-4 gap-8 text-center">
-            <div className="group hover:scale-105 transition-transform">
-              <div className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-orange-600 text-transparent bg-clip-text mb-2">30s</div>
-              <div className="text-slate-400 group-hover:text-slate-300 transition">Inventory Analysis</div>
-            </div>
-            <div className="group hover:scale-105 transition-transform">
-              <div className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-orange-600 text-transparent bg-clip-text mb-2">3s</div>
-              <div className="text-slate-400 group-hover:text-slate-300 transition">VIN to Decision</div>
-            </div>
-            <div className="group hover:scale-105 transition-transform">
-              <div className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-orange-600 text-transparent bg-clip-text mb-2">2x</div>
-              <div className="text-slate-400 group-hover:text-slate-300 transition">Faster Turnover</div>
-            </div>
-            <div className="group hover:scale-105 transition-transform">
-              <div className="text-5xl font-bold bg-gradient-to-r from-orange-400 to-orange-600 text-transparent bg-clip-text mb-2">20%</div>
-              <div className="text-slate-400 group-hover:text-slate-300 transition">Higher Margins</div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="how-it-works" className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-950">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              How It Works
-            </h2>
-            <p className="text-xl text-slate-400">Three simple steps to smarter buying</p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            <div className="group relative bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 rounded-2xl p-8 hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                1
-              </div>
-              <div className="bg-blue-950/50 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
-                <BarChart3 className="h-8 w-8 text-orange-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4 text-center">
-                Analyze Your Inventory
-              </h3>
-              <p className="text-slate-400 text-center leading-relaxed">
-                Enter your dealership website and we'll analyze your entire inventory in 30 seconds.
-                Understand your portfolio, pricing patterns, and what you stock most.
-              </p>
-            </div>
-
-            <div className="group relative bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 rounded-2xl p-8 hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                2
-              </div>
-              <div className="bg-blue-950/50 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
-                <Smartphone className="h-8 w-8 text-orange-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4 text-center">
-                Scan VINs at Auctions
-              </h3>
-              <p className="text-slate-400 text-center leading-relaxed">
-                Use our mobile app to scan VINs at auctions. Get instant buy/no-buy guidance
-                with profit calculations based on your inventory profile.
-              </p>
-            </div>
-
-            <div className="group relative bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 rounded-2xl p-8 hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="absolute -top-4 -left-4 w-12 h-12 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl flex items-center justify-center text-white font-bold text-xl shadow-lg">
-                3
-              </div>
-              <div className="bg-blue-950/50 w-16 h-16 rounded-xl flex items-center justify-center mx-auto mb-6 group-hover:scale-110 transition-transform">
-                <TrendingUp className="h-8 w-8 text-orange-400" />
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-4 text-center">
-                Track Sales & Learn
-              </h3>
-              <p className="text-slate-400 text-center leading-relaxed">
-                As you make sales, we learn your sweet spot and improve recommendations.
-                Buy more of what sells fast and profitably.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="features" className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-900/50">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Everything You Need to Buy Smarter
-            </h2>
-            <p className="text-xl text-slate-400">Powerful features designed for dealers</p>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <div className="group bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 p-8 rounded-2xl hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="bg-orange-500/10 w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Target className="h-7 w-7 text-orange-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                Instant Portfolio Analysis
-              </h3>
-              <p className="text-slate-400 leading-relaxed">
-                Scan your website and get comprehensive insights in 30 seconds. Total vehicles,
-                portfolio value, average metrics, and inventory composition.
-              </p>
-            </div>
-
-            <div className="group bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 p-8 rounded-2xl hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="bg-orange-500/10 w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Smartphone className="h-7 w-7 text-orange-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                Mobile VIN Scanner
-              </h3>
-              <p className="text-slate-400 leading-relaxed">
-                Scan VINs at auctions and get instant guidance. See if it matches your profile,
-                calculate profit potential, and get clear buy/maybe/pass recommendation.
-              </p>
-            </div>
-
-            <div className="group bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 p-8 rounded-2xl hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="bg-orange-500/10 w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <TrendingUp className="h-7 w-7 text-orange-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                AI-Powered Recommendations
-              </h3>
-              <p className="text-slate-400 leading-relaxed">
-                Get smart buy recommendations based on your inventory profile and sales history.
-                Know exactly what to look for at your next auction.
-              </p>
-            </div>
-
-            <div className="group bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 p-8 rounded-2xl hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="bg-orange-500/10 w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <LineChart className="h-7 w-7 text-orange-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                Sweet Spot Intelligence
-              </h3>
-              <p className="text-slate-400 leading-relaxed">
-                After 10+ sales, discover your sweet spot. Learn which vehicles sell fastest
-                and most profitably for your dealership specifically.
-              </p>
-            </div>
-
-            <div className="group bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 p-8 rounded-2xl hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="bg-orange-500/10 w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <BarChart3 className="h-7 w-7 text-orange-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                Profit Calculator
-              </h3>
-              <p className="text-slate-400 leading-relaxed">
-                Calculate profit potential instantly. Adjust max bid, see total investment
-                including fees, and understand your expected margin.
-              </p>
-            </div>
-
-            <div className="group bg-gradient-to-br from-slate-900 to-slate-900/50 backdrop-blur border border-slate-800 p-8 rounded-2xl hover:border-orange-500/50 transition-all hover:shadow-xl hover:shadow-orange-500/10">
-              <div className="bg-orange-500/10 w-14 h-14 rounded-xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                <Shield className="h-7 w-7 text-orange-400" />
-              </div>
-              <h3 className="text-xl font-bold text-white mb-3">
-                Sales Tracking
-              </h3>
-              <p className="text-slate-400 leading-relaxed">
-                Track every sale with gross profit and days to sale. Build a database of what
-                works for your lot and continuously improve.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section id="pricing" className="py-24 px-4 sm:px-6 lg:px-8 bg-slate-950">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-slate-400">
-              Start with a 14-day free trial. No credit card required.
-            </p>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-8 rounded-2xl hover:border-slate-700 transition-all">
-              <h3 className="text-2xl font-bold text-white mb-2">Free</h3>
-              <div className="mt-4 mb-6">
-                <span className="text-5xl font-bold text-white">$0</span>
-                <span className="text-slate-400 ml-2">/month</span>
-              </div>
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-slate-300">Up to 100 vehicles</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-slate-300">Basic recommendations</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-slate-300">50 VIN scans/month</span>
-                </li>
-              </ul>
-              <Link
-                to="/signup"
-                className="block w-full text-center bg-slate-800 text-white px-6 py-3 rounded-xl font-semibold hover:bg-slate-700 transition"
+                className="bg-white text-slate-950 px-5 py-2 rounded-full text-sm font-bold hover:bg-orange-50 transition-all shadow-[0_0_20px_-5px_rgba(255,255,255,0.3)]"
               >
                 Get Started
               </Link>
             </div>
 
-            <div className="relative bg-gradient-to-br from-orange-500 to-orange-600 p-8 rounded-2xl shadow-2xl shadow-orange-500/30 transform scale-105">
-              <div className="absolute -top-5 left-1/2 transform -translate-x-1/2 bg-slate-950 text-orange-400 px-6 py-2 rounded-full text-sm font-bold border border-orange-500">
-                Most Popular
-              </div>
-              <h3 className="text-2xl font-bold text-white mb-2">Pro</h3>
-              <div className="mt-4 mb-6">
-                <span className="text-5xl font-bold text-white">$99</span>
-                <span className="text-orange-100 ml-2">/month</span>
-              </div>
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-white mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-white">Up to 500 vehicles</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-white mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-white">AI-powered recommendations</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-white mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-white">Unlimited VIN scans</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-white mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-white">Sweet spot analysis</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-white mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-white">Priority support</span>
-                </li>
-              </ul>
-              <Link
-                to="/signup"
-                className="block w-full text-center bg-white text-orange-600 px-6 py-3 rounded-xl font-bold hover:bg-orange-50 transition shadow-lg"
-              >
-                Start Free Trial
-              </Link>
-            </div>
-
-            <div className="bg-slate-900/50 backdrop-blur border border-slate-800 p-8 rounded-2xl hover:border-slate-700 transition-all">
-              <h3 className="text-2xl font-bold text-white mb-2">Enterprise</h3>
-              <div className="mt-4 mb-6">
-                <span className="text-5xl font-bold text-white">Custom</span>
-              </div>
-              <ul className="space-y-4 mb-8">
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-slate-300">Unlimited vehicles</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-slate-300">Multi-location support</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-slate-300">Dedicated account manager</span>
-                </li>
-                <li className="flex items-start">
-                  <CheckCircle className="h-5 w-5 text-green-400 mr-3 flex-shrink-0 mt-0.5" />
-                  <span className="text-slate-300">Custom integrations</span>
-                </li>
-              </ul>
-              <a
-                href="mailto:sales@dealercopilot.com"
-                className="block w-full text-center bg-slate-800 text-white px-6 py-3 rounded-xl font-semibold hover:bg-slate-700 transition"
-              >
-                Contact Sales
-              </a>
-            </div>
+            <button
+              className="md:hidden p-2 text-slate-400 hover:text-white"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              {mobileMenuOpen ? <X /> : <Menu />}
+            </button>
           </div>
         </div>
-      </section>
+      </nav>
 
-      <section className="py-24 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-950 to-slate-950 relative overflow-hidden">
-        <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iNjAiIGhlaWdodD0iNjAiIHZpZXdCb3g9IjAgMCA2MCA2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZyBmaWxsPSJub25lIiBmaWxsLXJ1bGU9ImV2ZW5vZGQiPjxnIGZpbGw9IiNmOTczMTYiIGZpbGwtb3BhY2l0eT0iMC4wNSI+PHBhdGggZD0iTTM2IDE2djRoLTR2LTRoNG16bTAgMGg0djRoLTR2LTR6Ii8+PC9nPjwvZz48L3N2Zz4=')] opacity-30"></div>
-
+      {/* Hero Section */}
+      <section className="relative pt-32 pb-20 px-4 sm:px-6 lg:px-8 overflow-hidden">
+        <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-7xl h-[500px] bg-orange-500/20 blur-[120px] rounded-full pointer-events-none" />
+        
         <div className="max-w-4xl mx-auto text-center relative z-10">
-          <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-            Ready to Buy Smarter?
-          </h2>
-          <p className="text-xl md:text-2xl text-blue-200 mb-12">
-            Join dealers who are making better buying decisions every day.
-          </p>
-          <Link
-            to="/signup"
-            className="group inline-flex items-center bg-gradient-to-r from-orange-500 to-orange-600 text-white px-12 py-5 rounded-xl text-xl font-bold hover:from-orange-600 hover:to-orange-700 transition-all shadow-2xl shadow-orange-500/30 hover:shadow-orange-500/50"
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="inline-flex items-center gap-2 bg-white/5 border border-white/10 rounded-full px-4 py-1.5 mb-8 backdrop-blur-sm"
           >
-            Start Your Free Trial
-            <ArrowRight className="ml-3 h-6 w-6 group-hover:translate-x-1 transition-transform" />
-          </Link>
-          <p className="mt-8 text-blue-300 text-sm">
-            14-day free trial • No credit card required • Cancel anytime
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-green-500"></span>
+            </span>
+            <span className="text-xs font-semibold tracking-wide text-slate-300 uppercase">Live Auction Intelligence</span>
+          </motion.div>
+
+          <motion.h1 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.1 }}
+            className="text-5xl md:text-7xl font-bold leading-tight tracking-tight mb-6"
+          >
+            Stop Guessing. <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-orange-400 via-red-500 to-orange-600">
+              Start Profiting.
+            </span>
+          </motion.h1>
+
+          <motion.p 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2 }}
+            className="text-lg md:text-xl text-slate-400 max-w-2xl mx-auto mb-12 leading-relaxed"
+          >
+            The "Auction Shield" for independent dealers. We calculate hidden fees, reconditioning, and real market days-to-sale in 3 seconds.
+          </motion.p>
+
+          {/* Interactive Mock Scan */}
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.3 }}
+            className="max-w-md mx-auto bg-slate-900/80 backdrop-blur-xl border border-white/10 rounded-2xl p-2 shadow-2xl shadow-black/50 ring-1 ring-white/10"
+          >
+            {scanResult === 'idle' && (
+              <form onSubmit={handleScan} className="relative">
+                <input
+                  type="text"
+                  value={vinInput}
+                  onChange={(e) => setVinInput(e.target.value.toUpperCase())}
+                  placeholder="Enter VIN to Scan (Try 1GCEC...)"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl px-4 py-4 text-white placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-orange-500/50 focus:border-orange-500/50 transition-all font-mono tracking-wider"
+                />
+                <button
+                  type="submit"
+                  disabled={vinInput.length < 3}
+                  className="absolute right-2 top-2 bottom-2 bg-gradient-to-r from-orange-500 to-red-600 text-white px-6 rounded-lg font-semibold hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-orange-500/20"
+                >
+                  Scan
+                </button>
+              </form>
+            )}
+
+            {scanResult === 'scanning' && (
+              <div className="h-[72px] flex items-center justify-center gap-3">
+                <div className="animate-spin rounded-full h-5 w-5 border-2 border-orange-500 border-t-transparent" />
+                <span className="text-slate-300 font-mono animate-pulse">Analyzing Auction Fees...</span>
+              </div>
+            )}
+
+            {scanResult !== 'idle' && scanResult !== 'scanning' && (
+              <div className="p-4">
+                <div className="flex justify-between items-start mb-4">
+                  <div>
+                    <div className="text-xs text-slate-500 font-mono mb-1">VIN: {vinInput}</div>
+                    <div className="text-sm font-medium text-slate-300">2018 Ford F-150 XLT</div>
+                  </div>
+                  <button 
+                    onClick={() => setScanResult('idle')}
+                    className="text-slate-500 hover:text-white"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+
+                {scanResult === 'success' ? (
+                  <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <CheckCircle className="text-emerald-500 h-6 w-6" />
+                      <span className="text-emerald-400 font-bold text-lg">GREEN LIGHT</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Est. Profit:</span>
+                      <span className="text-white font-bold">$2,450</span>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-4 mb-4">
+                    <div className="flex items-center gap-3 mb-2">
+                      <XCircle className="text-red-500 h-6 w-6" />
+                      <span className="text-red-400 font-bold text-lg">RED LIGHT</span>
+                    </div>
+                    <div className="flex justify-between text-sm">
+                      <span className="text-slate-400">Hidden Loss:</span>
+                      <span className="text-red-400 font-bold">-$850</span>
+                    </div>
+                    <div className="text-xs text-red-500/70 mt-2">
+                      *Auction fees ($680) + Reconditioning exceed margin.
+                    </div>
+                  </div>
+                )}
+
+                <Link 
+                  to="/signup"
+                  className="block w-full bg-white text-slate-950 text-center py-3 rounded-xl font-bold hover:bg-slate-100 transition-colors"
+                >
+                  Unlock Full Report
+                </Link>
+              </div>
+            )}
+          </motion.div>
+          
+          <p className="mt-4 text-xs text-slate-600 uppercase tracking-widest font-medium">
+            Try scanning mock VIN: <span className="text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => { setVinInput('1GCEC14X05'); setScanResult('idle'); }}>1GCEC...</span> (Winner) or <span className="text-slate-400 cursor-pointer hover:text-white transition-colors" onClick={() => { setVinInput('5T1BF1FK79'); setScanResult('idle'); }}>5T1BF...</span> (Loser)
           </p>
         </div>
       </section>
 
-      <footer className="bg-slate-950 border-t border-slate-900 py-12 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8">
+      {/* The Auction Roast (Problem Awareness) */}
+      <section id="roast" className="py-24 bg-slate-900 relative overflow-hidden">
+        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-800/40 via-slate-950 to-slate-950" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
+          <div className="grid lg:grid-cols-2 gap-16 items-center">
             <div>
-              <div className="flex items-center text-white mb-4">
-                <div className="bg-gradient-to-br from-orange-500 to-orange-600 p-1.5 rounded-lg">
-                  <Target className="h-5 w-5 text-white" />
-                </div>
-                <span className="ml-2 font-bold">Dealer Co-Pilot</span>
+              <div className="inline-flex items-center gap-2 text-orange-500 font-bold mb-4">
+                <AlertTriangle className="h-5 w-5" />
+                <span>The "Good Deal" Trap</span>
               </div>
-              <p className="text-slate-400 text-sm">
-                Know what to buy at auction in 3 seconds.
+              <h2 className="text-4xl md:text-5xl font-bold mb-6">
+                Your gut says "Buy". <br />
+                <span className="text-slate-500">The math says "Run".</span>
+              </h2>
+              <p className="text-lg text-slate-400 leading-relaxed mb-8">
+                That 2015 Camry looks like a steal at $10k. But after the $600 buy fee, $400 transport, and $800 reconditioning, you're already underwater. <br /><br />
+                We calculate the <strong className="text-white">True Cost</strong> instantly, so you never bid on a loser.
               </p>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Product</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#features" className="text-slate-400 hover:text-white transition">Features</a></li>
-                <li><a href="#pricing" className="text-slate-400 hover:text-white transition">Pricing</a></li>
-                <li><a href="#how-it-works" className="text-slate-400 hover:text-white transition">How It Works</a></li>
+              
+              <ul className="space-y-4 mb-8">
+                {['Real-time Auction Fee Calculation', 'Hidden Reconditioning Estimates', 'True Market Days-to-Sale'].map((item, i) => (
+                  <li key={i} className="flex items-center gap-3 text-slate-300">
+                    <CheckCircle className="h-5 w-5 text-emerald-500 flex-shrink-0" />
+                    {item}
+                  </li>
+                ))}
               </ul>
             </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Company</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-slate-400 hover:text-white transition">About</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-white transition">Contact</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-white transition">Support</a></li>
-              </ul>
-            </div>
-            <div>
-              <h4 className="text-white font-semibold mb-4">Legal</h4>
-              <ul className="space-y-2 text-sm">
-                <li><a href="#" className="text-slate-400 hover:text-white transition">Privacy Policy</a></li>
-                <li><a href="#" className="text-slate-400 hover:text-white transition">Terms of Service</a></li>
-              </ul>
+
+            {/* Interactive Card */}
+            <div 
+              className="relative group cursor-pointer"
+              onMouseEnter={() => setRoastRevealed(true)}
+              onMouseLeave={() => setRoastRevealed(false)}
+              onClick={() => setRoastRevealed(!roastRevealed)}
+            >
+              <div className="absolute -inset-1 bg-gradient-to-r from-orange-500 to-red-600 rounded-2xl blur opacity-20 group-hover:opacity-40 transition duration-500"></div>
+              <div className="relative bg-slate-950 border border-slate-800 rounded-2xl overflow-hidden shadow-2xl">
+                {/* Header mimicking a listing */}
+                <div className="bg-slate-900 p-4 border-b border-slate-800 flex justify-between items-center">
+                  <div className="flex gap-3">
+                    <div className="h-10 w-10 bg-slate-800 rounded-lg flex items-center justify-center">
+                      <Smartphone className="text-slate-500" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-bold text-white">2015 Toyota Camry</div>
+                      <div className="text-xs text-slate-500">85k Miles • Clean Title</div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-xs text-slate-500">Current Bid</div>
+                    <div className="text-lg font-bold text-white">$10,200</div>
+                  </div>
+                </div>
+
+                {/* The Reveal Overlay */}
+                <div className="p-8 min-h-[300px] flex items-center justify-center text-center relative">
+                   <div className={`transition-all duration-500 absolute inset-0 flex flex-col items-center justify-center p-8 ${roastRevealed ? 'opacity-0 scale-95' : 'opacity-100 scale-100'}`}>
+                      <div className="h-16 w-16 rounded-full bg-slate-800 flex items-center justify-center mb-4 border border-slate-700">
+                        <Lock className="text-slate-400 h-8 w-8" />
+                      </div>
+                      <h3 className="text-2xl font-bold text-white mb-2">Tap to Reveal Truth</h3>
+                      <p className="text-slate-400">See the hidden costs behind this bid.</p>
+                   </div>
+
+                   <div className={`transition-all duration-500 absolute inset-0 bg-slate-950 flex flex-col items-center justify-center p-8 ${roastRevealed ? 'opacity-100 scale-100' : 'opacity-0 scale-105 pointer-events-none'}`}>
+                      <div className="w-full space-y-3">
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-400">Sale Price (Est)</span>
+                          <span className="text-emerald-400 font-mono">$11,500</span>
+                        </div>
+                        <div className="h-px bg-slate-800 my-2" />
+                        <div className="flex justify-between text-sm">
+                          <span className="text-slate-400">Bid Amount</span>
+                          <span className="text-white font-mono">$10,200</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-red-400 font-medium">Auction Fees</span>
+                          <span className="text-red-400 font-mono">-$680</span>
+                        </div>
+                        <div className="flex justify-between text-sm">
+                          <span className="text-red-400 font-medium">Transport/Recon</span>
+                          <span className="text-red-400 font-mono">-$850</span>
+                        </div>
+                        <div className="h-px bg-slate-800 my-2" />
+                        <div className="flex justify-between text-lg font-bold bg-red-500/10 p-3 rounded-lg border border-red-500/20">
+                          <span className="text-red-500">Net Loss</span>
+                          <span className="text-red-500">-$230</span>
+                        </div>
+                      </div>
+                   </div>
+                </div>
+              </div>
             </div>
           </div>
-          <div className="border-t border-slate-900 mt-12 pt-8 text-center text-sm text-slate-500">
-            <p>&copy; 2024 Dealer Co-Pilot. All rights reserved.</p>
+        </div>
+      </section>
+
+      {/* Dual Persona Strategy */}
+      <section id="personas" className="py-24 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-5xl font-bold mb-4">One Tool. Two Weapons.</h2>
+          <p className="text-slate-400">Whether you're new school or old school, we protect your money.</p>
+        </div>
+
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Persona A: The Hunter */}
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 p-8 rounded-3xl hover:border-slate-700 transition-all">
+            <div className="h-12 w-12 bg-blue-500/10 rounded-xl flex items-center justify-center mb-6">
+              <Zap className="text-blue-400 h-6 w-6" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">The Digital Hunter</h3>
+            <p className="text-slate-400 mb-6 h-12">"I want automation, data, and speed. I hate manual calculations."</p>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                <span className="text-slate-300">Real-time API Data Analysis</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                <span className="text-slate-300">Automated "Days-to-Sale" prediction</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-blue-500 mt-0.5" />
+                <span className="text-slate-300">Competitor Listing Spy</span>
+              </li>
+            </ul>
+          </div>
+
+          {/* Persona B: The Veteran */}
+          <div className="bg-gradient-to-b from-slate-900 to-slate-950 border border-slate-800 p-8 rounded-3xl hover:border-slate-700 transition-all">
+            <div className="h-12 w-12 bg-orange-500/10 rounded-xl flex items-center justify-center mb-6">
+              <Shield className="text-orange-400 h-6 w-6" />
+            </div>
+            <h3 className="text-2xl font-bold text-white mb-2">The Auction Veteran</h3>
+            <p className="text-slate-400 mb-6 h-12">"I trust my gut, but I hate overpaying on fees. Keep it simple."</p>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+                <span className="text-slate-300">Simple Red Light / Green Light</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+                <span className="text-slate-300">Instant Auction Fee Calculator</span>
+              </li>
+              <li className="flex items-start gap-3">
+                <CheckCircle className="h-5 w-5 text-orange-500 mt-0.5" />
+                <span className="text-slate-300">Profit Margin Protection</span>
+              </li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      {/* Guerrilla Beta Access */}
+      <section id="beta" className="py-24 relative overflow-hidden">
+        <div className="absolute inset-0 bg-orange-600"></div>
+        <div className="absolute inset-0 bg-[url('https://www.transparenttextures.com/patterns/carbon-fibre.png')] opacity-20"></div>
+        <div className="absolute inset-0 bg-gradient-to-t from-orange-900/90 to-transparent"></div>
+        
+        <div className="max-w-4xl mx-auto px-4 text-center relative z-10">
+          <h2 className="text-4xl md:text-6xl font-black text-white mb-6 uppercase tracking-tight">
+            We Need 10 Dealers.
+          </h2>
+          <p className="text-xl text-orange-100 mb-8 max-w-2xl mx-auto font-medium">
+            We are looking for 10 "Beta Pilots" in each city. You get full access for free. 
+            All we ask for is your brutal, honest feedback.
+          </p>
+
+          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+            <Link 
+              to="/signup"
+              className="bg-white text-orange-600 px-8 py-4 rounded-xl text-xl font-bold hover:bg-orange-50 transition-all shadow-xl shadow-black/20 transform hover:-translate-y-1"
+            >
+              Join the Beta Pilot
+            </Link>
+            <span className="text-orange-200 text-sm font-medium">
+              Only 3 spots left in your region
+            </span>
+          </div>
+        </div>
+      </section>
+
+      {/* Footer */}
+      <footer className="bg-slate-950 py-12 px-4 border-t border-slate-900">
+        <div className="max-w-7xl mx-auto flex flex-col md:flex-row justify-between items-center text-slate-500 text-sm">
+          <div className="flex items-center gap-2 mb-4 md:mb-0">
+            <Target className="h-4 w-4" />
+            <span>© 2024 Dealer Co-Pilot. Built for the hustle.</span>
+          </div>
+          <div className="flex gap-6">
+            <a href="#" className="hover:text-white transition">Privacy</a>
+            <a href="#" className="hover:text-white transition">Terms</a>
+            <a href="#" className="hover:text-white transition">Contact</a>
           </div>
         </div>
       </footer>
