@@ -76,6 +76,7 @@ export default function RecommendationsPage() {
     async (pageNum: number, append = false) => {
       if (!user?.tenant_id) return;
 
+      setLoading(true); // re-arm the in-flight guard checked by the scroll observer
       try {
         const fromRow = pageNum * PAGE_SIZE;
         const toRow = fromRow + PAGE_SIZE - 1;
@@ -177,7 +178,10 @@ export default function RecommendationsPage() {
         observer.unobserve(currentTarget);
       }
     };
-  }, [hasMore, loading, page, loadRecommendations]);
+    // The sentinel <div ref={observerTarget}> only mounts once filteredRecommendations
+    // is non-empty and searchQuery is empty, so the effect must re-run on those too —
+    // otherwise observe() is never called on the real element.
+  }, [hasMore, loading, page, loadRecommendations, filteredRecommendations, searchQuery]);
 
   const handleSignOut = async () => {
     try {
@@ -235,9 +239,10 @@ export default function RecommendationsPage() {
 
                 if (error) throw error;
 
-                // Remove from local state
-                setRecommendations(recommendations.filter(s => s.id !== scanId));
-                setFilteredRecommendations(filteredRecommendations.filter(s => s.id !== scanId));
+                // Remove from local state (functional updates: the toast closure may be stale
+                // by the time Delete is clicked, once more pages have been appended)
+                setRecommendations(prev => prev.filter(s => s.id !== scanId));
+                setFilteredRecommendations(prev => prev.filter(s => s.id !== scanId));
                 toast.success('Scan deleted successfully');
               } catch (error) {
                 console.error('Error deleting scan:', error);
