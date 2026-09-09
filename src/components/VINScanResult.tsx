@@ -60,6 +60,7 @@ interface VINScanResultProps {
         custom_transport_cost?: number | null;
         custom_max_bid?: number | null;
         custom_market_price?: number | null;
+        custom_auction_fee?: number | null;
         auction_url?: string | null;
         purchase_status?: 'purchased' | 'not_purchased' | 'pending';
         purchase_price?: number | null;
@@ -83,6 +84,7 @@ interface VINScanResultProps {
         custom_transport_cost?: number | null;
         custom_max_bid?: number | null;
         custom_market_price?: number | null;
+        custom_auction_fee?: number | null;
         auction_url?: string | null;
         purchase_status?: 'purchased' | 'not_purchased' | 'pending';
         purchase_price?: number | null;
@@ -125,7 +127,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     );
     const [currentAuctionUrl, setCurrentAuctionUrl] = useState<string>(scanData.auction_url || '');
 
-    const handleSaveCosts = async (costs: { recon: number; transport: number; maxBid: number; marketPrice: number }) => {
+    const handleSaveCosts = async (costs: { recon: number; transport: number; maxBid: number; marketPrice: number; customAuctionFee: number | null }) => {
         if (!scanData.id) return;
 
         setIsSaving(true);
@@ -140,6 +142,8 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                 custom_transport_cost: costs.transport,
                 custom_max_bid: costs.maxBid,
                 custom_market_price: costs.marketPrice,
+                // null clears the override so the fee derives from the thresholds again
+                custom_auction_fee: costs.customAuctionFee,
             };
 
             // Always update profit calculations if they changed
@@ -166,6 +170,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     custom_transport_cost: costs.transport,
                     custom_max_bid: costs.maxBid,
                     custom_market_price: costs.marketPrice,
+                    custom_auction_fee: costs.customAuctionFee,
                     estimated_profit: currentEstimatedProfit,
                     max_bid_suggestion: currentMaxBid,
                 });
@@ -705,6 +710,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     initialRecon={scanData.custom_recon_cost ?? undefined}
                     initialTransport={scanData.custom_transport_cost ?? undefined}
                     initialMarketPrice={scanData.custom_market_price ?? undefined}
+                    initialAuctionFee={scanData.custom_auction_fee ?? undefined}
                     auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
                     defaultRecon={defaultCostSettings.reconditioning_cost}
                     defaultTransport={defaultCostSettings.transport_cost}
