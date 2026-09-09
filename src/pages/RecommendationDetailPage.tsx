@@ -76,6 +76,7 @@ export default function RecommendationDetailPage() {
         scanData={scanData}
         isModal={false}
         tenantZipCode={tenant?.zip_code}
+        costSettings={tenant?.cost_settings}
         onUpdate={handleUpdate}
       />
     </div>

@@ -130,24 +130,17 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
 
         setIsSaving(true);
         try {
-            // Only update the fields that actually changed
+            // Persist every calculator value, including ones that happen to equal the
+            // current defaults. Skipping those left an earlier custom value in the DB,
+            // so a field could never be set back to the default and the save appeared
+            // not to stick.
             const updateData: any = {
                 costs_edited: true,
+                custom_recon_cost: costs.recon,
+                custom_transport_cost: costs.transport,
+                custom_max_bid: costs.maxBid,
+                custom_market_price: costs.marketPrice,
             };
-
-            // Only include fields that have custom values
-            if (costs.recon !== (costSettings?.reconditioning_cost || 800)) {
-                updateData.custom_recon_cost = costs.recon;
-            }
-            if (costs.transport !== (costSettings?.transport_cost || 150)) {
-                updateData.custom_transport_cost = costs.transport;
-            }
-            if (costs.maxBid !== (scanData.max_bid_suggestion || 0)) {
-                updateData.custom_max_bid = costs.maxBid;
-            }
-            if (costs.marketPrice !== (scanData.market_data?.averagePrice || 0)) {
-                updateData.custom_market_price = costs.marketPrice;
-            }
 
             // Always update profit calculations if they changed
             if (currentEstimatedProfit !== null && currentEstimatedProfit !== scanData.estimated_profit) {
@@ -708,10 +701,10 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     ref={calculatorRef}
                     maxBidSuggestion={scanData.max_bid_suggestion || 0}
                     marketPrice={scanData.market_data?.averagePrice || 0}
-                    initialMaxBid={scanData.custom_max_bid || undefined}
-                    initialRecon={scanData.custom_recon_cost || undefined}
-                    initialTransport={scanData.custom_transport_cost || undefined}
-                    initialMarketPrice={scanData.custom_market_price || undefined}
+                    initialMaxBid={scanData.custom_max_bid ?? undefined}
+                    initialRecon={scanData.custom_recon_cost ?? undefined}
+                    initialTransport={scanData.custom_transport_cost ?? undefined}
+                    initialMarketPrice={scanData.custom_market_price ?? undefined}
                     auctionFeeThresholds={defaultCostSettings.auction_fee_thresholds || []}
                     defaultRecon={defaultCostSettings.reconditioning_cost}
                     defaultTransport={defaultCostSettings.transport_cost}
