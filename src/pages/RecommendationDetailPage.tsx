@@ -1,8 +1,9 @@
 import { useParams, useNavigate } from 'react-router-dom';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../contexts/AuthContext';
 import VINScanResult from '../components/VINScanResult';
+import ConfirmationDialog from '../components/ConfirmationDialog';
 import Header from '../components/Header';
 
 export default function RecommendationDetailPage() {
@@ -12,6 +13,12 @@ export default function RecommendationDetailPage() {
   const [scanData, setScanData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [menuOpen, setMenuOpen] = useState(false);
+  // Guards unsaved profit-calculator edits, matching VINScanPage and DashboardPage.
+  // Without this, clicking anything outside the calculator (the purchase-status
+  // control, for instance) silently discarded the edits.
+  const scanResultRef = useRef<{ saveCosts: () => void }>(null);
+  const [isEditingCosts, setIsEditingCosts] = useState(false);
+  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
 
   useEffect(() => {
     if (scanId && user?.tenant_id) {
@@ -73,11 +80,31 @@ export default function RecommendationDetailPage() {
         setMenuOpen={setMenuOpen}
       />
       <VINScanResult
+        ref={scanResultRef}
         scanData={scanData}
         isModal={false}
         tenantZipCode={tenant?.zip_code}
         costSettings={tenant?.cost_settings}
         onUpdate={handleUpdate}
+        onEditStatusChange={setIsEditingCosts}
+        onOutsideClick={() => setShowConfirmDialog(true)}
+        isEditing={isEditingCosts}
+      />
+
+      <ConfirmationDialog
+        isOpen={showConfirmDialog}
+        onConfirm={() => {
+          setIsEditingCosts(false);
+          setShowConfirmDialog(false);
+        }}
+        onCancel={() => {
+          scanResultRef.current?.saveCosts();
+          setIsEditingCosts(false);
+          setShowConfirmDialog(false);
+        }}
+        confirmLabel="Discard Changes"
+        cancelLabel="Save Changes"
+        message="You have unsaved changes in the profit calculator. How would you like to proceed?"
       />
     </div>
   );
