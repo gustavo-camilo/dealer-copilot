@@ -162,6 +162,7 @@ export interface VINScan {
   custom_transport_cost: number | null;
   custom_max_bid: number | null;
   custom_market_price: number | null;
+  custom_auction_fee: number | null;
   auction_url: string | null;
   purchase_status: PurchaseStatusType;
   purchase_price: number | null;

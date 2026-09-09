@@ -11,6 +11,7 @@ export interface ProfitCalculatorProps {
   initialRecon?: number;
   initialTransport?: number;
   initialMarketPrice?: number;
+  initialAuctionFee?: number;
   auctionFeeThresholds: AuctionFeeThreshold[];
   defaultRecon: number;
   defaultTransport: number;
@@ -29,6 +30,9 @@ export interface ProfitCalculatorProps {
     transport: number;
     maxBid: number;
     marketPrice: number;
+    // null means the user has not overridden the fee: keep deriving it from the
+    // tenant's thresholds rather than freezing today's calculated value.
+    customAuctionFee: number | null;
   }) => void;
   onEditStatusChange?: (isEditing: boolean) => void;
   onOutsideClick?: () => void;
@@ -43,6 +47,7 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
   initialRecon,
   initialTransport,
   initialMarketPrice,
+  initialAuctionFee,
   auctionFeeThresholds,
   defaultRecon,
   defaultTransport,
@@ -54,7 +59,9 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
   isEditing: isEditingProp,
 }, ref) => {
   const [maxBid, setMaxBid] = useState(initialMaxBid !== undefined ? initialMaxBid : defaultMaxBid);
-  const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(null);
+  const [customAuctionFee, setCustomAuctionFee] = useState<number | null>(
+    initialAuctionFee !== undefined ? initialAuctionFee : null
+  );
   const [reconCost, setReconCost] = useState(initialRecon !== undefined ? initialRecon : defaultRecon);
   const [transportCost, setTransportCost] = useState(initialTransport !== undefined ? initialTransport : defaultTransport);
   const [marketPrice, setMarketPrice] = useState(initialMarketPrice !== undefined ? initialMarketPrice : defaultMarketPrice);
@@ -68,12 +75,13 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
           recon: reconCost,
           transport: transportCost,
           maxBid,
-          marketPrice
+          marketPrice,
+          customAuctionFee
         });
       }
       setIsEditing(false); // Reset to view mode after save
     }
-  }), [onSave, reconCost, transportCost, maxBid, marketPrice]);
+  }), [onSave, reconCost, transportCost, maxBid, marketPrice, customAuctionFee]);
 
   // Sync isEditing with prop
   useEffect(() => {
@@ -181,7 +189,8 @@ const ProfitCalculator = forwardRef<{ save: () => void }, ProfitCalculatorProps>
                   recon: reconCost,
                   transport: transportCost,
                   maxBid,
-                  marketPrice
+                  marketPrice,
+                  customAuctionFee
                 });
               }
               setIsEditing(!isEditing);
