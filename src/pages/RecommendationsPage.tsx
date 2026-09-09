@@ -50,17 +50,53 @@ type PurchaseStatusFilter = 'all' | 'pending' | 'purchased' | 'not_purchased';
 
 const PAGE_SIZE = 25;
 
+const STATUS_TABS: Array<{ value: PurchaseStatusFilter; label: string }> = [
+  { value: 'pending', label: 'Pending' },
+  { value: 'purchased', label: 'Purchased' },
+  { value: 'not_purchased', label: 'Not Purchased' },
+  { value: 'all', label: 'All Vehicles' },
+];
+
+// Builds the server-side search filter for PostgREST's .or().
+//
+// SECURITY: .or() takes a comma-separated list of filters as a raw string, so an
+// unescaped search term could terminate its own filter and inject additional
+// conditions. Wrapping the value in double quotes neutralises PostgREST's
+// reserved characters ( , . : ( ) ), and backslashes and quotes inside the term
+// are escaped so it cannot close its own quoting. The term is never concatenated
+// into SQL — PostgREST parses it as a value and parameterises the query itself.
+const buildSearchFilter = (term: string) => {
+  const value = `"%${term.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}%"`;
+  return [
+    `vin.ilike.${value}`,
+    `decoded_data->>make.ilike.${value}`,
+    `decoded_data->>model.ilike.${value}`,
+    `decoded_data->>year.ilike.${value}`,
+    `decoded_data->>trim.ilike.${value}`,
+  ].join(',');
+};
+
 export default function RecommendationsPage() {
   const { user, tenant, signOut } = useAuth();
   const navigate = useNavigate();
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
-  const [filteredRecommendations, setFilteredRecommendations] = useState<Recommendation[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(0);
   const [searchQuery, setSearchQuery] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
   const [statusFilter, setStatusFilter] = useState<PurchaseStatusFilter>('pending');
+  const [tabCounts, setTabCounts] = useState<Record<PurchaseStatusFilter, number | null>>({
+    pending: null,
+    purchased: null,
+    not_purchased: null,
+    all: null,
+  });
+  // Bumped after a delete or a status change so the tab counts are refetched
+  const [countsVersion, setCountsVersion] = useState(0);
+  // Total rows matching the active tab + search, returned by the list query
+  const [totalCount, setTotalCount] = useState<number | null>(null);
 
   const observerTarget = useRef<HTMLDivElement>(null);
   const [stats, setStats] = useState({
@@ -71,7 +107,15 @@ export default function RecommendationsPage() {
     potentialProfit: 0,
   });
 
-  // Load recommendations with pagination
+  // Debounce the search box so typing doesn't fire a query per keystroke
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 300);
+    return () => clearTimeout(timer);
+  }, [searchQuery]);
+
+  // Load recommendations with pagination. The status filter and the search are
+  // applied server-side so they cover every row in the table, not just the pages
+  // already loaded by the infinite scroll.
   const loadRecommendations = useCallback(
     async (pageNum: number, append = false) => {
       if (!user?.tenant_id) return;
@@ -81,15 +125,29 @@ export default function RecommendationsPage() {
         const fromRow = pageNum * PAGE_SIZE;
         const toRow = fromRow + PAGE_SIZE - 1;
 
-        const { data, error } = await supabase
+        // count: 'exact' returns the total number of matching rows alongside this
+        // page, so the results count reflects the whole table rather than the pages
+        // loaded so far.
+        let query = supabase
           .from('vin_scans')
-          .select('*')
+          .select('*', { count: 'exact' })
           .eq('tenant_id', user.tenant_id)
-          .not('recommendation', 'is', null)
+          .not('recommendation', 'is', null);
+
+        if (statusFilter !== 'all') {
+          query = query.eq('purchase_status', statusFilter);
+        }
+        if (debouncedSearch) {
+          query = query.or(buildSearchFilter(debouncedSearch));
+        }
+
+        const { data, error, count } = await query
           .order('created_at', { ascending: false })
           .range(fromRow, toRow);
 
         if (error) throw error;
+
+        setTotalCount(count ?? null);
 
         if (data) {
           if (append) {
@@ -105,46 +163,65 @@ export default function RecommendationsPage() {
         setLoading(false);
       }
     },
-    [user?.tenant_id]
+    [user?.tenant_id, statusFilter, debouncedSearch]
   );
 
-  // Initial load
+  // Load the first page, and start over whenever the tab or the search changes
+  // (loadRecommendations is re-created when either does).
   useEffect(() => {
+    setPage(0);
+    setHasMore(true);
     loadRecommendations(0);
   }, [loadRecommendations]);
 
-  // Filter recommendations
+  // Tab counts are totals for the whole tenant, independent of the search and of
+  // how many pages have been scrolled. head:true fetches the count without rows.
   useEffect(() => {
-    let filtered = [...recommendations];
+    if (!user?.tenant_id) return;
+    let cancelled = false;
 
-    // Apply purchase status filter
-    if (statusFilter !== 'all') {
-      filtered = filtered.filter(r => r.purchase_status === statusFilter);
-    }
+    const countFor = async (status: PurchaseStatusFilter) => {
+      let query = supabase
+        .from('vin_scans')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', user.tenant_id)
+        .not('recommendation', 'is', null);
 
-    // Apply search filter
-    if (searchQuery.trim()) {
-      const query = searchQuery.toLowerCase();
-      filtered = filtered.filter(
-        (r) =>
-          r.vin.toLowerCase().includes(query) ||
-          r.decoded_data.make.toLowerCase().includes(query) ||
-          r.decoded_data.model.toLowerCase().includes(query) ||
-          `${r.decoded_data.year}`.includes(query) ||
-          (r.decoded_data.trim && r.decoded_data.trim.toLowerCase().includes(query))
-      );
-    }
+      if (status !== 'all') {
+        query = query.eq('purchase_status', status);
+      }
 
-    setFilteredRecommendations(filtered);
-  }, [searchQuery, recommendations, statusFilter]);
+      const { count, error } = await query;
+      if (error) throw error;
+      return count ?? 0;
+    };
 
-  // Calculate stats from filtered recommendations
+    (async () => {
+      try {
+        const [pending, purchased, not_purchased, all] = await Promise.all([
+          countFor('pending'),
+          countFor('purchased'),
+          countFor('not_purchased'),
+          countFor('all'),
+        ]);
+        if (!cancelled) setTabCounts({ pending, purchased, not_purchased, all });
+      } catch (error) {
+        console.error('Error loading tab counts:', error);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user?.tenant_id, countsVersion]);
+
+  // Calculate stats from the loaded recommendations
   useEffect(() => {
-    const buy = filteredRecommendations.filter((r) => r.recommendation === 'buy').length;
-    const maybe = filteredRecommendations.filter((r) => r.recommendation === 'maybe').length;
-    const pass = filteredRecommendations.filter((r) => r.recommendation === 'pass').length;
-    const totalInvestment = filteredRecommendations.reduce((sum, r) => sum + (r.max_bid_suggestion || 0), 0);
-    const potentialProfit = filteredRecommendations.reduce((sum, r) => sum + (r.estimated_profit || 0), 0);
+    const buy = recommendations.filter((r) => r.recommendation === 'buy').length;
+    const maybe = recommendations.filter((r) => r.recommendation === 'maybe').length;
+    const pass = recommendations.filter((r) => r.recommendation === 'pass').length;
+    const totalInvestment = recommendations.reduce((sum, r) => sum + (r.max_bid_suggestion || 0), 0);
+    const potentialProfit = recommendations.reduce((sum, r) => sum + (r.estimated_profit || 0), 0);
 
     setStats({
       buy,
@@ -153,7 +230,7 @@ export default function RecommendationsPage() {
       totalInvestment,
       potentialProfit,
     });
-  }, [filteredRecommendations]);
+  }, [recommendations]);
 
   // Infinite scroll observer
   useEffect(() => {
@@ -178,10 +255,10 @@ export default function RecommendationsPage() {
         observer.unobserve(currentTarget);
       }
     };
-    // The sentinel <div ref={observerTarget}> only mounts once filteredRecommendations
-    // is non-empty and searchQuery is empty, so the effect must re-run on those too —
-    // otherwise observe() is never called on the real element.
-  }, [hasMore, loading, page, loadRecommendations, filteredRecommendations, searchQuery]);
+    // The sentinel <div ref={observerTarget}> only mounts once recommendations is
+    // non-empty, so the effect must re-run on that too — otherwise observe() is
+    // never called on the real element.
+  }, [hasMore, loading, page, loadRecommendations, recommendations]);
 
   const handleSignOut = async () => {
     try {
@@ -242,7 +319,7 @@ export default function RecommendationsPage() {
                 // Remove from local state (functional updates: the toast closure may be stale
                 // by the time Delete is clicked, once more pages have been appended)
                 setRecommendations(prev => prev.filter(s => s.id !== scanId));
-                setFilteredRecommendations(prev => prev.filter(s => s.id !== scanId));
+                setCountsVersion(v => v + 1);
                 toast.success('Scan deleted successfully');
               } catch (error) {
                 console.error('Error deleting scan:', error);
@@ -293,17 +370,14 @@ export default function RecommendationsPage() {
 
       if (error) throw error;
 
-      // Update local state
-      setRecommendations(prev => prev.map(rec =>
-        rec.id === scanId
-          ? { ...rec, ...updateData }
-          : rec
-      ));
-      setFilteredRecommendations(prev => prev.map(rec =>
-        rec.id === scanId
-          ? { ...rec, ...updateData }
-          : rec
-      ));
+      // Update local state. The list is now filtered server-side, so a scan that no
+      // longer matches the active tab has to drop out of it rather than linger.
+      setRecommendations(prev =>
+        statusFilter !== 'all' && status !== statusFilter
+          ? prev.filter(rec => rec.id !== scanId)
+          : prev.map(rec => (rec.id === scanId ? { ...rec, ...updateData } : rec))
+      );
+      setCountsVersion(v => v + 1);
 
       const messages = {
         purchased: 'Marked as purchased',
@@ -403,10 +477,42 @@ export default function RecommendationsPage() {
           </div>
         </div>
 
-        {/* Search and Filter */}
-        <div className="mb-6 flex flex-col sm:flex-row gap-3">
-          {/* Search Field */}
-          <div className="relative flex-1">
+        {/* Status Tabs */}
+        <div className="mb-4 border-b border-gray-200 dark:border-brand-border-dark">
+          <nav className="-mb-px flex gap-1 sm:gap-2 overflow-x-auto" aria-label="Filter by purchase status">
+            {STATUS_TABS.map((tab) => {
+              const isActive = statusFilter === tab.value;
+              const count = tabCounts[tab.value];
+              return (
+                <button
+                  key={tab.value}
+                  onClick={() => setStatusFilter(tab.value)}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={`px-3 sm:px-4 py-3 text-sm font-medium border-b-2 whitespace-nowrap transition-colors ${isActive
+                    ? 'border-blue-900 dark:border-blue-400 text-blue-900 dark:text-blue-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:border-gray-300 dark:hover:border-navy-600'
+                    }`}
+                >
+                  {tab.label}
+                  {count !== null && (
+                    <span
+                      className={`ml-2 px-2 py-0.5 rounded-full text-xs font-semibold ${isActive
+                        ? 'bg-blue-100 dark:bg-blue-500/20 text-blue-900 dark:text-blue-300'
+                        : 'bg-gray-100 dark:bg-navy-800 text-gray-600 dark:text-gray-400'
+                        }`}
+                    >
+                      {count}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </nav>
+        </div>
+
+        {/* Search */}
+        <div className="mb-6">
+          <div className="relative">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 dark:text-gray-500 w-5 h-5" />
             <input
               type="text"
@@ -416,25 +522,12 @@ export default function RecommendationsPage() {
               className="w-full pl-10 pr-4 py-3 border border-gray-300 dark:border-navy-600 bg-white dark:bg-navy-900 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             />
           </div>
-
-          {/* Status Filter Dropdown */}
-          <select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value as PurchaseStatusFilter)}
-            className="px-4 py-3 pr-10 border border-gray-300 dark:border-navy-600 bg-white dark:bg-navy-900 text-gray-900 dark:text-white rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent appearance-none"
-            style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%236B7280' stroke-linecap='round' stroke-linejoin='round' stroke-width='1.5' d='M6 8l4 4 4-4'/%3E%3C/svg%3E")`, backgroundPosition: 'right 0.5rem center', backgroundRepeat: 'no-repeat', backgroundSize: '1.5em 1.5em' }}
-          >
-            <option value="pending">Pending ({recommendations.filter(r => r.purchase_status === 'pending').length})</option>
-            <option value="purchased">Purchased ({recommendations.filter(r => r.purchase_status === 'purchased').length})</option>
-            <option value="not_purchased">Not Purchased ({recommendations.filter(r => r.purchase_status === 'not_purchased').length})</option>
-            <option value="all">All Vehicles</option>
-          </select>
         </div>
 
         {/* Results Count */}
-        {searchQuery && (
+        {debouncedSearch && totalCount !== null && (
           <div className="mb-4 text-sm text-gray-600 dark:text-gray-400">
-            Found {filteredRecommendations.length} result{filteredRecommendations.length !== 1 ? 's' : ''}
+            Found {totalCount} result{totalCount !== 1 ? 's' : ''}
           </div>
         )}
 
@@ -443,21 +536,27 @@ export default function RecommendationsPage() {
           <div className="flex justify-center items-center py-12">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
           </div>
-        ) : filteredRecommendations.length === 0 ? (
+        ) : recommendations.length === 0 ? (
           <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-12 text-center">
             <AlertCircle className="w-12 h-12 text-gray-400 dark:text-gray-500 mx-auto mb-4" />
             <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">
-              {searchQuery ? 'No results found' : 'No VIN scans yet'}
+              {debouncedSearch
+                ? 'No results found'
+                : statusFilter === 'all'
+                  ? 'No VIN scans yet'
+                  : `No ${STATUS_TABS.find(t => t.value === statusFilter)?.label.toLowerCase()} vehicles`}
             </h3>
             <p className="text-gray-600 dark:text-gray-400">
-              {searchQuery
+              {debouncedSearch
                 ? 'Try adjusting your search terms'
-                : 'Start scanning VINs to see recommendations here'}
+                : statusFilter === 'all'
+                  ? 'Start scanning VINs to see recommendations here'
+                  : 'Try another tab to see your other vehicles'}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {filteredRecommendations.map((rec) => (
+            {recommendations.map((rec) => (
               <div
                 key={rec.id}
                 onClick={() => navigate(`/recommendations/${rec.id}`)}
@@ -570,8 +669,9 @@ export default function RecommendationsPage() {
               </div>
             ))}
 
-            {/* Infinite Scroll Trigger */}
-            {hasMore && !searchQuery && (
+            {/* Infinite Scroll Trigger — search is applied server-side now, so
+                results keep paginating instead of stopping at the loaded pages */}
+            {hasMore && (
               <div ref={observerTarget} className="py-8 text-center">
                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">Loading more...</p>
@@ -579,9 +679,9 @@ export default function RecommendationsPage() {
             )}
 
             {/* End of Results */}
-            {!hasMore && recommendations.length > 0 && !searchQuery && (
+            {!hasMore && recommendations.length > 0 && (
               <div className="py-8 text-center text-sm text-gray-500 dark:text-gray-400">
-                You've reached the end of your scan history
+                {debouncedSearch ? "You've reached the end of the results" : "You've reached the end of your scan history"}
               </div>
             )}
           </div>
