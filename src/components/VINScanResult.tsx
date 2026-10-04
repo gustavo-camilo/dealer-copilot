@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft, ExternalLink } from 'lucide-react';
 import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft, ExternalLink, Copy } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
+import { VerdictHero } from './scan/VerdictHero';
+import type { CostBreakdown } from './scan/CostWaterfall';
 import { supabase } from '../lib/supabase';
 import { VehicleCommentSection } from './VehicleCommentSection';
 import { useAuth } from '../contexts/AuthContext';
@@ -122,6 +123,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
     const [currentRecommendation, setCurrentRecommendation] = useState(scanData.recommendation);
     const [currentEstimatedProfit, setCurrentEstimatedProfit] = useState<number | null>(null);
     const [currentMaxBid, setCurrentMaxBid] = useState<number | null>(null);
+    const [costBreakdown, setCostBreakdown] = useState<CostBreakdown | null>(null);
     const [currentPurchaseStatus, setCurrentPurchaseStatus] = useState<'purchased' | 'not_purchased' | 'pending'>(
         scanData.purchase_status || 'pending'
     );
@@ -427,6 +429,15 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                     </div>
                 )}
 
+                {/* Verdict first: tracks the profit calculator live */}
+                <VerdictHero
+                    verdict={currentRecommendation}
+                    confidence={scanData.confidence_score}
+                    maxBid={currentMaxBid ?? scanData.max_bid_suggestion}
+                    profit={currentEstimatedProfit ?? scanData.estimated_profit}
+                    costs={costBreakdown}
+                />
+
                 {/* Vehicle Header */}
                 <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6 mb-6">
                     <div className="flex items-center justify-between mb-4">
@@ -718,6 +729,24 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                         // Track the current estimated profit and max bid for use in save callback
                         setCurrentEstimatedProfit(costs.estimatedProfit);
                         setCurrentMaxBid(costs.maxBid);
+                        // Keep the same object when nothing changed: the calculator re-reports
+                        // on every render, and a new object each time would loop.
+                        setCostBreakdown((prev) =>
+                            prev &&
+                            prev.marketPrice === costs.marketPrice &&
+                            prev.bid === costs.maxBid &&
+                            prev.auctionFee === costs.auctionFee &&
+                            prev.transport === costs.transport &&
+                            prev.recon === costs.recon
+                                ? prev
+                                : {
+                                      marketPrice: costs.marketPrice,
+                                      bid: costs.maxBid,
+                                      auctionFee: costs.auctionFee,
+                                      transport: costs.transport,
+                                      recon: costs.recon,
+                                  }
+                        );
                     }}
                     onSave={handleSaveCosts}
                     onEditStatusChange={onEditStatusChange}

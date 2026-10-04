@@ -1,3 +1,197 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/*
+ * Design tokens.
+ * Colors are stored as space-separated RGB channels so Tailwind can apply
+ * opacity modifiers (e.g. bg-accent/10). Light values live on :root and the
+ * .dark class (set by ThemeContext / index.html) swaps them.
+ */
+@layer base {
+  :root {
+    --canvas: 247 248 250;
+    --surface: 255 255 255;
+    --surface-2: 241 243 246;
+    --line: 226 230 236;
+    --ink: 12 17 29;
+    --ink-muted: 82 92 110;
+    --ink-subtle: 130 140 158;
+
+    /* Light: orange-700 keeps white button text and orange text above WCAG AA (5.2:1 / 4.9:1). */
+    --accent: 194 65 12;
+    --accent-strong: 154 52 18;
+    --accent-ink: 255 255 255;
+
+    --success: 5 150 105;
+    --warning: 202 138 4;
+    --danger: 220 38 38;
+
+    --radius: 14px;
+    --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+    /* Floating dock: 64px bar + 12px gap above the screen edge */
+    --dock-space: 88px;
+  }
+
+  .dark {
+    --canvas: 5 8 15;
+    --surface: 11 17 29;
+    --surface-2: 18 26 42;
+    --line: 30 41 59;
+    --ink: 241 245 249;
+    --ink-muted: 148 160 180;
+    --ink-subtle: 100 112 134;
+
+    /* Dark: bright orange with near-black text (7.2:1); white on this orange is only 2.8:1. */
+    --accent: 249 115 22;
+    --accent-strong: 251 146 60;
+    --accent-ink: 5 8 15;
+
+    --success: 52 211 153;
+    --warning: 250 204 21;
+    --danger: 248 113 113;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+    color-scheme: light;
+  }
+
+  html.dark {
+    color-scheme: dark;
+  }
+
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+    font-feature-settings: 'ss01', 'cv11';
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Leave room for the floating mobile dock on any page that renders it. */
+  body:has(.app-tabbar) {
+    padding-bottom: calc(var(--dock-space) + env(safe-area-inset-bottom));
+  }
+
+  @media (min-width: 768px) {
+    body:has(.app-tabbar) {
+      padding-bottom: 0;
+    }
+  }
+
+  ::selection {
+    background: rgb(var(--accent) / 0.25);
+  }
+
+  /* One consistent, keyboard-only focus ring across the app. */
+  :focus-visible {
+    outline: 2px solid rgb(var(--accent));
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+@layer components {
+  /* Faint top highlight + soft depth: makes flat cards read as objects. */
+  .edge-light {
+    box-shadow:
+      0 1px 2px rgb(16 24 40 / 0.04),
+      0 8px 24px -16px rgb(16 24 40 / 0.12);
+  }
+  .dark .edge-light {
+    box-shadow: inset 0 1px 0 0 rgb(255 255 255 / 0.05);
+  }
+
+  /* Frosted material for floating chrome (dock, menus). */
+  .glass {
+    background: rgb(var(--surface) / 0.72);
+    -webkit-backdrop-filter: blur(24px) saturate(1.7);
+    backdrop-filter: blur(24px) saturate(1.7);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.7),
+      0 1px 0 0 rgb(16 24 40 / 0.04),
+      0 18px 40px -16px rgb(16 24 40 / 0.28);
+  }
+  .dark .glass {
+    background: rgb(var(--surface-2) / 0.62);
+    box-shadow:
+      inset 0 1px 0 0 rgb(255 255 255 / 0.08),
+      0 18px 48px -12px rgb(0 0 0 / 0.7);
+  }
+
+  /*
+   * Cursor spotlight for interactive cards (pointer devices only). The pointer
+   * position comes from one shared listener (see lib/spotlight.ts).
+   */
+  .spotlight {
+    position: relative;
+    isolation: isolate;
+  }
+  @media (hover: hover) and (pointer: fine) {
+    .spotlight::before,
+    .spotlight::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: inherit;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 300ms var(--ease-out);
+    }
+    .spotlight::before {
+      z-index: -1;
+      background: radial-gradient(420px circle at var(--mx, 50%) var(--my, 0%), rgb(var(--accent) / 0.07), transparent 60%);
+    }
+    .spotlight::after {
+      padding: 1px;
+      background: radial-gradient(260px circle at var(--mx, 50%) var(--my, 0%), rgb(var(--accent) / 0.55), transparent 70%);
+      -webkit-mask:
+        linear-gradient(#000 0 0) content-box,
+        linear-gradient(#000 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+    }
+    .spotlight:hover::before,
+    .spotlight:hover::after {
+      opacity: 1;
+    }
+  }
+}
+
+@layer utilities {
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .pt-safe {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  /* Hairline grid used behind hero sections; masked so it fades out. */
+  .bg-grid {
+    background-image:
+      linear-gradient(to right, rgb(var(--ink) / 0.06) 1px, transparent 1px),
+      linear-gradient(to bottom, rgb(var(--ink) / 0.06) 1px, transparent 1px);
+    background-size: 44px 44px;
+    mask-image: radial-gradient(ellipse 70% 60% at 50% 0%, #000 40%, transparent 100%);
+  }
+
+  .text-gradient-accent {
+    @apply bg-gradient-to-r from-orange-400 via-orange-500 to-red-500 bg-clip-text text-transparent;
+  }
+}

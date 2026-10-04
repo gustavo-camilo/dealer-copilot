@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Link, useNavigate, useBlocker } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
-import { Target, Loader2 } from 'lucide-react';
+import { Scan, Check } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { decodeVIN, enrichDecodedData } from '../services/vinDecoder';
 import { getMarketPricing, calculateMaxBid } from '../services/marketPricing';
@@ -10,6 +10,20 @@ import { generateRecommendation } from '../services/recommendationEngine';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import { Button, Input } from '../components/ui';
+import { VinPlate } from '../components/scan/VinPlate';
+
+const SCAN_STEPS = ['Decoding VIN…', 'Pulling market comps…', 'Calculating true cost…'];
+
+/** Cycles through the real pipeline steps while a scan runs. */
+function ScanProgress() {
+  const [step, setStep] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setStep((s) => Math.min(s + 1, SCAN_STEPS.length - 1)), 1400);
+    return () => clearInterval(id);
+  }, []);
+  return <span aria-live="polite">{SCAN_STEPS[step]}</span>;
+}
 import { SalesRecord, TenantCostSettings } from '../types/database';
 
 // Default cost settings if tenant hasn't configured them
@@ -308,7 +322,7 @@ export default function VINScanPage() {
 
   if (result) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
+      <div className="min-h-screen bg-canvas">
         {/* Header */}
         <Header
           user={user}
@@ -385,7 +399,7 @@ export default function VINScanPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
+    <div className="min-h-screen bg-canvas">
       {/* Header */}
       <Header
         user={user}
@@ -402,76 +416,60 @@ export default function VINScanPage() {
         }}
       />
 
-      <div className="flex-1 flex items-center justify-center px-4 py-12">
-        <div className="max-w-md w-full">
-          <div className="text-center mb-8">
-            <div className="bg-blue-100 dark:bg-navy-800 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Target className="h-8 w-8 text-blue-900 dark:text-orange-500" />
-            </div>
-            <h2 className="text-3xl font-bold text-gray-900 dark:text-white">Scan VIN</h2>
-            <p className="text-gray-600 dark:text-gray-400 mt-2">
-              Enter a VIN to get instant AI-powered buy/no-buy guidance
-            </p>
-          </div>
-
-          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm p-8 border border-gray-200 dark:border-navy-700">
-            {error && (
-              <div className="mb-4 p-3 bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg text-red-800 dark:text-red-200 text-sm">
-                {error}
-              </div>
-            )}
-
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Vehicle Identification Number (VIN)
-            </label>
-            <input
-              type="text"
-              value={vin}
-              onChange={(e) => setVin(e.target.value.toUpperCase())}
-              placeholder="1HGCV1F30LA012345"
-              maxLength={17}
-              className="w-full px-4 py-3 border border-gray-300 dark:border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-orange-500 mb-4 font-mono bg-white dark:bg-navy-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-4">Enter 17-character VIN number</p>
-
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Mileage (optional)
-            </label>
-            <input
-              type="number"
-              value={mileage}
-              onChange={(e) => setMileage(e.target.value)}
-              placeholder="e.g., 45000"
-              className="w-full px-4 py-3 border border-gray-300 dark:border-navy-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-900 dark:focus:ring-orange-500 mb-4 bg-white dark:bg-navy-800 text-gray-900 dark:text-white placeholder-gray-400 dark:placeholder-gray-500"
-              disabled={loading}
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-400 mb-6">
-              Providing mileage improves accuracy of recommendations
-            </p>
-
-            <button
-              onClick={() => handleScan()}
-              disabled={vin.length !== 17 || loading}
-              className="w-full bg-orange-600 text-white py-3 rounded-lg font-semibold hover:bg-orange-700 transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
-            >
-              {loading && <Loader2 className="h-5 w-5 animate-spin border-4 border-blue-900 dark:border-orange-500 border-t-transparent" />}
-              {loading ? 'Analyzing Vehicle...' : 'Analyze Vehicle'}
-            </button>
-
-            <div className="mt-6 p-4 bg-gray-50 dark:bg-navy-800 rounded-lg text-sm text-gray-600 dark:text-gray-400">
-              <p className="font-semibold mb-2 text-gray-900 dark:text-white">What you'll get:</p>
-              <ul className="space-y-1">
-                <li>✓ Complete vehicle decode and specifications</li>
-                <li>✓ Market pricing analysis</li>
-                <li>✓ Buy/Maybe/Pass recommendation</li>
-                <li>✓ Profit calculator with your costs</li>
-                <li>✓ AI-powered confidence score</li>
-              </ul>
-            </div>
-          </div>
+      <main className="mx-auto w-full max-w-lg px-4 py-8 sm:py-14">
+        <div className="mb-7 animate-enter text-center">
+          <span className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-red-600 text-white shadow-[0_12px_28px_-10px_rgb(249_115_22/0.8)]">
+            <Scan className="h-7 w-7" />
+          </span>
+          <h1 className="text-2xl font-semibold tracking-tight text-ink sm:text-3xl">Scan a VIN</h1>
+          <p className="mt-1.5 text-sm text-ink-muted">True cost, max bid and a clear buy / pass verdict.</p>
         </div>
-      </div>
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (vin.length === 17 && !loading) handleScan();
+          }}
+          className="animate-enter space-y-5 rounded-3xl border border-line bg-surface p-5 sm:p-6"
+          style={{ animationDelay: '60ms' }}
+        >
+          {error && (
+            <div role="alert" className="rounded-2xl border border-danger/25 bg-danger/10 p-3 text-sm text-danger">
+              {error}
+            </div>
+          )}
+
+          <VinPlate value={vin} onChange={setVin} scanning={loading} disabled={loading} />
+
+          <Input
+            label={
+              <>
+                Mileage <span className="font-normal text-ink-subtle">(optional)</span>
+              </>
+            }
+            type="number"
+            inputMode="numeric"
+            value={mileage}
+            onChange={(e) => setMileage(e.target.value)}
+            placeholder="e.g. 45000"
+            hint="Adding mileage sharpens the recommendation."
+            disabled={loading}
+          />
+
+          <Button type="submit" size="lg" block loading={loading} disabled={vin.length !== 17}>
+            {loading ? <ScanProgress /> : 'Analyze vehicle'}
+          </Button>
+
+          <ul className="grid grid-cols-2 gap-x-4 gap-y-2 border-t border-line pt-5 text-xs text-ink-muted">
+            {['Full decode & specs', 'Live market pricing', 'Buy / Maybe / Pass', 'Profit with your costs'].map((item) => (
+              <li key={item} className="flex items-center gap-1.5">
+                <Check className="h-3.5 w-3.5 text-success" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </form>
+      </main>
     </div>
   );
 }

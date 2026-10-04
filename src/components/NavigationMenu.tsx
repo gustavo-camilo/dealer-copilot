@@ -1,16 +1,9 @@
-import React from 'react';
+import { useEffect } from 'react';
 import { Link } from 'react-router-dom';
-import {
-  Target,
-  TrendingUp,
-  Car,
-  Package,
-  Scan,
-  Globe,
-  Settings,
-  LogOut,
-  X,
-} from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Globe, Settings, LogOut, Shield, Moon, Sun } from 'lucide-react';
+import { useTheme } from '../contexts/ThemeContext';
+import { cn } from './ui';
 
 interface NavigationMenuProps {
   currentPath: string;
@@ -24,6 +17,7 @@ interface NavigationMenuProps {
   tenantName?: string;
 }
 
+/** Account menu: anchored popover on every screen size (primary nav lives in the header / tab bar). */
 export default function NavigationMenu({
   currentPath,
   onClose,
@@ -31,136 +25,82 @@ export default function NavigationMenu({
   user,
   tenantName,
 }: NavigationMenuProps) {
-  const menuItems = [
-    {
-      path: '/dashboard',
-      label: 'Dashboard',
-      icon: Target,
-      showOnMobile: true,
-    },
-    {
-      path: '/scan',
-      label: 'Scan VIN',
-      icon: Scan,
-      showOnMobile: true,
-      mobileOnly: true,
-      highlight: true,
-    },
-    {
-      path: '/inventory',
-      label: 'Inventory',
-      icon: Car,
-      showOnMobile: true,
-    },
-    {
-      path: '/competitors',
-      label: 'Competitors',
-      icon: TrendingUp,
-      showOnMobile: true,
-    },
-    {
-      path: '/recommendations',
-      label: 'VIN Scans',
-      icon: Package,
-      showOnMobile: true,
-    },
+  const { theme, toggleTheme } = useTheme();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onClose]);
+
+  const items = [
+    { path: '/onboarding', label: 'Scan website', icon: Globe },
+    { path: '/settings', label: 'Settings', icon: Settings },
   ];
+
+  // Admin Panel - For va_uploader and super_admin
+  if (user?.role === 'va_uploader' || user?.role === 'super_admin') {
+    items.push({
+      path: '/admin',
+      label: user.role === 'va_uploader' ? 'Upload Portal' : 'Admin Panel',
+      icon: Shield,
+    });
+  }
+
+  const row =
+    'flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-ink-muted transition-colors hover:bg-surface-2 hover:text-ink';
 
   return (
     <>
-      {/* Full-page overlay on mobile, backdrop on desktop */}
-      <div
-        className="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 md:hidden dark:bg-navy-900 dark:bg-opacity-70"
-        onClick={onClose}
-      />
-
-      {/* Mobile: Full-page menu, Desktop: Dropdown */}
-      <div className="fixed inset-0 bg-white z-50 md:absolute md:inset-auto md:right-0 md:mt-2 md:w-64 md:rounded-lg md:shadow-lg md:border md:border-gray-200 dark:bg-brand-topbar-dark dark:border-navy-700">
-        {/* Mobile Header - matches main header exactly */}
-        <div className="flex justify-between items-center h-16 px-4 border-b border-gray-200 md:hidden dark:border-brand-border-dark bg-white dark:bg-brand-topbar-dark">
-          <div className="flex items-center">
-            <Target className="h-8 w-8 text-blue-900 dark:text-white" />
-            <span className="ml-2 text-xl font-bold text-gray-900 dark:text-white">Dealer Co-Pilot</span>
-          </div>
-          <button
-            onClick={onClose}
-            className="p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-navy-800"
-          >
-            <X className="h-6 w-6 text-gray-900 dark:text-white" />
-          </button>
+      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden />
+      <motion.div
+        role="menu"
+        initial={{ opacity: 0, scale: 0.96, y: -4 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.98, y: -2 }}
+        transition={{ duration: 0.16, ease: [0.22, 1, 0.36, 1] }}
+        style={{ transformOrigin: 'top right' }}
+        className="absolute right-0 top-full z-50 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-2xl border border-line bg-surface p-1.5 shadow-[0_24px_48px_-16px_rgb(0_0_0/0.35)]"
+      >
+        <div className="px-3 pb-3 pt-2.5">
+          <p className="truncate text-sm font-semibold text-ink">{user?.full_name}</p>
+          <p className="truncate text-xs text-ink-muted">{user?.email}</p>
+          {tenantName && <p className="mt-1 truncate text-xs text-ink-subtle">{tenantName}</p>}
         </div>
+        <div className="h-px bg-line" />
 
-        {/* User Info */}
-        <div className="p-6 md:p-4 border-b border-gray-200 dark:border-navy-700">
-          <p className="text-base md:text-sm font-semibold text-gray-900 dark:text-white">{user?.full_name}</p>
-          <p className="text-sm md:text-xs text-gray-500 dark:text-gray-400">{user?.email}</p>
-          <p className="text-sm md:text-xs text-gray-500 dark:text-gray-400 mt-1">{tenantName}</p>
-        </div>
-
-        {/* Menu Items */}
-        <div className="py-4 md:py-2">
-          {menuItems.map((item) => {
+        <div className="py-1.5">
+          {items.map((item) => {
             const Icon = item.icon;
-            const isActive = currentPath === item.path;
-            const itemClasses = `flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-navy-800 ${
-              isActive ? 'bg-gray-50 dark:bg-blue-900/30' : ''
-            } ${item.mobileOnly ? 'md:hidden' : ''}`;
-
             return (
               <Link
                 key={item.path}
                 to={item.path}
-                className={itemClasses}
+                role="menuitem"
                 onClick={onClose}
+                className={cn(row, currentPath === item.path && 'bg-surface-2 text-ink')}
               >
-                <Icon
-                  className={`h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3 ${
-                    item.highlight ? 'text-orange-600' : ''
-                  }`}
-                />
+                <Icon className="h-4 w-4" />
                 {item.label}
               </Link>
             );
           })}
-
-          {/* Settings - For all authenticated users */}
-          <Link
-            to="/settings"
-            className={`flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-navy-800 ${
-              currentPath === '/settings' ? 'bg-gray-50 dark:bg-blue-900/30' : ''
-            }`}
-            onClick={onClose}
-          >
-            <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-            Settings
-          </Link>
-
-          {/* Admin Panel - For va_uploader and super_admin */}
-          {(user?.role === 'va_uploader' || user?.role === 'super_admin') && (
-            <Link
-              to="/admin"
-              className={`flex items-center px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-gray-700 hover:bg-gray-50 dark:text-gray-400 dark:hover:bg-navy-800 ${
-                currentPath === '/admin' ? 'bg-gray-50 dark:bg-blue-900/30' : ''
-              }`}
-              onClick={onClose}
-            >
-              <Settings className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-              {user?.role === 'va_uploader' ? 'Upload Portal' : 'Admin Panel'}
-            </Link>
-          )}
-        </div>
-
-        {/* Sign Out */}
-        <div className="border-t border-gray-200 py-4 md:py-2 mt-auto dark:border-navy-700">
-          <button
-            onClick={onSignOut}
-            className="flex items-center w-full px-6 md:px-4 py-4 md:py-2 text-base md:text-sm text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20"
-          >
-            <LogOut className="h-6 md:h-4 w-6 md:w-4 mr-4 md:mr-3" />
-            Sign Out
+          <button role="menuitem" onClick={toggleTheme} className={row}>
+            {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {theme === 'dark' ? 'Light mode' : 'Dark mode'}
           </button>
         </div>
-      </div>
+
+        <div className="h-px bg-line" />
+        <div className="pt-1.5">
+          <button role="menuitem" onClick={onSignOut} className={cn(row, 'text-danger hover:bg-danger/10 hover:text-danger')}>
+            <LogOut className="h-4 w-4" />
+            Sign out
+          </button>
+        </div>
+      </motion.div>
     </>
   );
 }
