@@ -1,12 +1,14 @@
 import { useEffect, useState, useRef } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { supabase } from '../lib/supabase';
 import { VINScan, RecommendationType } from '../types/database';
-import { BarChart3, Car, Target, Scan, Globe, ChevronRight, Eye, X } from 'lucide-react';
 import VINScanResult from '../components/VINScanResult';
 import Header from '../components/Header';
 import ConfirmationDialog from '../components/ConfirmationDialog';
+import { Sheet } from '../components/ui';
+import { DashboardView, DashboardSkeleton } from '../components/dashboard/DashboardView';
+import { formatVehicleName } from '../utils/vehicle';
 
 
 export default function DashboardPage() {
@@ -56,33 +58,6 @@ export default function DashboardPage() {
     } catch (error) {
       console.error('Error signing out:', error);
     }
-  };
-
-  const formatCurrency = (value: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(value);
-  };
-
-  const getRecommendationBadge = (recommendation: string) => {
-    const badges = {
-      buy: 'bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400',
-      maybe: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-400',
-      pass: 'bg-red-100 dark:bg-red-900/30 text-red-800 dark:text-red-400',
-    };
-    return badges[recommendation as keyof typeof badges];
-  };
-
-  const formatVehicleName = (name: string) => {
-    if (!name) return '';
-    // Special case for BMW
-    if (name.toUpperCase() === 'BMW') return 'BMW';
-
-    // Capitalize first letter of each word
-    return name.toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
   };
 
   useEffect(() => {
@@ -229,254 +204,46 @@ export default function DashboardPage() {
     }
   };
 
+  const header = (
+    <Header
+      user={user}
+      tenant={tenant}
+      signOut={handleSignOut}
+      menuOpen={menuOpen}
+      setMenuOpen={setMenuOpen}
+    />
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 dark:border-orange-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading dashboard...</p>
-        </div>
+      <div className="min-h-screen bg-canvas">
+        {header}
+        <DashboardSkeleton />
       </div>
     );
   }
 
+  const selectedTitle = selectedScan
+    ? `${selectedScan.decoded_data.year} ${formatVehicleName(selectedScan.decoded_data.make)} ${formatVehicleName(selectedScan.decoded_data.model)}`
+    : '';
+
   return (
-    <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark">
-      {/* Header */}
-      <Header
-        user={user}
-        tenant={tenant}
-        signOut={handleSignOut}
-        menuOpen={menuOpen}
-        setMenuOpen={setMenuOpen}
+    <div className="min-h-screen bg-canvas">
+      {header}
+
+      <DashboardView
+        firstName={user?.full_name?.split(' ')[0]}
+        tenantName={tenant?.name}
+        stats={stats}
+        recentScans={recentScans}
+        recommendations={recommendations}
+        showOnboarding={!hasRequestedInventory}
+        onSelectScan={(scan) => setSelectedScan(scan as VINScan)}
       />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {/* Welcome Message - Only show if inventory hasn't been requested yet */}
-        {!hasRequestedInventory && (
-          <div className="mb-8 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-6">
-            <h3 className="text-lg font-bold text-blue-900 dark:text-blue-300 mb-2">
-              Welcome to Dealer Co-Pilot!
-            </h3>
-            <p className="text-blue-800 dark:text-blue-200 mb-4">
-              Get started by analyzing your website inventory or manually adding vehicles.
-            </p>
-            <Link
-              to="/onboarding"
-              className="inline-block bg-blue-900 text-white px-6 py-2 rounded-lg hover:bg-blue-800 transition"
-            >
-              Analyze My Website
-            </Link>
-          </div>
-        )}
-
-        {/* Quick Actions - Button Cards */}
-        <div className="mb-8">
-          <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <Link
-              to="/scan"
-              className="col-span-2 md:col-span-1 bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-orange-600 hover:shadow-md dark:hover:shadow-lg transition text-center"
-            >
-              <Scan className="h-8 w-8 text-orange-600 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Scan VIN</h3>
-            </Link>
-
-            <Link
-              to="/inventory"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
-            >
-              <Car className="h-8 w-8 text-blue-900 dark:text-cyan-400 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Inventory</h3>
-            </Link>
-
-            <Link
-              to="/competitors"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-purple-600 hover:shadow-md dark:hover:shadow-lg transition text-center"
-            >
-              <Eye className="h-8 w-8 text-purple-600 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Competitor Intel</h3>
-            </Link>
-
-            <Link
-              to="/recommendations"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
-            >
-              <Target className="h-8 w-8 text-blue-900 dark:text-emerald-400 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Recommendations</h3>
-            </Link>
-
-            <Link
-              to="/onboarding"
-              className="bg-white dark:bg-navy-900 p-4 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark hover:border-blue-900 hover:shadow-md dark:hover:shadow-lg transition text-center"
-            >
-              <Globe className="h-8 w-8 text-blue-900 dark:text-sky-400 mx-auto mb-2" />
-              <h3 className="font-semibold text-gray-900 dark:text-white text-sm">Scan Website</h3>
-            </Link>
-          </div>
-        </div>
-
-        {/* Recent VIN Scans - Full Width */}
-        <div className="mb-8">
-          <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recent VIN Scans</h2>
-              {recentScans.length > 0 && (
-                <Link
-                  to="/recommendations"
-                  className="text-sm text-blue-900 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center"
-                >
-                  View All
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Link>
-              )}
-            </div>
-            {recentScans.length === 0 ? (
-              <div className="text-center py-8 text-gray-500 dark:text-gray-500">
-                <Scan className="h-12 w-12 mx-auto mb-3 text-gray-300 dark:text-gray-600" />
-                <p>No scans yet</p>
-                <Link
-                  to="/scan"
-                  className="text-blue-900 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold text-sm mt-2 inline-block"
-                >
-                  Scan your first VIN
-                </Link>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {recentScans.map((scan) => (
-                  <div
-                    key={scan.id}
-                    onClick={() => setSelectedScan(scan)}
-                    className="p-3 border border-gray-200 dark:border-brand-border-dark rounded-lg hover:bg-gray-50 dark:hover:bg-navy-800 hover:shadow-md transition cursor-pointer"
-                  >
-                    <div className="flex items-center justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-2">
-                          <h3 className="font-semibold text-gray-900 dark:text-white truncate">
-                            {scan.decoded_data.year} {formatVehicleName(scan.decoded_data.make)} {formatVehicleName(scan.decoded_data.model)}
-                          </h3>
-                          <span className={`px-2 py-0.5 rounded text-xs font-semibold ${getRecommendationBadge(scan.recommendation)} flex-shrink-0`}>
-                            {scan.recommendation.toUpperCase()}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
-                          <span>Max Bid: {scan.max_bid_suggestion ? formatCurrency(scan.max_bid_suggestion) : 'N/A'}</span>
-                          <span className={`font-medium ${scan.estimated_profit && scan.estimated_profit > 0 ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}`}>
-                            Profit: {scan.estimated_profit ? formatCurrency(scan.estimated_profit) : 'N/A'}
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setSelectedScan(scan);
-                        }}
-                        className="p-2 text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-navy-800 rounded-lg transition flex-shrink-0"
-                        title="View Details"
-                      >
-                        <ChevronRight className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Total Vehicles</h3>
-              <Car className="h-5 w-5 text-blue-900 dark:text-cyan-400" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">{stats.totalVehicles}</p>
-          </div>
-
-          <div className="bg-white dark:bg-navy-900 p-6 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark">
-            <div className="flex items-center justify-between mb-2">
-              <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400">Portfolio Value</h3>
-              <BarChart3 className="h-5 w-5 text-blue-900 dark:text-emerald-400" />
-            </div>
-            <p className="text-3xl font-bold text-gray-900 dark:text-white">
-              ${stats.portfolioValue.toLocaleString()}
-            </p>
-          </div>
-        </div>
-
-
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Buy Recommendations */}
-          {recommendations.length > 0 && (
-            <div className="bg-white dark:bg-navy-900 rounded-lg shadow-sm border border-gray-200 dark:border-brand-border-dark p-6">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Recommended to Buy</h2>
-                <Link
-                  to="/recommendations"
-                  className="text-sm text-blue-900 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 font-semibold flex items-center"
-                >
-                  View All
-                  <ChevronRight className="h-4 w-4 ml-1" />
-                </Link>
-              </div>
-              <div className="space-y-3">
-                {recommendations.map((rec) => (
-                  <div key={rec.id} className="p-3 border border-green-200 dark:border-green-900/50 bg-green-50 dark:bg-green-900/30 rounded-lg">
-                    <div className="flex items-center justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center">
-                          <span className="font-semibold text-gray-900 dark:text-white">
-                            {rec.decoded_data.year} {rec.decoded_data.make} {rec.decoded_data.model}
-                          </span>
-                          <span className="ml-2 px-2 py-0.5 rounded text-xs font-semibold bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-400">
-                            BUY
-                          </span>
-                        </div>
-                        <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                          Max Bid: ${rec.max_bid_suggestion?.toLocaleString() || 'N/A'}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-sm font-semibold text-green-700 dark:text-green-400">
-                          {rec.confidence_score}%
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-
-          </div>
-        </div>
-
-        {/* Details Modal */}
-        {
-          selectedScan && (
-            <div
-              className="fixed inset-0 bg-gray-900 dark:bg-gray-950 bg-opacity-50 dark:bg-opacity-70 z-50 flex items-end md:items-center justify-center p-0 md:p-4"
-              onClick={handleCloseModal}
-            >
-              <div
-                className="bg-white dark:bg-navy-900 w-full md:max-w-4xl md:rounded-lg shadow-xl max-h-screen overflow-y-auto"
-                onClick={(e) => e.stopPropagation()}
-              >
-                {/* Modal Header */}
-                <div className="sticky top-0 bg-white dark:bg-navy-900 border-b border-gray-200 dark:border-brand-border-dark p-4 md:p-6 flex items-center justify-between z-10">
-                  <h2 className="text-xl md:text-2xl font-bold text-gray-900 dark:text-white">Scan Details</h2>
-                  <button
-                    onClick={handleCloseModal}
-                    className="p-2 hover:bg-gray-100 dark:hover:bg-navy-800 rounded-lg transition"
-                  >
-                    <X className="w-6 h-6 text-white" />
-                  </button>
-                </div>
-
+        {/* Details Sheet */}
+        <Sheet open={!!selectedScan} onClose={handleCloseModal} title={selectedTitle} size="xl" bodyClassName="p-4 sm:p-6">
+          {selectedScan && (
                 <VINScanResult
                   scanData={{
                     id: selectedScan.id,
@@ -501,10 +268,8 @@ export default function DashboardPage() {
                   ref={scanResultRef}
                   isEditing={isEditingCosts}
                 />
-              </div>
-            </div>
-          )
-        }
+          )}
+        </Sheet>
 
         <ConfirmationDialog
           isOpen={showConfirmDialog}

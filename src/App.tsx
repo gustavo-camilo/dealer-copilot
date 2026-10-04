@@ -1,38 +1,39 @@
+import { lazy, Suspense, useEffect } from 'react';
 import { createBrowserRouter, RouterProvider, Navigate, useLocation } from 'react-router-dom';
-import { Toaster } from 'react-hot-toast';
+import { Toaster, ToastIcon } from 'react-hot-toast';
+import { MotionConfig } from 'framer-motion';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import toast from 'react-hot-toast';
 import { X } from 'lucide-react';
-import LandingPage from './pages/LandingPage';
-import SignUpPage from './pages/SignUpPage';
-import SignInPage from './pages/SignInPage';
-import DashboardPage from './pages/DashboardPage';
-import OnboardingPage from './pages/OnboardingPage';
-import VINScanPage from './pages/VINScanPage';
-import ManageInventoryPage from './pages/ManageInventoryPage';
-import CompetitorAnalysisPage from './pages/CompetitorAnalysisPage';
-import CompetitorHistoryPage from './pages/CompetitorHistoryPage';
-import UpgradePage from './pages/UpgradePage';
-import UpgradeSuccessPage from './pages/UpgradeSuccessPage';
-import RecommendationsPage from './pages/RecommendationsPage';
-import RecommendationDetailPage from './pages/RecommendationDetailPage';
-import AdminPage from './pages/AdminPage';
-import SettingsPage from './pages/SettingsPage';
+import { PageLoader } from './components/ui';
+import { installSpotlight } from './lib/spotlight';
+
+// Each page is its own chunk, so visitors only download the screen they open.
+const LandingPage = lazy(() => import('./pages/LandingPage'));
+const SignUpPage = lazy(() => import('./pages/SignUpPage'));
+const SignInPage = lazy(() => import('./pages/SignInPage'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage'));
+const OnboardingPage = lazy(() => import('./pages/OnboardingPage'));
+const VINScanPage = lazy(() => import('./pages/VINScanPage'));
+const ManageInventoryPage = lazy(() => import('./pages/ManageInventoryPage'));
+const CompetitorAnalysisPage = lazy(() => import('./pages/CompetitorAnalysisPage'));
+const CompetitorHistoryPage = lazy(() => import('./pages/CompetitorHistoryPage'));
+const UpgradePage = lazy(() => import('./pages/UpgradePage'));
+const UpgradeSuccessPage = lazy(() => import('./pages/UpgradeSuccessPage'));
+const RecommendationsPage = lazy(() => import('./pages/RecommendationsPage'));
+const RecommendationDetailPage = lazy(() => import('./pages/RecommendationDetailPage'));
+const AdminPage = lazy(() => import('./pages/AdminPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+// Dev-only component playground; the import is stripped from production builds.
+const DesignPlayground = import.meta.env.DEV ? lazy(() => import('./pages/dev/DesignPlayground')) : null;
 
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const { user, loading, subscription } = useAuth();
   const location = useLocation();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 dark:border-orange-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (!user) {
@@ -47,21 +48,14 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to="/upgrade" replace />;
   }
 
-  return <>{children}</>;
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
 function PublicRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 dark:bg-brand-bg-dark flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-900 dark:border-orange-500 mx-auto"></div>
-          <p className="mt-4 text-gray-600 dark:text-gray-400">Loading...</p>
-        </div>
-      </div>
-    );
+    return <PageLoader />;
   }
 
   if (user) {
@@ -69,14 +63,30 @@ function PublicRoute({ children }: { children: React.ReactNode }) {
     return <Navigate to={user.role === 'super_admin' ? '/admin' : '/dashboard'} />;
   }
 
-  return <>{children}</>;
+  return <Suspense fallback={<PageLoader />}>{children}</Suspense>;
 }
 
 const router = createBrowserRouter([
   {
     path: '/',
-    element: <LandingPage />,
+    element: (
+      <Suspense fallback={<div className="min-h-screen bg-[#020617]" />}>
+        <LandingPage />
+      </Suspense>
+    ),
   },
+  ...(DesignPlayground
+    ? [
+        {
+          path: '/design',
+          element: (
+            <Suspense fallback={<PageLoader />}>
+              <DesignPlayground />
+            </Suspense>
+          ),
+        },
+      ]
+    : []),
   {
     path: '/signup',
     element: (
@@ -192,58 +202,43 @@ const router = createBrowserRouter([
 ]);
 
 function App() {
+  useEffect(() => installSpotlight(), []);
+
   return (
     <AuthProvider>
       <ThemeProvider>
-        <Toaster
-          position="top-right"
-          toastOptions={{
-            duration: 4000,
-            className: 'dark:!bg-navy-800 dark:!text-white dark:!border dark:!border-navy-700',
-            style: {
-              background: '#fff',
-              color: '#363636',
-              padding: '16px',
-              paddingRight: '48px',
-              borderRadius: '8px',
-              boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-            },
-            success: {
-              className: 'dark:!bg-green-900 dark:!border-green-700',
-              iconTheme: {
-                primary: '#10b981',
-                secondary: '#fff',
-              },
-            },
-            error: {
-              className: 'dark:!bg-red-900 dark:!border-red-700',
-              iconTheme: {
-                primary: '#ef4444',
-                secondary: '#fff',
-              },
-            },
-          }}
-        >
-          {(t) => {
-            const message = typeof t.message === 'function' ? t.message(t) : t.message;
-            return (
-              <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
-                {t.icon}
-                <div style={{ marginLeft: '12px', flex: 1 }}>
-                  {message}
-                </div>
-                <button
-                  onClick={() => toast.dismiss(t.id)}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                  aria-label="Close notification"
+        <MotionConfig reducedMotion="user">
+          <Toaster
+            position="top-center"
+            toastOptions={{
+              duration: 4000,
+              success: { iconTheme: { primary: 'rgb(var(--success))', secondary: '#fff' } },
+              error: { iconTheme: { primary: 'rgb(var(--danger))', secondary: '#fff' } },
+            }}
+          >
+            {(t) => {
+              const message = typeof t.message === 'function' ? t.message(t) : t.message;
+              return (
+                <div
+                  className={`flex w-[min(24rem,calc(100vw-2rem))] items-center gap-3 rounded-2xl border border-line bg-surface/95 py-3 pl-4 pr-2 text-sm text-ink shadow-[0_16px_40px_-16px_rgb(0_0_0/0.4)] backdrop-blur-xl transition-all duration-200 ${
+                    t.visible ? 'translate-y-0 opacity-100' : '-translate-y-2 opacity-0'
+                  }`}
                 >
-                  <X className="w-4 h-4 text-gray-500 dark:text-gray-400" />
-                </button>
-              </div>
-            );
-          }}
-        </Toaster>
-        <RouterProvider router={router} />
+                  <ToastIcon toast={t} />
+                  <div className="flex-1">{message}</div>
+                  <button
+                    onClick={() => toast.dismiss(t.id)}
+                    className="rounded-full p-1.5 text-ink-subtle transition-colors hover:bg-surface-2 hover:text-ink"
+                    aria-label="Close notification"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+              );
+            }}
+          </Toaster>
+          <RouterProvider router={router} />
+        </MotionConfig>
       </ThemeProvider>
     </AuthProvider>
   );

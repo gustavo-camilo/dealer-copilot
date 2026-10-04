@@ -1,4 +1,7 @@
+import { createPortal } from 'react-dom';
+import { AnimatePresence, motion } from 'framer-motion';
 import { AlertTriangle } from 'lucide-react';
+import { Button } from './ui';
 
 interface ConfirmationDialogProps {
     isOpen: boolean;
@@ -19,37 +22,43 @@ export default function ConfirmationDialog({
     confirmLabel = 'Leave & Discard',
     cancelLabel = 'Stay on Page',
 }: ConfirmationDialogProps) {
-    if (!isOpen) return null;
-
-    return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-gray-900 bg-opacity-50 dark:bg-navy-900 dark:bg-opacity-70 animate-in fade-in duration-200">
-            <div className="bg-white dark:bg-navy-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden transform transition-all animate-in zoom-in-95 duration-200">
-                <div className="p-6">
-                    <div className="flex items-center gap-4 mb-4">
-                        <div className="bg-yellow-100 dark:bg-yellow-900 p-3 rounded-full">
-                            <AlertTriangle className="h-6 w-6 text-yellow-600 dark:text-yellow-400" />
+    return createPortal(
+        <AnimatePresence>
+            {isOpen && (
+                <div className="fixed inset-0 z-[100] flex items-end justify-center p-4 sm:items-center">
+                    <motion.div
+                        className="absolute inset-0 bg-black/55 backdrop-blur-[2px]"
+                        initial={{ opacity: 0 }}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                    />
+                    <motion.div
+                        role="alertdialog"
+                        aria-modal="true"
+                        aria-labelledby="confirm-title"
+                        className="relative w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-2xl"
+                        initial={{ opacity: 0, y: 16, scale: 0.98 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: 8, scale: 0.98 }}
+                        transition={{ type: 'spring', damping: 30, stiffness: 400 }}
+                    >
+                        <div className="mb-4 flex h-11 w-11 items-center justify-center rounded-2xl bg-warning/10 text-warning">
+                            <AlertTriangle className="h-5 w-5" />
                         </div>
-                        <h3 className="text-xl font-bold text-gray-900 dark:text-white">{title}</h3>
-                    </div>
-                    <p className="text-gray-600 dark:text-gray-300 mb-6">
-                        {message}
-                    </p>
-                    <div className="flex gap-3 justify-end">
-                        <button
-                            onClick={onCancel}
-                            className="px-4 py-2 text-sm font-semibold text-gray-700 dark:text-gray-200 bg-gray-100 dark:bg-navy-700 rounded-lg hover:bg-gray-200 dark:hover:bg-navy-600 transition"
-                        >
-                            {cancelLabel}
-                        </button>
-                        <button
-                            onClick={onConfirm}
-                            className="px-4 py-2 text-sm font-semibold text-white bg-blue-900 dark:bg-blue-700 rounded-lg hover:bg-blue-800 dark:hover:bg-blue-600 transition"
-                        >
-                            {confirmLabel}
-                        </button>
-                    </div>
+                        <h3 id="confirm-title" className="text-lg font-semibold tracking-tight text-ink">{title}</h3>
+                        <p className="mt-1.5 text-sm text-ink-muted">{message}</p>
+                        <div className="mt-6 flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+                            <Button variant="secondary" onClick={onCancel} autoFocus>
+                                {cancelLabel}
+                            </Button>
+                            <Button variant="inverse" onClick={onConfirm}>
+                                {confirmLabel}
+                            </Button>
+                        </div>
+                    </motion.div>
                 </div>
-            </div>
-        </div>
+            )}
+        </AnimatePresence>,
+        document.body
     );
 }
