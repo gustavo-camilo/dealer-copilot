@@ -567,7 +567,7 @@ export default function RecommendationsPage() {
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
                   {/* Left: Vehicle Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 mb-2 sm:mb-2">
+                    <div className="flex items-center gap-2 mb-1">
                       <h3 className="font-semibold text-gray-900 dark:text-white truncate">
                         {rec.decoded_data.year} {formatVehicleName(rec.decoded_data.make)} {formatVehicleName(rec.decoded_data.model)}
                       </h3>
@@ -581,6 +581,9 @@ export default function RecommendationsPage() {
                         </span>
                       )}
                     </div>
+                    {rec.vin && (
+                      <p className="font-mono text-xs tracking-wider text-gray-500 dark:text-gray-400 truncate mb-2">{rec.vin}</p>
+                    )}
                     <div className="flex items-center gap-4 text-sm text-gray-600 dark:text-gray-400">
                       <span className="hidden sm:inline">Max Bid: {rec.max_bid_suggestion ? formatCurrency(rec.max_bid_suggestion) : 'N/A'}</span>
                       <span className={`hidden sm:inline font-medium ${rec.estimated_profit && rec.estimated_profit > 0 ? 'text-green-600' : 'text-gray-600 dark:text-gray-400'}`}>

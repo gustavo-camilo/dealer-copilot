@@ -13,6 +13,7 @@ export interface DashboardStats {
 
 export interface DashboardScan {
   id: string;
+  vin?: string | null;
   decoded_data: { year?: number | string; make?: string; model?: string };
   recommendation: string;
   max_bid_suggestion?: number | null;
@@ -133,6 +134,7 @@ export function DashboardView({
                           <p className="truncate font-medium text-ink">{vehicleTitle(scan)}</p>
                           <VerdictBadge verdict={scan.recommendation} />
                         </div>
+                        {scan.vin && <VinLine vin={scan.vin} />}
                         <p className="mt-1 flex gap-3 text-xs text-ink-muted tabular">
                           <span>Max bid {scan.max_bid_suggestion ? formatUSD(scan.max_bid_suggestion) : '—'}</span>
                           <Profit value={scan.estimated_profit} />
@@ -173,6 +175,7 @@ export function DashboardView({
                     >
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-medium text-ink">{vehicleTitle(rec)}</p>
+                        {rec.vin && <VinLine vin={rec.vin} />}
                         <p className="mt-1 text-xs text-ink-muted tabular">
                           Max bid {rec.max_bid_suggestion ? formatUSD(rec.max_bid_suggestion) : '—'}
                         </p>
@@ -209,6 +212,10 @@ export function DashboardSkeleton() {
       </div>
     </main>
   );
+}
+
+function VinLine({ vin }: { vin: string }) {
+  return <p className="mt-0.5 truncate font-mono text-[11px] tracking-wider text-ink-subtle">{vin}</p>;
 }
 
 function ViewAll({ to }: { to: string }) {

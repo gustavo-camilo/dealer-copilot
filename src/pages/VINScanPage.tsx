@@ -217,6 +217,7 @@ export default function VINScanPage() {
 
       // Display results
       setResult({
+        vin,
         decoded_data: enrichedData,
         recommendation: recommendation.recommendation,
         confidence_score: recommendation.confidenceScore,
@@ -342,6 +343,7 @@ export default function VINScanPage() {
         <VINScanResult
           scanData={{
             id: result.scan_id,
+            vin: result.vin,
             decoded_data: result.decoded_data,
             market_data: result.market_data,
             recommendation: result.recommendation,

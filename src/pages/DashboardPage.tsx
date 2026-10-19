@@ -247,6 +247,7 @@ export default function DashboardPage() {
                 <VINScanResult
                   scanData={{
                     id: selectedScan.id,
+                    vin: selectedScan.vin,
                     decoded_data: selectedScan.decoded_data,
                     market_data: selectedScan.market_data,
                     recommendation: selectedScan.recommendation,
