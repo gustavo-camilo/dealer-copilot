@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef, forwardRef, useImperativeHandle } from 'react';
-import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft, ExternalLink, Copy } from 'lucide-react';
+import { CheckCircle, AlertCircle, Loader2, ChevronDown, ChevronUp, ChevronDown as ChevronDownIcon, ArrowLeft, ExternalLink, Copy, Check } from 'lucide-react';
 import ProfitCalculator from './ProfitCalculator';
 import { VerdictHero } from './scan/VerdictHero';
+import { copyText } from '../utils/clipboard';
 import type { CostBreakdown } from './scan/CostWaterfall';
 import { supabase } from '../lib/supabase';
 import { VehicleCommentSection } from './VehicleCommentSection';
@@ -48,6 +49,7 @@ function getSimplifiedBodyType(bodyType: string | undefined): string {
 interface VINScanResultProps {
     scanData: {
         id?: string; // scan_id
+        vin?: string | null; // vin_scans.vin column
         decoded_data: any;
         market_data: any;
         recommendation: 'buy' | 'maybe' | 'pass';
@@ -128,6 +130,10 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
         scanData.purchase_status || 'pending'
     );
     const [currentAuctionUrl, setCurrentAuctionUrl] = useState<string>(scanData.auction_url || '');
+    const [vinCopied, setVinCopied] = useState(false);
+    // The VIN lives in its own column on vin_scans; the decoders don't put it in
+    // decoded_data, so that is only a fallback for older rows.
+    const vin: string = scanData.vin || scanData.decoded_data?.vin || '';
 
     const handleSaveCosts = async (costs: { recon: number; transport: number; maxBid: number; marketPrice: number; customAuctionFee: number | null }) => {
         if (!scanData.id) return;
@@ -290,10 +296,14 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
         }
     };
 
-    const handleCopyVin = () => {
-        if (scanData.decoded_data?.vin) {
-            navigator.clipboard.writeText(scanData.decoded_data.vin);
+    const handleCopyVin = async () => {
+        if (!vin) return;
+        if (await copyText(vin)) {
+            setVinCopied(true);
             toast.success('VIN copied to clipboard');
+            window.setTimeout(() => setVinCopied(false), 1500);
+        } else {
+            toast.error('Could not copy the VIN');
         }
     };
 
@@ -353,7 +363,7 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                 type: 'missing_market_data',
                 subject: `Missing Pricing: ${scanData.decoded_data.year} ${scanData.decoded_data.make} ${scanData.decoded_data.model}`,
                 details: {
-                    vin: scanData.decoded_data.vin || '', // Assuming VIN is in decoded_data or passed separately. It's usually in decoded_data.
+                    vin,
                     decoded_data: scanData.decoded_data,
                     mileage: scanData.decoded_data.mileage
                 },
@@ -453,17 +463,18 @@ const VINScanResult = forwardRef<{ saveCosts: () => void }, VINScanResultProps>(
                                     {getSimplifiedBodyType(scanData.decoded_data.body_type)}
                                 </p>
                                 */}
-                                {scanData.decoded_data.vin && (
-                                    <div className="flex items-center gap-2 mt-1">
-                                        <span className="text-sm font-mono text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded select-all">
-                                            {scanData.decoded_data.vin}
+                                {vin && (
+                                    <div className="flex items-center gap-1.5 mt-1">
+                                        <span className="text-sm font-mono tracking-wider text-gray-500 dark:text-gray-400 bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded select-all">
+                                            {vin}
                                         </span>
                                         <button
                                             onClick={handleCopyVin}
-                                            className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded hover:bg-gray-100 dark:hover:bg-gray-800"
+                                            className="p-2 -m-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors rounded-md hover:bg-gray-100 dark:hover:bg-gray-800"
                                             title="Copy VIN"
+                                            aria-label="Copy VIN"
                                         >
-                                            <Copy className="h-3.5 w-3.5" />
+                                            {vinCopied ? <Check className="h-4 w-4 text-green-600 dark:text-green-400" /> : <Copy className="h-4 w-4" />}
                                         </button>
                                     </div>
                                 )}

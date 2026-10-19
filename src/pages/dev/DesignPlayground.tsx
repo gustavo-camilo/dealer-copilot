@@ -8,6 +8,7 @@ import { Car, Moon, RotateCcw, Scan, Sun } from 'lucide-react';
 import Header from '../../components/Header';
 import { DashboardView, type DashboardScan } from '../../components/dashboard/DashboardView';
 import { VerdictHero } from '../../components/scan/VerdictHero';
+import VINScanResult from '../../components/VINScanResult';
 import { DealGauge } from '../../components/scan/DealGauge';
 import { VinPlate } from '../../components/scan/VinPlate';
 import { RollingNumber } from '../../components/ui/RollingNumber';
@@ -32,10 +33,10 @@ const sampleUser = { full_name: 'Sample Dealer', email: 'sample@example.test', r
 const sampleTenant = { name: 'Sample Motors' };
 
 const scans: DashboardScan[] = [
-  { id: '1', decoded_data: { year: 2019, make: 'TOYOTA', model: 'CAMRY' }, recommendation: 'buy', max_bid_suggestion: 14200, estimated_profit: 2350, confidence_score: 86 },
-  { id: '2', decoded_data: { year: 2017, make: 'HONDA', model: 'CR-V' }, recommendation: 'maybe', max_bid_suggestion: 15800, estimated_profit: 640, confidence_score: 61 },
-  { id: '3', decoded_data: { year: 2015, make: 'BMW', model: '328I' }, recommendation: 'pass', max_bid_suggestion: 9100, estimated_profit: -420, confidence_score: 74 },
-  { id: '4', decoded_data: { year: 2020, make: 'FORD', model: 'F-150' }, recommendation: 'buy', max_bid_suggestion: 27400, estimated_profit: 3900, confidence_score: 91 },
+  { id: '1', vin: '4T1B11HK5KU208364', decoded_data: { year: 2019, make: 'TOYOTA', model: 'CAMRY' }, recommendation: 'buy', max_bid_suggestion: 14200, estimated_profit: 2350, confidence_score: 86 },
+  { id: '2', vin: '2HKRW2H54HH604215', decoded_data: { year: 2017, make: 'HONDA', model: 'CR-V' }, recommendation: 'maybe', max_bid_suggestion: 15800, estimated_profit: 640, confidence_score: 61 },
+  { id: '3', vin: 'WBA8E9G51FNT12345', decoded_data: { year: 2015, make: 'BMW', model: '328I' }, recommendation: 'pass', max_bid_suggestion: 9100, estimated_profit: -420, confidence_score: 74 },
+  { id: '4', vin: '1FTEW1EP0LFA71234', decoded_data: { year: 2020, make: 'FORD', model: 'F-150' }, recommendation: 'buy', max_bid_suggestion: 27400, estimated_profit: 3900, confidence_score: 91 },
 ];
 
 const MARKET = 17900;
@@ -153,6 +154,29 @@ export default function DesignPlayground() {
                   Market {formatUSD(MARKET)} · Buy fee {formatUSD(labFee)} · Transport {formatUSD(TRANSPORT)}
                 </p>
               </Card>
+            </div>
+          </section>
+
+          <section>
+            <SectionHeader title="Scan result (real component)" />
+            <p className="-mt-1 mb-4 text-sm text-ink-muted">
+              The production VINScanResult with sample data and no scan id, so nothing is saved or loaded.
+            </p>
+            <div className="max-w-4xl">
+              <VINScanResult
+                isModal
+                scanData={{
+                  vin: '4T1B11HK5KU208364',
+                  decoded_data: { year: 2019, make: 'TOYOTA', model: 'CAMRY', mileage: 41200 },
+                  market_data: { averagePrice: 17900, minPrice: 15400, maxPrice: 21900, listingsCount: 38, radius: 100 },
+                  recommendation: 'buy',
+                  confidence_score: 86,
+                  match_reasoning: [],
+                  estimated_profit: 2350,
+                  max_bid_suggestion: 13200,
+                  estimated_days_to_sale: 24,
+                }}
+              />
             </div>
           </section>
 
